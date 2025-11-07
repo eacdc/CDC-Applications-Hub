@@ -137,19 +137,25 @@
 
     function startIdleTimer(initialMinutes) {
         clearIdleTimer();
+        const updateDisplay = (mins) => {
+            selectors.idleDuration.textContent = `Machine idle since ${mins}`;
+        };
+
         if (initialMinutes === null || initialMinutes === undefined) {
-            selectors.idleDuration.textContent = '—';
+            updateDisplay('—');
             return;
         }
+
         idleTimerMinutes = Number(initialMinutes);
         if (!Number.isFinite(idleTimerMinutes)) {
-            selectors.idleDuration.textContent = '—';
+            updateDisplay('—');
             return;
         }
-        selectors.idleDuration.textContent = minutesToHrsMinutes(idleTimerMinutes);
+
+        updateDisplay(minutesToHrsMinutes(idleTimerMinutes));
         idleTimerInterval = setInterval(() => {
             idleTimerMinutes += 1;
-            selectors.idleDuration.textContent = minutesToHrsMinutes(idleTimerMinutes);
+            updateDisplay(minutesToHrsMinutes(idleTimerMinutes));
         }, 60_000);
     }
 
@@ -171,14 +177,14 @@
         selectors.runningLayout.hidden = true;
         clearIdleTimer();
 
-        selectors.machineStatusBadge.textContent = 'Idle';
+        selectors.machineStatusBadge.textContent = 'IDLE';
         setBadgeColor(data.StatusColor, 'red');
 
-        selectors.idleStatusText.textContent = 'IDLE (Red)';
+        selectors.idleStatusText.textContent = 'Status: IDLE (Red)';
         selectors.idleStatusText.style.color = '#b91c1c';
         selectors.lastJobCompleted.textContent = data.LastCompletedAt
-            ? `${formatDateTime(data.LastCompletedAt)} (${data.LastCompletedJobNumber ?? 'Unknown Job'})`
-            : 'No data';
+            ? `Last job completed on ${formatDateTime(data.LastCompletedAt)}${data.LastCompletedJobNumber ? ` (Job ${data.LastCompletedJobNumber})` : ''}`
+            : 'Last job completed on —';
 
         startIdleTimer(data.IdleSinceMinutes);
 
@@ -192,18 +198,18 @@
         clearIdleTimer();
 
         const isBehind = Boolean(data.IsBehindSchedule);
-        selectors.machineStatusBadge.textContent = 'Running';
+        selectors.machineStatusBadge.textContent = 'RUNNING';
         setBadgeColor(data.StatusColor, isBehind ? 'red' : 'green');
 
         const jobNumber = data.CurrentJobNumber ?? 'Unknown Job';
         const jobName = data.CurrentJobName ?? 'Unnamed';
-        selectors.currentJob.textContent = `${jobNumber} – ${jobName}`;
-        selectors.startTime.textContent = formatDateTime(data.CurrentJobStartedAt);
-        selectors.runningDuration.textContent = minutesToHrsMinutes(data.RunningSinceMinutes);
-        selectors.targetFinishIn.textContent = minutesToHrsMinutes(data.TargetMinutesToFinish);
-        selectors.eta.textContent = formatDateTime(data.TargetFinishAt);
+        selectors.currentJob.textContent = `Job: ${jobNumber} – ${jobName}`;
+        selectors.startTime.textContent = `Started at: ${formatDateTime(data.CurrentJobStartedAt)}`;
+        selectors.runningDuration.textContent = `Running for: ${minutesToHrsMinutes(data.RunningSinceMinutes)}`;
+        selectors.targetFinishIn.textContent = `Target finish in: ${minutesToHrsMinutes(data.TargetMinutesToFinish)}`;
+        selectors.eta.textContent = `ETA: ${formatDateTime(data.TargetFinishAt)}`;
 
-        selectors.runningStatusText.textContent = isBehind ? 'Running behind schedule' : 'On track';
+        selectors.runningStatusText.textContent = isBehind ? 'Status: Running behind schedule' : 'Status: On track';
         selectors.runningStatusText.style.color = isBehind ? '#b91c1c' : '#047857';
 
         const produced = Number(data.ProducedQty) || 0;
@@ -222,8 +228,8 @@
     }
 
     function renderDashboard(data) {
-        selectors.machineName.textContent = data.MachineName ?? 'Unknown Machine';
-        selectors.machineIdLabel.textContent = `Machine ID: ${data.MachineID}`;
+        selectors.machineName.textContent = `Machine: ${data.MachineName ?? 'Unknown Machine'}`;
+        selectors.machineIdLabel.textContent = `Machine ID: ${data.MachineID ?? '—'}`;
         state.machineId = data.MachineID ?? state.machineId;
         if (selectors.machineIdInput) {
             selectors.machineIdInput.value = state.machineId ?? '';
@@ -265,7 +271,7 @@
         const parsedMachineId = Number(inputMachineId);
 
         if (!Number.isInteger(parsedMachineId) || parsedMachineId <= 0) {
-            setStatusMessage('Enter a valid machine ID to load data.', 'error');
+            setStatusMessage('Select a machine ID to view the dashboard.', 'info');
             showDashboard(false);
             return;
         }
