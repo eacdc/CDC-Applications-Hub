@@ -155,6 +155,22 @@
         }, 60_000);
     }
 
+    function flagIsTrue(value) {
+        if (typeof value === 'boolean') {
+            return value;
+        }
+        const num = Number(value);
+        if (Number.isFinite(num)) {
+            return num === 1;
+        }
+        if (typeof value === 'string') {
+            const normalized = value.trim().toLowerCase();
+            if (normalized === 'true') return true;
+            if (normalized === 'false') return false;
+        }
+        return false;
+    }
+
     function renderIdleState(data) {
         selectors.idleLayout.hidden = false;
         selectors.idleLayout.style.display = '';
@@ -188,7 +204,7 @@
         selectors.runningLayout.style.display = '';
         clearIdleTimer();
 
-        const isBehind = Boolean(data.IsBehindSchedule);
+        const isBehind = flagIsTrue(data.IsBehindSchedule);
         if (selectors.machineHeader) {
             selectors.machineHeader.hidden = true;
         }
@@ -222,7 +238,9 @@
             selectors.machineIdInput.value = state.machineId ?? '';
         }
 
-        if (data.IsRunning) {
+        const isRunning = flagIsTrue(data.IsRunning);
+
+        if (isRunning) {
             renderRunningState(data);
         } else {
             renderIdleState(data);
