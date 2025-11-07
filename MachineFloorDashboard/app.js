@@ -48,10 +48,29 @@
     function deriveStateFromUrl() {
         const params = new URLSearchParams(window.location.search);
 
+        const pathSegments = window.location.pathname.split('/').filter(Boolean);
+        let pathMachineId = null;
+
+        if (pathSegments.length > 0) {
+            const last = pathSegments[pathSegments.length - 1];
+            if (/^\d+$/.test(last)) {
+                pathMachineId = Number(last);
+            } else if (last.includes('.') && pathSegments.length >= 2) {
+                const maybeId = pathSegments[pathSegments.length - 2];
+                if (/^\d+$/.test(maybeId)) {
+                    pathMachineId = Number(maybeId);
+                }
+            }
+        }
+
+        if (Number.isInteger(pathMachineId) && pathMachineId > 0) {
+            state.machineId = pathMachineId;
+        }
+
         if (params.has('machineId')) {
-            const fromUrl = Number(params.get('machineId'));
-            if (Number.isInteger(fromUrl) && fromUrl > 0) {
-                state.machineId = fromUrl;
+            const fromQuery = Number(params.get('machineId'));
+            if (Number.isInteger(fromQuery) && fromQuery > 0) {
+                state.machineId = fromQuery;
             }
         }
 
@@ -245,7 +264,7 @@
 
     async function loadData() {
         if (!Number.isInteger(state.machineId) || state.machineId <= 0) {
-            setStatusMessage('No machine ID provided. Pass ?machineId=### in the URL.', 'error');
+            setStatusMessage('No machine ID provided. Append it to the URL, e.g., /index.html/58.', 'error');
             showDashboard(false);
             updateMachineChip();
             return;

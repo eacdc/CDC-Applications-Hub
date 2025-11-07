@@ -15,7 +15,7 @@ This lightweight dashboard consumes the `GetMachineFloorScreenData` stored proce
    npm run start
    ```
 2. Open `MachineFloorDashboard/index.html` in a browser (or serve the directory with any static file server).
-3. Provide the machine ID via the query string when opening the page, e.g. `index.html?machineId=58&database=KOL`. The page fetches `/api/machine-floor/{machineId}` and renders either an idle or running layout without additional user input.
+3. Provide the machine ID by appending it to the URL, e.g. `index.html/58` (optionally `index.html/58?database=KOL`). The page fetches `/api/machine-floor/{machineId}` and renders either an idle or running layout without additional user input.
 4. Leave **Auto refresh** enabled to keep the view in sync (defaults to 60 seconds). While idle, the timer increments every minute using the last known `IdleSinceMinutes` value.
 
 ## Configuration
