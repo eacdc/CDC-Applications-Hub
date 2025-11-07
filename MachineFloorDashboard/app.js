@@ -5,9 +5,8 @@
         dashboard: document.getElementById('dashboard'),
         noMachineSelected: document.getElementById('noMachineSelected'),
         statusMessage: document.getElementById('statusMessage'),
+        machineHeader: document.getElementById('machineHeader'),
         machineName: document.getElementById('machineName'),
-        machineIdLabel: document.getElementById('machineIdLabel'),
-        machineStatusBadge: document.getElementById('machineStatusBadge'),
         idleLayout: document.getElementById('idleLayout'),
         runningLayout: document.getElementById('runningLayout'),
         idleStatusText: document.getElementById('idleStatusText'),
@@ -21,7 +20,6 @@
         targetFinishIn: document.getElementById('targetFinishIn'),
         eta: document.getElementById('eta'),
         runningStatusText: document.getElementById('runningStatusText'),
-        progressFill: document.getElementById('progressFill'),
         progressText: document.getElementById('progressText'),
         remainingText: document.getElementById('remainingText'),
         refreshButton: document.getElementById('refreshButton'),
@@ -38,6 +36,7 @@
 
     const state = {
         machineId: null,
+        machineIdFromUrl: false,
         database: allowedDatabases.includes((config.defaultDatabase || '').toUpperCase())
             ? (config.defaultDatabase || '').toUpperCase()
             : 'KOL',
@@ -63,17 +62,15 @@
 
         if (Number.isInteger(pathMachineId) && pathMachineId > 0) {
             state.machineId = pathMachineId;
+            state.machineIdFromUrl = true;
         }
 
         if (params.has('machineId')) {
             const fromQuery = Number(params.get('machineId'));
             if (Number.isInteger(fromQuery) && fromQuery > 0) {
                 state.machineId = fromQuery;
+                state.machineIdFromUrl = true;
             }
-        }
-
-        if (state.machineId === null && Number.isInteger(config.defaultMachineId) && config.defaultMachineId > 0) {
-            state.machineId = Number(config.defaultMachineId);
         }
 
         if (params.has('database')) {
@@ -157,26 +154,14 @@
         }, 60_000);
     }
 
-    function setBadgeColor(statusColor, fallbackColor) {
-        const color = (statusColor || '').toString().toLowerCase();
-        selectors.machineStatusBadge.classList.remove('green', 'red');
-
-        if (color === 'green') {
-            selectors.machineStatusBadge.classList.add('green');
-        } else if (color === 'red') {
-            selectors.machineStatusBadge.classList.add('red');
-        } else if (fallbackColor) {
-            selectors.machineStatusBadge.classList.add(fallbackColor);
-        }
-    }
-
     function renderIdleState(data) {
         selectors.idleLayout.hidden = false;
         selectors.runningLayout.hidden = true;
         clearIdleTimer();
 
-        selectors.machineStatusBadge.textContent = 'Idle';
-        setBadgeColor(data.StatusColor, 'red');
+        if (selectors.machineHeader) {
+            selectors.machineHeader.hidden = false;
+        }
 
         selectors.idleStatusText.textContent = 'IDLE';
         selectors.idleStatusText.style.color = '#b91c1c';
@@ -196,8 +181,9 @@
         clearIdleTimer();
 
         const isBehind = Boolean(data.IsBehindSchedule);
-        selectors.machineStatusBadge.textContent = 'Running';
-        setBadgeColor(data.StatusColor, isBehind ? 'red' : 'green');
+        if (selectors.machineHeader) {
+            selectors.machineHeader.hidden = true;
+        }
 
         const jobNumber = data.CurrentJobNumber ?? 'Unknown';
         const jobName = data.CurrentJobName ?? 'Unnamed';
@@ -213,16 +199,14 @@
         const produced = Number(data.ProducedQty) || 0;
         const plan = Number(data.PlanQty) || 0;
         const remaining = Number(data.RemainingQty) || 0;
-        const progress = plan > 0 ? Math.min(100, Math.max(0, (produced / plan) * 100)) : 0;
-        selectors.progressFill.style.width = `${progress.toFixed(1)}%`;
         selectors.progressText.textContent = `Produced ${formatNumber(produced)} / ${formatNumber(plan)}`;
         selectors.remainingText.textContent = `Remaining ${formatNumber(remaining)}`;
     }
 
     function renderDashboard(data) {
         selectors.machineName.textContent = data.MachineName ?? 'Unknown Machine';
-        selectors.machineIdLabel.textContent = `Machine ID: ${data.MachineID}`;
         state.machineId = data.MachineID ?? state.machineId;
+        state.machineIdFromUrl = false;
         if (selectors.machineIdInput) {
             selectors.machineIdInput.value = state.machineId ?? '';
         }
@@ -261,6 +245,7 @@
         const parsedMachineId = Number(inputMachineId);
 
         if (!Number.isInteger(parsedMachineId) || parsedMachineId <= 0) {
+            stopAutoRefresh();
             setStatusMessage('');
             showNoMachineMessage(true);
             return;
@@ -277,6 +262,9 @@
             renderDashboard(data);
             setStatusMessage('');
             showDashboard(true);
+            if (selectors.autoRefreshToggle.checked) {
+                startAutoRefresh();
+            }
         } catch (error) {
             console.error('Failed to load machine data', error);
             setStatusMessage(error.message || 'Failed to load machine data.', 'error');
@@ -313,6 +301,9 @@
     function startAutoRefresh() {
         stopAutoRefresh();
         const seconds = Number(config.refreshIntervalSeconds) || 300;
+        if (!Number.isInteger(state.machineId) || state.machineId <= 0) {
+            return;
+        }
         autoRefreshInterval = setInterval(loadData, seconds * 1000);
     }
 
@@ -331,17 +322,20 @@
         }
 
         if (selectors.machineIdInput) {
-            selectors.machineIdInput.value = state.machineId ?? '';
+            if (state.machineIdFromUrl) {
+                selectors.machineIdInput.value = state.machineId;
+            } else if (Number.isInteger(config.defaultMachineId) && config.defaultMachineId > 0) {
+                selectors.machineIdInput.value = '';
+                selectors.machineIdInput.placeholder = `e.g. ${config.defaultMachineId}`;
+            } else {
+                selectors.machineIdInput.value = '';
+            }
         }
 
         setupEventListeners();
-        
-        // Only load data if machine ID is available, otherwise show no machine message
-        if (state.machineId && Number.isInteger(state.machineId) && state.machineId > 0) {
+
+        if (state.machineIdFromUrl && Number.isInteger(state.machineId) && state.machineId > 0) {
             loadData();
-            if (selectors.autoRefreshToggle.checked) {
-                startAutoRefresh();
-            }
         } else {
             showNoMachineMessage(true);
         }

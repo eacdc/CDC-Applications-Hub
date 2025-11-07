@@ -39,18 +39,14 @@
 
         <section id="noMachineSelected" class="no-machine-message" hidden>
             <div class="card">
-                <p class="no-machine-text">Select provide machine id</p>
+                <p class="no-machine-text">Provide Machine ID</p>
             </div>
         </section>
 
         <section id="dashboard" class="dashboard" hidden>
             <article class="card" id="machineCard">
-                <div class="card-header">
-                    <div>
-                        <h2 id="machineName">Machine</h2>
-                        <p id="machineIdLabel" class="muted"></p>
-                    </div>
-                    <span id="machineStatusBadge" class="badge">Status</span>
+                <div class="card-header" id="machineHeader">
+                    <h2 id="machineName">Machine</h2>
                 </div>
                 <div id="idleLayout" class="card-content layout" hidden>
                     <div class="info-grid">
@@ -105,9 +101,6 @@
                     </div>
                     <div class="progress">
                         <h3>Progress</h3>
-                        <div class="progress-bar">
-                            <div id="progressFill" class="progress-fill" style="width: 0%"></div>
-                        </div>
                         <p class="progress-text" id="progressText"></p>
                         <p class="muted" id="remainingText"></p>
                     </div>
