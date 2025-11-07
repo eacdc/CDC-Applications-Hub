@@ -37,6 +37,12 @@
 
         <section id="statusMessage" class="status-message" hidden></section>
 
+        <section id="noMachineSelected" class="no-machine-message" hidden>
+            <div class="card">
+                <p class="no-machine-text">Select provide machine id</p>
+            </div>
+        </section>
+
         <section id="dashboard" class="dashboard" hidden>
             <article class="card" id="machineCard">
                 <div class="card-header">
@@ -53,16 +59,16 @@
                             <p id="idleStatusText" class="status-text"></p>
                         </div>
                         <div>
-                            <h3>Last Job Completed</h3>
+                            <h3>Last job completed on</h3>
                             <p id="lastJobCompleted"></p>
                         </div>
                         <div>
-                            <h3>Idle Since</h3>
+                            <h3>Machine idle since</h3>
                             <p id="idleDuration">&mdash;</p>
                         </div>
                     </div>
                     <div class="backlog">
-                        <h3>Total Backlog</h3>
+                        <h3>Total backlog:</h3>
                         <ul>
                             <li><strong>On this machine:</strong> <span id="backlogMachine">0</span></li>
                             <li><strong>For this process:</strong> <span id="backlogProcess">0</span></li>
@@ -73,19 +79,19 @@
                 <div id="runningLayout" class="card-content layout" hidden>
                     <div class="info-grid">
                         <div>
-                            <h3>Current Job</h3>
+                            <h3>Job</h3>
                             <p id="currentJob"></p>
                         </div>
                         <div>
-                            <h3>Started At</h3>
+                            <h3>Started at</h3>
                             <p id="startTime"></p>
                         </div>
                         <div>
-                            <h3>Running For</h3>
+                            <h3>Running for</h3>
                             <p id="runningDuration"></p>
                         </div>
                         <div>
-                            <h3>Target Finish In</h3>
+                            <h3>Target finish in</h3>
                             <p id="targetFinishIn"></p>
                         </div>
                         <div>
@@ -104,26 +110,6 @@
                         </div>
                         <p class="progress-text" id="progressText"></p>
                         <p class="muted" id="remainingText"></p>
-                    </div>
-                </div>
-            </article>
-
-            <article class="card" id="metaCard">
-                <div class="card-header">
-                    <h2>Machine Metrics</h2>
-                </div>
-                <div class="card-content metrics">
-                    <div>
-                        <h3>Speed (UPM)</h3>
-                        <p id="machineSpeed">&mdash;</p>
-                    </div>
-                    <div>
-                        <h3>Changeover</h3>
-                        <p id="changeOver">&mdash;</p>
-                    </div>
-                    <div>
-                        <h3>Plan Quantity</h3>
-                        <p id="planQty">&mdash;</p>
                     </div>
                 </div>
             </article>

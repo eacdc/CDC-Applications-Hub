@@ -3,6 +3,7 @@
 
     const selectors = {
         dashboard: document.getElementById('dashboard'),
+        noMachineSelected: document.getElementById('noMachineSelected'),
         statusMessage: document.getElementById('statusMessage'),
         machineName: document.getElementById('machineName'),
         machineIdLabel: document.getElementById('machineIdLabel'),
@@ -23,9 +24,6 @@
         progressFill: document.getElementById('progressFill'),
         progressText: document.getElementById('progressText'),
         remainingText: document.getElementById('remainingText'),
-        machineSpeed: document.getElementById('machineSpeed'),
-        changeOver: document.getElementById('changeOver'),
-        planQty: document.getElementById('planQty'),
         refreshButton: document.getElementById('refreshButton'),
         databaseSelect: document.getElementById('databaseSelect'),
         autoRefreshToggle: document.getElementById('autoRefreshToggle'),
@@ -94,6 +92,12 @@
 
     function showDashboard(show) {
         selectors.dashboard.hidden = !show;
+        selectors.noMachineSelected.hidden = show;
+    }
+
+    function showNoMachineMessage(show) {
+        selectors.noMachineSelected.hidden = !show;
+        selectors.dashboard.hidden = show;
     }
 
     function minutesToHrsMinutes(value) {
@@ -137,25 +141,19 @@
 
     function startIdleTimer(initialMinutes) {
         clearIdleTimer();
-        const updateDisplay = (mins) => {
-            selectors.idleDuration.textContent = `Machine idle since ${mins}`;
-        };
-
         if (initialMinutes === null || initialMinutes === undefined) {
-            updateDisplay('—');
+            selectors.idleDuration.textContent = '—';
             return;
         }
-
         idleTimerMinutes = Number(initialMinutes);
         if (!Number.isFinite(idleTimerMinutes)) {
-            updateDisplay('—');
+            selectors.idleDuration.textContent = '—';
             return;
         }
-
-        updateDisplay(minutesToHrsMinutes(idleTimerMinutes));
+        selectors.idleDuration.textContent = minutesToHrsMinutes(idleTimerMinutes);
         idleTimerInterval = setInterval(() => {
             idleTimerMinutes += 1;
-            updateDisplay(minutesToHrsMinutes(idleTimerMinutes));
+            selectors.idleDuration.textContent = minutesToHrsMinutes(idleTimerMinutes);
         }, 60_000);
     }
 
@@ -177,14 +175,14 @@
         selectors.runningLayout.hidden = true;
         clearIdleTimer();
 
-        selectors.machineStatusBadge.textContent = 'IDLE';
+        selectors.machineStatusBadge.textContent = 'Idle';
         setBadgeColor(data.StatusColor, 'red');
 
-        selectors.idleStatusText.textContent = 'Status: IDLE (Red)';
+        selectors.idleStatusText.textContent = 'IDLE';
         selectors.idleStatusText.style.color = '#b91c1c';
         selectors.lastJobCompleted.textContent = data.LastCompletedAt
-            ? `Last job completed on ${formatDateTime(data.LastCompletedAt)}${data.LastCompletedJobNumber ? ` (Job ${data.LastCompletedJobNumber})` : ''}`
-            : 'Last job completed on —';
+            ? formatDateTime(data.LastCompletedAt)
+            : '—';
 
         startIdleTimer(data.IdleSinceMinutes);
 
@@ -198,18 +196,18 @@
         clearIdleTimer();
 
         const isBehind = Boolean(data.IsBehindSchedule);
-        selectors.machineStatusBadge.textContent = 'RUNNING';
+        selectors.machineStatusBadge.textContent = 'Running';
         setBadgeColor(data.StatusColor, isBehind ? 'red' : 'green');
 
-        const jobNumber = data.CurrentJobNumber ?? 'Unknown Job';
+        const jobNumber = data.CurrentJobNumber ?? 'Unknown';
         const jobName = data.CurrentJobName ?? 'Unnamed';
-        selectors.currentJob.textContent = `Job: ${jobNumber} – ${jobName}`;
-        selectors.startTime.textContent = `Started at: ${formatDateTime(data.CurrentJobStartedAt)}`;
-        selectors.runningDuration.textContent = `Running for: ${minutesToHrsMinutes(data.RunningSinceMinutes)}`;
-        selectors.targetFinishIn.textContent = `Target finish in: ${minutesToHrsMinutes(data.TargetMinutesToFinish)}`;
-        selectors.eta.textContent = `ETA: ${formatDateTime(data.TargetFinishAt)}`;
+        selectors.currentJob.textContent = `${jobNumber} – ${jobName}`;
+        selectors.startTime.textContent = formatDateTime(data.CurrentJobStartedAt);
+        selectors.runningDuration.textContent = minutesToHrsMinutes(data.RunningSinceMinutes);
+        selectors.targetFinishIn.textContent = minutesToHrsMinutes(data.TargetMinutesToFinish);
+        selectors.eta.textContent = formatDateTime(data.TargetFinishAt);
 
-        selectors.runningStatusText.textContent = isBehind ? 'Status: Running behind schedule' : 'Status: On track';
+        selectors.runningStatusText.textContent = isBehind ? 'Running behind schedule' : 'On track';
         selectors.runningStatusText.style.color = isBehind ? '#b91c1c' : '#047857';
 
         const produced = Number(data.ProducedQty) || 0;
@@ -221,15 +219,9 @@
         selectors.remainingText.textContent = `Remaining ${formatNumber(remaining)}`;
     }
 
-    function renderMeta(data) {
-        selectors.machineSpeed.textContent = data.MachineSpeedUPM ? `${formatNumber(data.MachineSpeedUPM)} UPM` : '—';
-        selectors.changeOver.textContent = data.ChangeOverMinutes ? `${minutesToHrsMinutes(data.ChangeOverMinutes)}` : '—';
-        selectors.planQty.textContent = formatNumber(data.PlanQty);
-    }
-
     function renderDashboard(data) {
-        selectors.machineName.textContent = `Machine: ${data.MachineName ?? 'Unknown Machine'}`;
-        selectors.machineIdLabel.textContent = `Machine ID: ${data.MachineID ?? '—'}`;
+        selectors.machineName.textContent = data.MachineName ?? 'Unknown Machine';
+        selectors.machineIdLabel.textContent = `Machine ID: ${data.MachineID}`;
         state.machineId = data.MachineID ?? state.machineId;
         if (selectors.machineIdInput) {
             selectors.machineIdInput.value = state.machineId ?? '';
@@ -240,8 +232,6 @@
         } else {
             renderIdleState(data);
         }
-
-        renderMeta(data);
     }
 
     async function fetchMachineData(machineId, database) {
@@ -271,14 +261,15 @@
         const parsedMachineId = Number(inputMachineId);
 
         if (!Number.isInteger(parsedMachineId) || parsedMachineId <= 0) {
-            setStatusMessage('Select a machine ID to view the dashboard.', 'info');
-            showDashboard(false);
+            setStatusMessage('');
+            showNoMachineMessage(true);
             return;
         }
 
         state.machineId = parsedMachineId;
 
         setStatusMessage('Loading machine data…');
+        showNoMachineMessage(false);
         showDashboard(false);
 
         try {
@@ -290,6 +281,7 @@
             console.error('Failed to load machine data', error);
             setStatusMessage(error.message || 'Failed to load machine data.', 'error');
             showDashboard(false);
+            showNoMachineMessage(false);
         }
     }
 
@@ -343,10 +335,15 @@
         }
 
         setupEventListeners();
-        loadData();
-
-        if (selectors.autoRefreshToggle.checked) {
-            startAutoRefresh();
+        
+        // Only load data if machine ID is available, otherwise show no machine message
+        if (state.machineId && Number.isInteger(state.machineId) && state.machineId > 0) {
+            loadData();
+            if (selectors.autoRefreshToggle.checked) {
+                startAutoRefresh();
+            }
+        } else {
+            showNoMachineMessage(true);
         }
     }
 
