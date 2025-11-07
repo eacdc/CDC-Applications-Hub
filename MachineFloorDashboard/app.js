@@ -279,6 +279,8 @@
             throw new Error(payload.error || 'API returned an error');
         }
 
+        console.log('[MachineFloorDashboard] Full procedure payload:', payload.data);
+
         return payload.data;
     }
 
