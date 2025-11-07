@@ -16,10 +16,10 @@
                 <p class="subtitle">Real-time view of production floor performance</p>
             </div>
             <div class="header-controls">
-                <div class="machine-chip">
-                    <span class="label">Machine</span>
-                    <span id="machineIdDisplay" class="value">—</span>
-                </div>
+                <label class="field machine-field">
+                    <span>Machine</span>
+                    <input type="number" id="machineIdInput" min="1" step="1" placeholder="Enter machine ID" />
+                </label>
                 <label class="field">
                     <span>Database</span>
                     <select id="databaseSelect">

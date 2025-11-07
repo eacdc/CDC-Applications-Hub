@@ -29,7 +29,7 @@
         refreshButton: document.getElementById('refreshButton'),
         databaseSelect: document.getElementById('databaseSelect'),
         autoRefreshToggle: document.getElementById('autoRefreshToggle'),
-        machineIdDisplay: document.getElementById('machineIdDisplay'),
+        machineIdInput: document.getElementById('machineIdInput'),
     };
 
     let idleTimerInterval = null;
@@ -84,10 +84,6 @@
                 state.database = candidate;
             }
         }
-    }
-
-    function updateMachineChip() {
-        selectors.machineIdDisplay.textContent = state.machineId ?? '—';
     }
 
     function setStatusMessage(message, variant = 'info') {
@@ -229,7 +225,9 @@
         selectors.machineName.textContent = data.MachineName ?? 'Unknown Machine';
         selectors.machineIdLabel.textContent = `Machine ID: ${data.MachineID}`;
         state.machineId = data.MachineID ?? state.machineId;
-        updateMachineChip();
+        if (selectors.machineIdInput) {
+            selectors.machineIdInput.value = state.machineId ?? '';
+        }
 
         if (data.IsRunning) {
             renderRunningState(data);
@@ -263,16 +261,19 @@
     }
 
     async function loadData() {
-        if (!Number.isInteger(state.machineId) || state.machineId <= 0) {
-            setStatusMessage('No machine ID provided. Append it to the URL, e.g., /index.html/58.', 'error');
+        const inputMachineId = selectors.machineIdInput ? selectors.machineIdInput.value.trim() : '';
+        const parsedMachineId = Number(inputMachineId);
+
+        if (!Number.isInteger(parsedMachineId) || parsedMachineId <= 0) {
+            setStatusMessage('Enter a valid machine ID to load data.', 'error');
             showDashboard(false);
-            updateMachineChip();
             return;
         }
 
+        state.machineId = parsedMachineId;
+
         setStatusMessage('Loading machine data…');
         showDashboard(false);
-        updateMachineChip();
 
         try {
             const data = await fetchMachineData(state.machineId, state.database);
@@ -288,6 +289,14 @@
 
     function setupEventListeners() {
         selectors.refreshButton.addEventListener('click', () => loadData());
+
+        if (selectors.machineIdInput) {
+            selectors.machineIdInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    loadData();
+                }
+            });
+        }
 
         selectors.databaseSelect.addEventListener('change', () => {
             state.database = selectors.databaseSelect.value;
@@ -305,7 +314,7 @@
 
     function startAutoRefresh() {
         stopAutoRefresh();
-        const seconds = Number(config.refreshIntervalSeconds) || 60;
+        const seconds = Number(config.refreshIntervalSeconds) || 300;
         autoRefreshInterval = setInterval(loadData, seconds * 1000);
     }
 
@@ -323,7 +332,9 @@
             selectors.databaseSelect.value = state.database;
         }
 
-        updateMachineChip();
+        if (selectors.machineIdInput) {
+            selectors.machineIdInput.value = state.machineId ?? '';
+        }
 
         setupEventListeners();
         loadData();
