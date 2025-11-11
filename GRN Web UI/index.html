@@ -5,6 +5,128 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GRN Web UI</title>
   <link rel="stylesheet" href="styles.css" />
+  <style>
+    .status-results {
+      margin-top: 24px;
+      background: var(--card, #111827);
+      border: 1px solid var(--border, rgba(148, 163, 184, 0.16));
+      border-radius: 12px;
+      padding: 18px 20px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.35);
+    }
+
+    .status-results[hidden] {
+      display: none;
+    }
+
+    .status-results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .status-results-summary {
+      margin: 4px 0 0;
+      color: var(--muted, #94a3b8);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .status-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: transparent;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .status-table thead {
+      background: rgba(148, 163, 184, 0.08);
+    }
+
+    .status-table th {
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted, #a5b4fc);
+      padding: 12px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+    }
+
+    .status-table td {
+      padding: 12px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+      font-size: 14px;
+      color: var(--text, #e2e8f0);
+    }
+
+    .status-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .status-table tbody tr:hover {
+      background: rgba(37, 99, 235, 0.08);
+      transition: background 0.2s ease;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 4px 11px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: rgba(96, 165, 250, 0.18);
+      color: #bfdbfe;
+    }
+
+    .status-badge-packingslip {
+      background: rgba(16, 185, 129, 0.18);
+      color: #6ee7b7;
+    }
+
+    .status-badge-gpn {
+      background: rgba(129, 140, 248, 0.18);
+      color: #c7d2fe;
+    }
+
+    .status-badge-delivery {
+      background: rgba(251, 191, 36, 0.18);
+      color: #fde68a;
+    }
+
+    .status-badge-default {
+      background: rgba(148, 163, 184, 0.18);
+      color: #e2e8f0;
+    }
+
+    .empty-message {
+      text-align: center;
+      color: var(--muted, #94a3b8);
+      padding: 20px 0;
+      font-size: 14px;
+    }
+
+    @media (max-width: 640px) {
+      .status-table th,
+      .status-table td {
+        padding: 10px 8px;
+        font-size: 13px;
+      }
+
+      .status-results {
+        padding: 16px;
+      }
+    }
+  </style>
 </head>
 <body>
   <div id="app">
@@ -56,6 +178,12 @@
             <div class="portal-card-content">
               <h3>GPN Portal</h3>
               <p class="portal-description">Goods Packing Note</p>
+            </div>
+          </div>
+          <div class="portal-card" id="portal-barcode-status">
+            <div class="portal-card-content">
+              <h3>Barcode Status</h3>
+              <p class="portal-description">Track barcode progress</p>
             </div>
           </div>
         </div>
@@ -130,6 +258,49 @@
         
         <div class="form-actions">
           <button id="btn-update-gpn" class="secondary">Update Entry</button>
+        </div>
+      </section>
+
+      <section id="barcode-status-section" class="card hidden">
+        <div class="page-header">
+          <button id="btn-back-to-landing-status" class="back-btn">← Back</button>
+          <h2>Barcode Status Lookup</h2>
+        </div>
+        <div class="info">
+          <p><strong>User:</strong> <span id="info-username-status"></span></p>
+          <p><strong>Database:</strong> <span id="info-database-status"></span></p>
+        </div>
+        <div class="form-row">
+          <label for="status-barcode">Barcode Number</label>
+          <input id="status-barcode" name="status-barcode" type="text" inputmode="numeric" />
+        </div>
+        <div class="form-actions">
+          <button id="btn-search-barcode-status">Search Barcode Status</button>
+        </div>
+        <p id="status-error" class="error" aria-live="polite"></p>
+        <div class="status-results" id="status-results" hidden>
+          <div class="status-results-header">
+            <div>
+              <h3 id="status-results-title">Status Timeline</h3>
+              <p id="status-results-summary" class="status-results-summary"></p>
+            </div>
+          </div>
+          <div class="table-container">
+            <table class="status-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Date &amp; Time</th>
+                <th>Job Booking No</th>
+              </tr>
+            </thead>
+            <tbody id="status-table-body">
+              <tr class="empty-row">
+                <td colspan="3" class="empty-message">Enter a barcode to view status history.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
         </div>
       </section>
 

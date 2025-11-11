@@ -25,6 +25,92 @@
       }
     }
   
+    // Barcode Status Lookup
+    async function runBarcodeStatusLookup() {
+      try {
+        if (!session || !session.selectedDatabase || !session.userId) {
+          if (statusError) statusError.textContent = 'Please login first.';
+          return;
+        }
+  
+        const barcodeVal = String(statusBarcodeInput?.value || '').trim();
+        if (!barcodeVal) {
+          if (statusError) statusError.textContent = 'Enter barcode number';
+          if (statusBarcodeInput) statusBarcodeInput.focus();
+          return;
+        }
+  
+        const barcodeNum = Number(barcodeVal);
+        if (!Number.isFinite(barcodeNum)) {
+          if (statusError) statusError.textContent = 'Barcode must be a valid number';
+          if (statusBarcodeInput) statusBarcodeInput.focus();
+          return;
+        }
+  
+        if (statusError) statusError.textContent = '';
+        if (statusResults) statusResults.hidden = false;
+        if (statusResultsTitle) statusResultsTitle.textContent = `Status Timeline for Barcode ${barcodeNum}`;
+        if (statusResultsSummary) statusResultsSummary.textContent = 'Checking barcode status...';
+        if (statusTableBody) {
+          statusTableBody.innerHTML = `
+            <tr class="empty-row">
+              <td colspan="3" class="empty-message">Fetching status history...</td>
+            </tr>
+          `;
+        }
+        if (searchBarcodeStatusBtn) {
+          searchBarcodeStatusBtn.disabled = true;
+          searchBarcodeStatusBtn.dataset.originalText = searchBarcodeStatusBtn.textContent;
+          searchBarcodeStatusBtn.textContent = 'Searching...';
+        }
+  
+        const base = getApiBaseUrl();
+        const url = new URL('grn/barcode-status', base);
+        const res = await fetch(url.toString(), {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            barcode: barcodeNum,
+            database: session.selectedDatabase
+          })
+        });
+  
+        if (!res.ok) {
+          const t = await res.text().catch(() => '');
+          throw new Error(t || 'Failed to fetch barcode status');
+        }
+  
+        lastStatusBarcode = barcodeNum;
+
+        const data = await res.json();
+        if (!data || data.status !== true) {
+          const msg = data?.error || 'Failed to fetch barcode status';
+          if (statusError) statusError.textContent = msg;
+          renderBarcodeStatusRows([], barcodeNum);
+          return;
+        }
+  
+        renderBarcodeStatusRows(data.records || [], barcodeNum);
+      } catch (e) {
+        if (statusError) statusError.textContent = String(e.message || e);
+        if (statusResults) statusResults.hidden = true;
+      } finally {
+        if (searchBarcodeStatusBtn) {
+          searchBarcodeStatusBtn.disabled = false;
+          if (searchBarcodeStatusBtn.dataset.originalText) {
+            searchBarcodeStatusBtn.textContent = searchBarcodeStatusBtn.dataset.originalText;
+            delete searchBarcodeStatusBtn.dataset.originalText;
+          } else {
+            searchBarcodeStatusBtn.textContent = 'Search Barcode Status';
+          }
+        }
+      }
+    }
+
     // Siren sound for error/fail notifications (works after any user interaction)
     function playSiren() {
       try {
@@ -73,6 +159,10 @@
     const deliveryNoteConfirmation = document.getElementById('delivery-note-confirmation');
     const gpnSection = document.getElementById('gpn-section');
     const gpnConfirmation = document.getElementById('gpn-confirmation');
+    const barcodeStatusSection = document.getElementById('barcode-status-section');
+    const statusResults = document.getElementById('status-results');
+    const statusResultsSummary = document.getElementById('status-results-summary');
+    const statusResultsTitle = document.getElementById('status-results-title');
     const loginForm = document.getElementById('login-form');
     const loginError = document.getElementById('login-error');
     const usernameInput = document.getElementById('username');
@@ -83,6 +173,8 @@
     const infoDatabaseGrm = document.getElementById('info-database-grm');
     const infoUsernameGpn = document.getElementById('info-username-gpn');
     const infoDatabaseGpn = document.getElementById('info-database-gpn');
+    const infoUsernameStatus = document.getElementById('info-username-status');
+    const infoDatabaseStatus = document.getElementById('info-database-status');
     const barcodeInput = document.getElementById('barcode');
     const gpnBarcodeInput = document.getElementById('gpn-barcode');
     const gpnConfBarcode = document.getElementById('gpn-conf-barcode');
@@ -93,8 +185,10 @@
     const backToLandingBtn = document.getElementById('btn-back-to-landing');
     const backToLandingGpnBtn = document.getElementById('btn-back-to-landing-gpn');
     const backToGpnFormBtn = document.getElementById('btn-back-to-gpn-form');
+    const backToLandingStatusBtn = document.getElementById('btn-back-to-landing-status');
     const portalGrm = document.getElementById('portal-grm');
     const portalGpn = document.getElementById('portal-gpn');
+    const portalBarcodeStatus = document.getElementById('portal-barcode-status');
     const gpnError = document.getElementById('gpn-error');
     const gpnTableBody = document.getElementById('gpn-table-body');
     const clientNameInput = document.getElementById('clientName');
@@ -114,10 +208,24 @@
     const confBarcode = document.getElementById('conf-barcode');
     const updateDeliveryNoteBtn = document.getElementById('btn-update-delivery-note');
     const deliveryTableBody = document.getElementById('delivery-table-body');
+    const statusBarcodeInput = document.getElementById('status-barcode');
+    const searchBarcodeStatusBtn = document.getElementById('btn-search-barcode-status');
+    const statusError = document.getElementById('status-error');
+    const statusTableBody = document.getElementById('status-table-body');
     const backToInitiateBtn = document.getElementById('btn-back-to-initiate');
     const backToFormBtn = document.getElementById('btn-back-to-form');
   
     let session = null; // { userId, ledgerId, machines, selectedDatabase, username }
+    let lastStatusBarcode = null;
+    const STATUS_CATEGORY_CLASS_MAP = {
+      'packing slip': 'status-badge-packingslip',
+      'packing-slip': 'status-badge-packingslip',
+      'packingslip': 'status-badge-packingslip',
+      'gpn': 'status-badge-gpn',
+      'goods packing note': 'status-badge-gpn',
+      'delivery note': 'status-badge-delivery',
+      'dn': 'status-badge-delivery'
+    };
     
     // Session storage keys
     const SESSION_KEY = 'grn_session';
@@ -169,6 +277,92 @@
   
     function showError(msg) {
       if (loginError) loginError.textContent = msg || '';
+    }
+    
+    function resetBarcodeStatusView() {
+      if (statusError) statusError.textContent = '';
+      if (statusBarcodeInput) statusBarcodeInput.value = '';
+      lastStatusBarcode = null;
+      if (statusResults) statusResults.hidden = true;
+      if (statusResultsSummary) statusResultsSummary.textContent = '';
+      if (statusResultsTitle) statusResultsTitle.textContent = 'Status Timeline';
+      if (statusTableBody) {
+        statusTableBody.innerHTML = `
+          <tr class="empty-row">
+            <td colspan="3" class="empty-message">Enter a barcode to view status history.</td>
+          </tr>
+        `;
+      }
+    }
+  
+    function formatTimestamp(value) {
+      if (!value) return '—';
+      try {
+        const date = new Date(value);
+        if (!Number.isNaN(date.getTime())) {
+          return date.toLocaleString();
+        }
+      } catch (_) {
+        // ignore
+      }
+      return String(value);
+    }
+  
+    function renderBarcodeStatusRows(records = [], barcodeValue = null) {
+      if (!statusTableBody) return;
+      if (statusResults) statusResults.hidden = false;
+      const barcodeText = barcodeValue != null ? String(barcodeValue) : null;
+
+      if (statusResultsTitle) {
+        statusResultsTitle.textContent = barcodeText
+          ? `Status Timeline for Barcode ${barcodeText}`
+          : 'Status Timeline';
+      }
+
+      if (!Array.isArray(records) || records.length === 0) {
+        statusTableBody.innerHTML = `
+          <tr class="empty-row">
+            <td colspan="3" class="empty-message">No records found${barcodeText ? ` for barcode ${barcodeText}` : ''}.</td>
+          </tr>
+        `;
+        if (statusResultsSummary) {
+          statusResultsSummary.textContent = barcodeText
+            ? `No history available for barcode ${barcodeText}.`
+            : 'No history available for the provided barcode.';
+        }
+        return;
+      }
+
+      const jobBookingNumbers = new Set();
+      statusTableBody.innerHTML = '';
+      records.forEach(record => {
+        const category = record.Category ?? record.category ?? '—';
+        const eventDate = record.EventDate ?? record.eventDate ?? record.event_date ?? record.datetime ?? record.CreatedDate ?? '—';
+        const jobBookingNo = record.JobBookingNo ?? record.jobBookingNo ?? record.jobbookingno ?? '—';
+        if (jobBookingNo) jobBookingNumbers.add(jobBookingNo);
+
+        const normalizedCategory = String(category || '').toLowerCase().trim();
+        const badgeClass = STATUS_CATEGORY_CLASS_MAP[normalizedCategory] || 'status-badge-default';
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td><span class="status-badge ${badgeClass}">${category}</span></td>
+          <td>${formatTimestamp(eventDate)}</td>
+          <td>${jobBookingNo}</td>
+        `;
+        statusTableBody.appendChild(row);
+      });
+
+      if (statusResultsSummary) {
+        const formatter = new Intl.NumberFormat('en-IN');
+        const countText = `${formatter.format(records.length)} record${records.length === 1 ? '' : 's'}`;
+        const jobText = jobBookingNumbers.size > 0
+          ? `Job Booking${jobBookingNumbers.size > 1 ? 's' : ''}: ${Array.from(jobBookingNumbers).join(', ')}`
+          : 'Job Booking not available';
+        statusResultsSummary.textContent = barcodeText
+          ? `${countText} found for barcode ${barcodeText} • ${jobText}`
+          : `${countText} found • ${jobText}`;
+      }
     }
   
     // Load transporter options from backend
@@ -286,6 +480,10 @@
       if (infoDatabaseGrm) infoDatabaseGrm.textContent = data.selectedDatabase;
       if (infoUsernameGpn) infoUsernameGpn.textContent = username;
       if (infoDatabaseGpn) infoDatabaseGpn.textContent = data.selectedDatabase;
+      if (infoUsernameStatus) infoUsernameStatus.textContent = username;
+      if (infoDatabaseStatus) infoDatabaseStatus.textContent = data.selectedDatabase;
+  
+      resetBarcodeStatusView();
   
       if (loginSection) loginSection.classList.add('hidden');
       if (landingSection) landingSection.classList.remove('hidden');
@@ -325,11 +523,15 @@
         if (infoDatabaseGrm) infoDatabaseGrm.textContent = '';
         if (infoUsernameGpn) infoUsernameGpn.textContent = '';
         if (infoDatabaseGpn) infoDatabaseGpn.textContent = '';
+        if (infoUsernameStatus) infoUsernameStatus.textContent = '';
+        if (infoDatabaseStatus) infoDatabaseStatus.textContent = '';
         
         // Clear barcode fields
         if (barcodeInput) barcodeInput.value = '';
         if (gpnBarcodeInput) gpnBarcodeInput.value = '';
         if (gpnConfBarcode) gpnConfBarcode.value = '';
+        if (statusBarcodeInput) statusBarcodeInput.value = '';
+        resetBarcodeStatusView();
         if (gpnError) gpnError.textContent = '';
         if (gpnTableBody) gpnTableBody.innerHTML = '';
         
@@ -627,6 +829,15 @@
       });
     }
   
+    if (portalBarcodeStatus) {
+      portalBarcodeStatus.addEventListener('click', () => {
+        if (landingSection) landingSection.classList.add('hidden');
+        if (barcodeStatusSection) barcodeStatusSection.classList.remove('hidden');
+        resetBarcodeStatusView();
+        if (statusBarcodeInput) statusBarcodeInput.focus();
+      });
+    }
+  
     // GPN Submit handler
     if (submitGpnBtn) {
       submitGpnBtn.addEventListener('click', async () => {
@@ -868,6 +1079,13 @@
       });
     }
   
+    if (backToLandingStatusBtn) {
+      backToLandingStatusBtn.addEventListener('click', () => {
+        if (barcodeStatusSection) barcodeStatusSection.classList.add('hidden');
+        if (landingSection) landingSection.classList.remove('hidden');
+      });
+    }
+  
     if (backToGpnFormBtn) {
       backToGpnFormBtn.addEventListener('click', () => {
         if (gpnConfirmation) gpnConfirmation.classList.add('hidden');
@@ -889,6 +1107,19 @@
       });
     }
   
+    if (searchBarcodeStatusBtn) {
+      searchBarcodeStatusBtn.addEventListener('click', () => { runBarcodeStatusLookup(); });
+    }
+  
+    if (statusBarcodeInput) {
+      statusBarcodeInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          runBarcodeStatusLookup();
+        }
+      });
+    }
+  
     // Restore session on page load
     function restoreSession() {
       const savedSession = loadSession();
@@ -903,6 +1134,8 @@
         if (infoDatabaseGrm) infoDatabaseGrm.textContent = savedSession.selectedDatabase;
         if (infoUsernameGpn) infoUsernameGpn.textContent = savedSession.username;
         if (infoDatabaseGpn) infoDatabaseGpn.textContent = savedSession.selectedDatabase;
+        if (infoUsernameStatus) infoUsernameStatus.textContent = savedSession.username;
+        if (infoDatabaseStatus) infoDatabaseStatus.textContent = savedSession.selectedDatabase;
         
         // Show landing page
         if (loginSection) loginSection.classList.add('hidden');
@@ -911,6 +1144,7 @@
         
         return true;
       }
+      resetBarcodeStatusView();
       return false;
     }
     
@@ -995,6 +1229,8 @@
       if (infoDatabaseGrm) infoDatabaseGrm.textContent = '';
       if (infoUsernameGpn) infoUsernameGpn.textContent = '';
       if (infoDatabaseGpn) infoDatabaseGpn.textContent = '';
+      if (infoUsernameStatus) infoUsernameStatus.textContent = '';
+      if (infoDatabaseStatus) infoDatabaseStatus.textContent = '';
       
       // Reset UI to login screen
       if (landingSection) landingSection.classList.add('hidden');
@@ -1003,9 +1239,11 @@
       if (deliveryNoteConfirmation) deliveryNoteConfirmation.classList.add('hidden');
       if (gpnSection) gpnSection.classList.add('hidden');
       if (gpnConfirmation) gpnConfirmation.classList.add('hidden');
+      if (barcodeStatusSection) barcodeStatusSection.classList.add('hidden');
       if (loginSection) loginSection.classList.remove('hidden');
       if (logoutBtn) logoutBtn.classList.add('hidden');
       if (usernameInput) usernameInput.focus();
+      resetBarcodeStatusView();
     }
     
     // Logout - Clear in-memory session AND backend session
