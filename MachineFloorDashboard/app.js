@@ -392,7 +392,7 @@
 
     function startAutoRefresh() {
         stopAutoRefresh();
-        const seconds = Number(config.refreshIntervalSeconds) || 300;
+        const seconds = Number(config.refreshIntervalSeconds) || 60;
         if (!Number.isInteger(state.machineId) || state.machineId <= 0) {
             return;
         }
