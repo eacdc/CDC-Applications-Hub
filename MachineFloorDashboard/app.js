@@ -152,7 +152,8 @@
             <span class="status-indicator ${normalizedColor}"></span>
             <span>${label}</span>
         `;
-        element.style.color = normalizedColor === 'green' ? '#047857' : '#b91c1c';
+        // Color is now handled by CSS based on card background
+        element.style.color = '';
     }
 
     function clearIdleTimer() {
@@ -206,6 +207,7 @@
         }
         if (selectors.machineCard) {
             selectors.machineCard.dataset.state = 'idle';
+            selectors.machineCard.dataset.statusColor = 'red';
         }
 
         setStatusDisplay(selectors.idleStatusText, 'IDLE', 'red');
@@ -232,6 +234,7 @@
         }
         if (selectors.machineCard) {
             selectors.machineCard.dataset.state = 'running';
+            selectors.machineCard.dataset.statusColor = isBehind ? 'red' : 'green';
         }
 
         const jobNumber = data.CurrentJobNumber ?? 'Unknown';
@@ -305,6 +308,9 @@
             stopAutoRefresh();
             setStatusMessage('');
             selectors.machineIdInput.value = '';
+            if (selectors.machineCard) {
+                selectors.machineCard.removeAttribute('data-status-color');
+            }
             updateVisibility({ showPlaceholder: true });
             return;
         }

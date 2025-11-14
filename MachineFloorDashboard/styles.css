@@ -168,6 +168,37 @@ body {
     box-shadow: var(--shadow);
     border: 1px solid rgba(255, 255, 255, 0.12);
     color: #0f172a;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.card[data-status-color="red"] {
+    background: #b91c1c;
+    color: white;
+    animation: blink-red 1.5s ease-in-out infinite;
+}
+
+.card[data-status-color="green"] {
+    background: #22c55e;
+    color: #0f172a;
+    animation: blink-green 1.5s ease-in-out infinite;
+}
+
+@keyframes blink-red {
+    0%, 100% {
+        background-color: #b91c1c;
+    }
+    50% {
+        background-color: #dc2626;
+    }
+}
+
+@keyframes blink-green {
+    0%, 100% {
+        background-color: #22c55e;
+    }
+    50% {
+        background-color: #16a34a;
+    }
 }
 
 .card-header {
@@ -194,6 +225,28 @@ body {
 }
 
 .maximize-button:hover {
+    background: rgba(15, 23, 42, 0.1);
+    border-color: rgba(15, 23, 42, 0.3);
+    color: rgba(15, 23, 42, 0.9);
+}
+
+.card[data-status-color="red"] .maximize-button {
+    border-color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.card[data-status-color="red"] .maximize-button:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: white;
+}
+
+.card[data-status-color="green"] .maximize-button {
+    border-color: rgba(15, 23, 42, 0.2);
+    color: rgba(15, 23, 42, 0.7);
+}
+
+.card[data-status-color="green"] .maximize-button:hover {
     background: rgba(15, 23, 42, 0.1);
     border-color: rgba(15, 23, 42, 0.3);
     color: rgba(15, 23, 42, 0.9);
@@ -232,6 +285,50 @@ body {
 .card-header h2 {
     margin: 0;
     font-size: 1.4rem;
+}
+
+.card[data-status-color="red"] .card-header h2,
+.card[data-status-color="red"] .info-grid,
+.card[data-status-color="red"] .info-grid h3,
+.card[data-status-color="red"] .info-grid p,
+.card[data-status-color="red"] .backlog,
+.card[data-status-color="red"] .backlog li,
+.card[data-status-color="red"] .backlog strong,
+.card[data-status-color="red"] .progress,
+.card[data-status-color="red"] .progress-text,
+.card[data-status-color="red"] .muted,
+.card[data-status-color="red"] .status-text {
+    color: white;
+}
+
+.card[data-status-color="green"] .card-header h2,
+.card[data-status-color="green"] .info-grid,
+.card[data-status-color="green"] .info-grid h3,
+.card[data-status-color="green"] .info-grid p,
+.card[data-status-color="green"] .backlog,
+.card[data-status-color="green"] .backlog li,
+.card[data-status-color="green"] .backlog strong,
+.card[data-status-color="green"] .progress,
+.card[data-status-color="green"] .progress-text,
+.card[data-status-color="green"] .muted,
+.card[data-status-color="green"] .status-text {
+    color: #0f172a;
+}
+
+.card[data-status-color="red"] .info-grid h3 {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.card[data-status-color="green"] .info-grid h3 {
+    color: rgba(15, 23, 42, 0.6);
+}
+
+.card[data-status-color="red"] .muted {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.card[data-status-color="green"] .muted {
+    color: rgba(15, 23, 42, 0.55);
 }
 
 .card-content {
@@ -316,11 +413,21 @@ body {
 }
 
 .status-indicator.red {
-    background: #b91c1c;
+    background: #ffffff;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
 }
 
 .status-indicator.red::after {
-    background: rgba(185, 28, 28, 0.35);
+    background: rgba(255, 255, 255, 0.4);
+}
+
+.card[data-status-color="red"] .status-indicator.red {
+    background: #ffffff;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+}
+
+.card[data-status-color="red"] .status-indicator.red::after {
+    background: rgba(255, 255, 255, 0.4);
 }
 
 .status-indicator.green {
@@ -329,6 +436,15 @@ body {
 
 .status-indicator.green::after {
     background: rgba(4, 120, 87, 0.35);
+}
+
+.card[data-status-color="green"] .status-indicator.green {
+    background: #0f172a;
+    box-shadow: 0 0 8px rgba(15, 23, 42, 0.4);
+}
+
+.card[data-status-color="green"] .status-indicator.green::after {
+    background: rgba(15, 23, 42, 0.3);
 }
 
 @keyframes status-pulse {
