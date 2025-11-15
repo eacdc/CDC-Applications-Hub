@@ -164,8 +164,6 @@ body {
     background: var(--surface);
     border-radius: 1.5rem;
     padding: 1.75rem;
-    backdrop-filter: blur(18px);
-    box-shadow: var(--shadow);
     border: 1px solid rgba(255, 255, 255, 0.12);
     color: #0f172a;
     transition: background-color 0.3s ease, color 0.3s ease;
@@ -498,7 +496,6 @@ body {
     height: 0.65rem;
     border-radius: 50%;
     flex-shrink: 0;
-    animation: status-pulse 1.5s ease-in-out infinite;
 }
 
 .status-indicator::after {
@@ -507,7 +504,6 @@ body {
     inset: 0;
     border-radius: 50%;
     opacity: 0.4;
-    animation: status-pulse-ring 1.5s ease-in-out infinite;
 }
 
 .status-indicator.red {
@@ -543,30 +539,6 @@ body {
 
 .card[data-status-color="green"] .status-indicator.green::after {
     background: rgba(15, 23, 42, 0.3);
-}
-
-@keyframes status-pulse {
-    0%, 100% {
-        transform: scale(0.9);
-    }
-    50% {
-        transform: scale(1.1);
-    }
-}
-
-@keyframes status-pulse-ring {
-    0% {
-        transform: scale(0.8);
-        opacity: 0.6;
-    }
-    50% {
-        transform: scale(1.4);
-        opacity: 0.15;
-    }
-    100% {
-        transform: scale(0.8);
-        opacity: 0.6;
-    }
 }
 
 .backlog ul {
