@@ -262,7 +262,7 @@ body {
     margin: 0;
     border-radius: 0;
     z-index: 9999;
-    padding: 2rem;
+    padding: 5rem 2rem 2rem 2rem;
     overflow-y: auto;
 }
 
@@ -278,6 +278,11 @@ body {
 
 .card-header {
     position: relative;
+}
+
+.card.maximized .card-header {
+    margin-top: 1rem;
+    margin-bottom: 4rem;
 }
 
 .card-header h2 {
