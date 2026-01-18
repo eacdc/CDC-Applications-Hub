@@ -897,16 +897,18 @@ body:has(.machine-card-grid.card-maximized) {
     font-size: 1rem;
 }
 
-.machine-card-grid .idle-field-item h3,
 .machine-card-grid .field-item h3 {
     margin: 0 0 0.5rem;
-    font-size: 0.9rem;
+    font-size: 0.27rem;
     letter-spacing: 0.05em;
     text-transform: uppercase;
 }
 
 .machine-card-grid .idle-field-item h3 {
-    font-size: 1rem;
+    margin: 0 0 0.5rem;
+    font-size: 0.3rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
 }
 
 .machine-card-grid.card-maximized .idle-field-item h3,
@@ -918,12 +920,12 @@ body:has(.machine-card-grid.card-maximized) {
 .machine-card-grid .idle-field-item p,
 .machine-card-grid .field-item p {
     margin: 0;
-    font-size: 1.1rem;
+    font-size: 0.33rem;
     font-weight: 600;
 }
 
 .machine-card-grid .idle-field-item p {
-    font-size: 1.3rem;
+    font-size: 0.39rem;
 }
 
 .machine-card-grid.card-maximized .idle-field-item p,
@@ -1002,7 +1004,7 @@ body:has(.machine-card-grid.card-maximized) {
 
 .machine-card-grid .status-text {
     font-weight: 700;
-    font-size: 1.05rem;
+    font-size: 0.315rem;
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
@@ -1015,7 +1017,7 @@ body:has(.machine-card-grid.card-maximized) {
 .machine-card-grid .progress-text {
     margin: 0;
     font-weight: 600;
-    font-size: 1.1rem;
+    font-size: 0.33rem;
 }
 
 .machine-card-grid.card-maximized .progress-text {
@@ -1029,7 +1031,7 @@ body:has(.machine-card-grid.card-maximized) {
 
 .machine-card-grid .backlog h3 {
     margin: 0 0 0.5rem;
-    font-size: 1rem;
+    font-size: 0.3rem;
 }
 
 .machine-card-grid .backlog ul {
@@ -1043,7 +1045,7 @@ body:has(.machine-card-grid.card-maximized) {
 }
 
 .machine-card-grid .backlog li {
-    font-size: 1rem;
+    font-size: 0.3rem;
     display: flex;
     align-items: baseline;
     justify-content: center;
