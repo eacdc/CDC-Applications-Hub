@@ -899,14 +899,14 @@ body:has(.machine-card-grid.card-maximized) {
 
 .machine-card-grid .field-item h3 {
     margin: 0 0 0.5rem;
-    font-size: 0.27rem;
+    font-size: 0.54rem;
     letter-spacing: 0.05em;
     text-transform: uppercase;
 }
 
 .machine-card-grid .idle-field-item h3 {
     margin: 0 0 0.5rem;
-    font-size: 0.3rem;
+    font-size: 0.6rem;
     letter-spacing: 0.05em;
     text-transform: uppercase;
 }
@@ -920,12 +920,12 @@ body:has(.machine-card-grid.card-maximized) {
 .machine-card-grid .idle-field-item p,
 .machine-card-grid .field-item p {
     margin: 0;
-    font-size: 0.33rem;
+    font-size: 0.66rem;
     font-weight: 600;
 }
 
 .machine-card-grid .idle-field-item p {
-    font-size: 0.39rem;
+    font-size: 0.78rem;
 }
 
 .machine-card-grid.card-maximized .idle-field-item p,
@@ -1004,7 +1004,7 @@ body:has(.machine-card-grid.card-maximized) {
 
 .machine-card-grid .status-text {
     font-weight: 700;
-    font-size: 0.315rem;
+    font-size: 0.63rem;
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
@@ -1031,7 +1031,7 @@ body:has(.machine-card-grid.card-maximized) {
 
 .machine-card-grid .backlog h3 {
     margin: 0 0 0.5rem;
-    font-size: 0.3rem;
+    font-size: 0.6rem;
 }
 
 .machine-card-grid .backlog ul {
@@ -1045,7 +1045,7 @@ body:has(.machine-card-grid.card-maximized) {
 }
 
 .machine-card-grid .backlog li {
-    font-size: 0.3rem;
+    font-size: 0.6rem;
     display: flex;
     align-items: baseline;
     justify-content: center;
