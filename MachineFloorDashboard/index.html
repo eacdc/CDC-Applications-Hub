@@ -16,6 +16,7 @@
                 <p class="subtitle">Real-time view of production floor performance</p>
             </div>
             <div class="header-controls">
+                <button id="viewAllButton" class="primary view-all-btn">View All</button>
                 <label class="field machine-field">
                     <span>Machine</span>
                     <input type="number" id="machineIdInput" min="1" step="1" placeholder="Enter machine ID" />
@@ -121,10 +122,92 @@
                 </div>
             </article>
         </section>
+
+        <section id="allMachinesDashboard" class="all-machines-dashboard" hidden>
+            <div class="machines-grid" id="machinesGrid"></div>
+        </section>
     </main>
 
     <template id="loadingTemplate">
         <div class="loading">Loading machine data…</div>
+    </template>
+
+    <template id="machineCardTemplate">
+        <article class="card machine-card-grid" data-machine-id="">
+            <div class="card-header">
+                <h2 class="machine-name-centered">Machine</h2>
+                <button class="maximize-button card-maximize-btn" title="Maximize">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="card-content layout idle-layout-grid" hidden>
+                <div class="idle-row idle-row-1">
+                    <div class="idle-field-item">
+                        <h3>Status</h3>
+                        <p class="status-text"></p>
+                    </div>
+                    <div class="idle-field-item">
+                        <h3>Last job completed on</h3>
+                        <p class="last-job-completed"></p>
+                    </div>
+                </div>
+                <div class="idle-row idle-row-2">
+                    <div class="idle-field-item">
+                        <h3>Machine idle since</h3>
+                        <p class="idle-duration">&mdash;</p>
+                    </div>
+                </div>
+                <div class="backlog">
+                    <h3>Total backlog:</h3>
+                    <ul>
+                        <li><strong>On this machine:</strong> <span class="backlog-machine">0</span></li>
+                        <li><strong>For this process:</strong> <span class="backlog-process">0</span></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card-content layout running-layout-grid" hidden>
+                <div class="running-row row-1">
+                    <div class="field-item">
+                        <h3>Job</h3>
+                        <p class="current-job"></p>
+                    </div>
+                </div>
+                <div class="running-row row-2">
+                    <div class="field-item">
+                        <h3>Started at</h3>
+                        <p class="start-time"></p>
+                    </div>
+                    <div class="field-item">
+                        <h3>ETA</h3>
+                        <p class="eta"></p>
+                    </div>
+                </div>
+                <div class="running-row row-3">
+                    <div class="field-item">
+                        <h3>Running for</h3>
+                        <p class="running-duration"></p>
+                    </div>
+                    <div class="field-item">
+                        <h3>Target finish in</h3>
+                        <p class="target-finish-in"></p>
+                    </div>
+                </div>
+                <div class="running-row row-4">
+                    <div class="field-item">
+                        <h3>Status</h3>
+                        <p class="status-text"></p>
+                    </div>
+                </div>
+                <div class="running-row row-5">
+                    <div class="field-item progress-field">
+                        <h3>Progress</h3>
+                        <p class="progress-text"></p>
+                    </div>
+                </div>
+            </div>
+        </article>
     </template>
 </body>
 </html>

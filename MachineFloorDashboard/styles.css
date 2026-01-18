@@ -756,6 +756,160 @@ body:has(.card.maximized) {
     font-size: 1rem;
 }
 
+.view-all-btn {
+    margin-right: 0.5rem;
+}
+
+.all-machines-dashboard {
+    width: 100%;
+}
+
+.machines-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 1.5rem;
+    padding: 0;
+}
+
+.machine-card-grid {
+    position: relative;
+    transition: transform 0.3s ease, z-index 0.3s ease;
+}
+
+.machine-card-grid.card-maximized {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
+    max-height: 100vh;
+    margin: 0;
+    border-radius: 0;
+    z-index: 9999;
+    padding: 3.5rem 1rem 1.5rem 1rem;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    transform: none;
+    box-sizing: border-box;
+}
+
+body:has(.machine-card-grid.card-maximized) {
+    overflow: hidden;
+}
+
+.machine-card-grid.card-maximized .card-content {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 1.5rem 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.machine-card-grid .card-header {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.machine-card-grid.card-maximized .card-header {
+    margin-top: 1rem;
+    margin-bottom: 3rem;
+}
+
+.machine-card-grid .card-header h2 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.machine-card-grid.card-maximized .card-header h2 {
+    font-size: 3.2rem;
+}
+
+.machine-card-grid .idle-layout-grid,
+.machine-card-grid .running-layout-grid {
+    font-size: 0.9rem;
+}
+
+.machine-card-grid.card-maximized .idle-layout-grid,
+.machine-card-grid.card-maximized .running-layout-grid {
+    font-size: 1rem;
+}
+
+.machine-card-grid .idle-field-item h3,
+.machine-card-grid .field-item h3 {
+    font-size: 0.85rem;
+}
+
+.machine-card-grid.card-maximized .idle-field-item h3,
+.machine-card-grid.card-maximized .field-item h3 {
+    font-size: 1.4rem;
+    margin-bottom: 0.75rem;
+}
+
+.machine-card-grid .idle-field-item p,
+.machine-card-grid .field-item p {
+    font-size: 1rem;
+}
+
+.machine-card-grid.card-maximized .idle-field-item p,
+.machine-card-grid.card-maximized .field-item p {
+    font-size: 1.9rem;
+    font-weight: 700;
+}
+
+.machine-card-grid .idle-row.idle-row-1,
+.machine-card-grid .running-row.row-2,
+.machine-card-grid .running-row.row-3 {
+    gap: 2rem;
+    padding: 0 1rem;
+}
+
+.machine-card-grid.card-maximized .idle-row.idle-row-1,
+.machine-card-grid.card-maximized .running-row.row-2,
+.machine-card-grid.card-maximized .running-row.row-3 {
+    gap: 12rem;
+    padding: 0 4rem;
+}
+
+.machine-card-grid .idle-field-item,
+.machine-card-grid .field-item {
+    min-width: 200px;
+}
+
+.machine-card-grid.card-maximized .idle-field-item,
+.machine-card-grid.card-maximized .field-item {
+    min-width: 450px;
+}
+
+.machine-card-grid .progress-field {
+    max-width: 100%;
+}
+
+.machine-card-grid.card-maximized .progress-field {
+    max-width: 1000px;
+}
+
+.machine-card-grid .status-text {
+    font-size: 0.95rem;
+}
+
+.machine-card-grid.card-maximized .status-text {
+    font-size: 1.9rem;
+}
+
+.machine-card-grid .progress-text {
+    font-size: 1rem;
+}
+
+.machine-card-grid.card-maximized .progress-text {
+    font-size: 2.1rem;
+}
+
 @media (max-width: 768px) {
     .app-shell {
         width: 100%;
@@ -784,6 +938,26 @@ body:has(.card.maximized) {
 
     .primary {
         width: 100%;
+    }
+
+    .machines-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .machine-card-grid .idle-row.idle-row-1,
+    .machine-card-grid .running-row.row-2,
+    .machine-card-grid .running-row.row-3 {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        padding: 0;
+    }
+
+    .machine-card-grid.card-maximized .idle-row.idle-row-1,
+    .machine-card-grid.card-maximized .running-row.row-2,
+    .machine-card-grid.card-maximized .running-row.row-3 {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+        padding: 0 1rem;
     }
 }
 
