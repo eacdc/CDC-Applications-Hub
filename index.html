@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CDC Apps Home</title>
+    <link rel="stylesheet" href="home-styles.css" />
+  </head>
+  <body>
+    <header class="page-header">
+      <div class="header-content">
+        <h1>CDC Applications Hub</h1>
+        <p>Your central landing page for all CDC tools.</p>
+      </div>
+    </header>
+
+    <main class="page-main">
+      <section class="toc-section" aria-labelledby="apps-heading">
+        <div class="toc-header">
+          <h2 id="apps-heading">Table of Contents</h2>
+          <p>Select a tool to open its landing page.</p>
+        </div>
+
+        <div class="apps-grid">
+          <article class="app-card">
+            <div class="app-meta">
+              <span class="app-index">01</span>
+              <h3 class="app-title">Production Tool (CDC Web App)</h3>
+              <p class="app-desc">
+                Core production planning and tracking web application.
+              </p>
+            </div>
+            <a
+              class="app-button"
+              href="https://cdc-site-web.onrender.com"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open App
+            </a>
+          </article>
+
+          <article class="app-card">
+            <div class="app-meta">
+              <span class="app-index">02</span>
+              <h3 class="app-title">Contractor PO System</h3>
+              <p class="app-desc">
+                Create and manage purchase orders for contractors.
+              </p>
+            </div>
+            <a
+              class="app-button"
+              href="https://contractor-po-v1.onrender.com"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open App
+            </a>
+          </article>
+
+          <article class="app-card">
+            <div class="app-meta">
+              <span class="app-index">03</span>
+              <h3 class="app-title">GRN Web UI</h3>
+              <p class="app-desc">
+                Goods Receipt Note management and tracking interface.
+              </p>
+            </div>
+            <a
+              class="app-button"
+              href="https://cdc-grn-portal.onrender.com"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open App
+            </a>
+          </article>
+
+          <article class="app-card">
+            <div class="app-meta">
+              <span class="app-index">04</span>
+              <h3 class="app-title">Job Completion System</h3>
+              <p class="app-desc">
+                Capture and monitor job completion status from production.
+              </p>
+            </div>
+            <a
+              class="app-button"
+              href="https://closejob.onrender.com"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open App
+            </a>
+          </article>
+
+          <article class="app-card">
+            <div class="app-meta">
+              <span class="app-index">05</span>
+              <h3 class="app-title">Machine Floor Dashboard</h3>
+              <p class="app-desc">
+                Live machine floor overview, performance and running jobs.
+              </p>
+            </div>
+            <a
+              class="app-button"
+              href="https://machine-dashboard-v1.onrender.com"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open App
+            </a>
+          </article>
+
+          <article class="app-card">
+            <div class="app-meta">
+              <span class="app-index">06</span>
+              <h3 class="app-title">Prepress FMS Tool</h3>
+              <p class="app-desc">
+                Prepress File Management System for artwork and approvals.
+              </p>
+            </div>
+            <a
+              class="app-button"
+              href="https://prepress-fms-tool.onrender.com"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open App
+            </a>
+          </article>
+
+          <article class="app-card">
+            <div class="app-meta">
+              <span class="app-index">07</span>
+              <h3 class="app-title">QC Tool</h3>
+              <p class="app-desc">
+                Quality control checks, logging and reporting for jobs.
+              </p>
+            </div>
+            <a
+              class="app-button"
+              href="https://cdc-qc-tool.onrender.com"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open App
+            </a>
+          </article>
+
+          <article class="app-card">
+            <div class="app-meta">
+              <span class="app-index">08</span>
+              <h3 class="app-title">Update Job Card</h3>
+              <p class="app-desc">
+                Update and maintain job card details throughout the lifecycle.
+              </p>
+            </div>
+            <a
+              class="app-button"
+              href="https://updatejobcolor.onrender.com"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open App
+            </a>
+          </article>
+
+          <article class="app-card">
+            <div class="app-meta">
+              <span class="app-index">09</span>
+              <h3 class="app-title">Voice Note Tool</h3>
+              <p class="app-desc">
+                Record, manage and review production-related voice notes.
+              </p>
+            </div>
+            <a
+              class="app-button"
+              href="https://voicenotetool.onrender.com"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open App
+            </a>
+          </article>
+
+          <article class="app-card">
+            <div class="app-meta">
+              <span class="app-index">10</span>
+              <h3 class="app-title">Whats App Intimation Tool</h3>
+              <p class="app-desc">
+                WhatsApp-based job and status intimation interface.
+              </p>
+            </div>
+            <a
+              class="app-button"
+              href="https://send-whatsapp-cdc.onrender.com"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open App
+            </a>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="page-footer">
+      <p>CDC Applications &middot; <span id="year"></span></p>
+    </footer>
+
+    <script>
+      // Set current year in footer
+      (function () {
+        var yearEl = document.getElementById('year');
+        if (yearEl) {
+          yearEl.textContent = new Date().getFullYear();
+        }
+      })();
+    </script>
+  </body>
+</html>
+
