@@ -1,5 +1,9 @@
 // API Configuration
-const API_BASE_URL = 'http://localhost:3001/api';
+// Automatically detect environment: use production URL if not on localhost
+// Points to contractor-po backend in main backend folder
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:3000/api'  // Local: contractor-po backend runs on port 3000
+  : 'https://contractor-po-backend.onrender.com/api';  // Production: contractor-po backend subfolder
 
 // Helper function for API calls
 async function apiCall(endpoint, options = {}) {
@@ -46,7 +50,7 @@ export const authAPI = {
 // Jobs API
 export const jobsAPI = {
   getAll: () => apiCall('/jobs'),
-  search: (jobNumber) => apiCall(`/jobs/search/${jobNumber}`),
+  search: (jobNumber) => apiCall(`/jobs/search/${encodeURIComponent(jobNumber)}`),
   getById: (id) => apiCall(`/jobs/${id}`),
   create: (jobData) => apiCall('/jobs', {
     method: 'POST',
@@ -62,12 +66,19 @@ export const jobsAPI = {
     method: 'POST',
     body: { jobNumber, operations, ...extraJobData }
   }),
+  // Get one JobopsMaster document by job number (used for copy-ops)
+  getJobOpsMasterByJobNumber: (jobNumber) =>
+    apiCall(`/jobs/jobopsmaster/by-job-number?jobNumber=${encodeURIComponent(jobNumber)}`),
   // Get all job numbers from JobopsMaster
   getJobNumbers: () => apiCall('/jobs/jobopsmaster/jobnumbers'),
   // Search job numbers from MSSQL (4+ digits)
-  searchJobNumbers: (jobNumberPart) => apiCall(`/jobs/search-numbers/${jobNumberPart}`),
+  searchJobNumbers: (jobNumberPart) => apiCall(`/jobs/search-numbers/${encodeURIComponent(jobNumberPart)}`),
   // Get job details from MSSQL
-  getJobDetails: (jobNumber) => apiCall(`/jobs/details/${jobNumber}`)
+  getJobDetails: (jobNumber) => apiCall(`/jobs/details/${encodeURIComponent(jobNumber)}`),
+  // Delete an operation from JobopsMaster
+  deleteOperationFromJob: (jobNumber, opId) => apiCall(`/jobs/jobopsmaster/operation?jobNumber=${encodeURIComponent(jobNumber)}&opId=${encodeURIComponent(opId)}`, {
+    method: 'DELETE'
+  })
 };
 
 // Operations API
@@ -92,8 +103,8 @@ export const operationsAPI = {
 
 // Work API
 export const workAPI = {
-  getPending: (contractor, jobNumber) => apiCall(`/work/pending/${contractor}/${jobNumber}`),
-  getPendingFromJobOpsMaster: (jobNumber) => apiCall(`/work/pending/jobopsmaster/${jobNumber}`),
+  getPending: (contractor, jobNumber) => apiCall(`/work/pending/${encodeURIComponent(contractor)}/${encodeURIComponent(jobNumber)}`),
+  getPendingFromJobOpsMaster: (jobNumber) => apiCall(`/work/pending/jobopsmaster/${encodeURIComponent(jobNumber)}`),
   update: (contractor, jobNumber, operations) => apiCall('/work/update', {
     method: 'POST',
     body: { contractor, jobNumber, operations }
@@ -110,6 +121,13 @@ export const contractorsAPI = {
   create: (name) => apiCall('/contractors', {
     method: 'POST',
     body: { name }
+  }),
+  update: (id, name) => apiCall(`/contractors/${id}`, {
+    method: 'PUT',
+    body: { name }
+  }),
+  delete: (id) => apiCall(`/contractors/${id}`, {
+    method: 'DELETE'
   })
 };
 
@@ -125,11 +143,33 @@ export const billsAPI = {
     method: 'PUT',
     body: { contractorName, jobs }
   }),
-  markAsPaid: (billNumber) => apiCall(`/bills/${billNumber}/pay`, {
-    method: 'PATCH'
+  checkRoomRent: (contractorName) => apiCall(`/bills/check-roomrent/${encodeURIComponent(contractorName)}`),
+  markAsPaid: (billNumber, roomRent) => apiCall(`/bills/${billNumber}/pay`, {
+    method: 'PATCH',
+    body: roomRent !== undefined ? { roomRent } : {}
   }),
   delete: (billNumber) => apiCall(`/bills/${billNumber}`, {
     method: 'DELETE'
   })
+};
+
+// Bill editing API (qtyCompleted only)
+export const billEditAPI = {
+  editQuantities: (billNumber, contractorId, changes) =>
+    apiCall(`/bills/${encodeURIComponent(billNumber)}/edit-qty`, {
+      method: 'PUT',
+      body: { contractorId, changes }
+    })
+};
+
+// Series API
+export const seriesAPI = {
+  getAll: () => apiCall('/series'),
+  getById: (id) => apiCall(`/series/${id}`),
+  create: (jobNumbers) => apiCall('/series', {
+    method: 'POST',
+    body: { jobNumbers }
+  }),
+  searchByJobNumber: (jobNumber) => apiCall(`/series/search/${encodeURIComponent(jobNumber)}`)
 };
 

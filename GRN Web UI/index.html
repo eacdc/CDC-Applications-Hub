@@ -40,6 +40,7 @@
       background: transparent;
       border-radius: 12px;
       overflow: hidden;
+      table-layout: fixed;
     }
 
     .status-table thead {
@@ -49,19 +50,22 @@
     .status-table th {
       text-align: left;
       font-weight: 600;
-      font-size: 13px;
+      font-size: 12px;
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--muted, #a5b4fc);
-      padding: 12px;
+      padding: 10px;
       border-bottom: 1px solid rgba(148, 163, 184, 0.16);
     }
 
     .status-table td {
-      padding: 12px;
+      padding: 10px;
       border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-      font-size: 14px;
+      font-size: 12px;
       color: var(--text, #e2e8f0);
+      word-break: break-word;
+      white-space: normal;
+      line-height: 1.35;
     }
 
     .status-table tbody tr:last-child td {
@@ -73,14 +77,71 @@
       transition: background 0.2s ease;
     }
 
+    .status-action-cell {
+      width: 120px;
+      text-align: right;
+    }
+
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: auto;
+      max-height: 320px;
+    }
+
+    .table-container::-webkit-scrollbar {
+      height: 6px;
+      width: 6px;
+    }
+
+    .table-container::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.4);
+      border-radius: 999px;
+    }
+
+    .table-container::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.8);
+    }
+
+    .status-action-placeholder {
+      color: var(--muted, #94a3b8);
+      font-style: italic;
+    }
+
+    .status-delete-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 10px;
+      border-radius: 6px;
+      border: none;
+      background: #ef4444;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+    .status-delete-btn:hover:not(:disabled) {
+      background: #dc2626;
+      transform: translateY(-1px);
+    }
+
+    .status-delete-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+      background: rgba(239, 68, 68, 0.45);
+    }
+
     .status-badge {
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 6px;
-      padding: 4px 11px;
+      padding: 3px 9px;
       border-radius: 999px;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
       letter-spacing: 0.08em;
       text-transform: uppercase;
@@ -115,11 +176,134 @@
       font-size: 14px;
     }
 
+    .delivery-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: transparent;
+      min-width: 800px;
+    }
+
+    .delivery-table th,
+    .delivery-table td {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .delivery-table th {
+      background: rgba(148, 163, 184, 0.08);
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--muted, #a5b4fc);
+    }
+
+    .delivery-table tbody tr:hover {
+      background: rgba(37, 99, 235, 0.08);
+    }
+
+    .btn-loading {
+      cursor: wait !important;
+      opacity: 0.8;
+    }
+
+    .collapse-toggle {
+      margin-left: auto;
+      width: 32px;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      background: rgba(15, 23, 42, 0.6);
+      color: var(--text, #e2e8f0);
+      font-size: 20px;
+      font-weight: 600;
+      line-height: 1;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+    .collapse-toggle:hover {
+      background: rgba(59, 130, 246, 0.24);
+      transform: translateY(-1px);
+    }
+
+    .collapse-toggle:focus-visible {
+      outline: 2px solid rgba(96, 165, 250, 0.7);
+      outline-offset: 2px;
+    }
+
+    .delivery-details-panel.collapsed {
+      display: none;
+    }
+
     @media (max-width: 640px) {
+      .card {
+        width: 100% !important;
+        max-width: 100vw !important;
+        overflow: hidden !important;
+      }
+
+      .delivery-note-card {
+        overflow: hidden !important;
+      }
+
+      .barcode-row {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: var(--card, #111827);
+        padding-bottom: 12px;
+        margin-left: 0;
+        margin-right: 0;
+      }
+
+      .table-container {
+        max-height: 240px;
+        width: 100%;
+        overflow-x: auto;
+        overflow-y: auto;
+        margin-left: 0;
+        margin-right: 0;
+        padding-left: 0;
+        padding-right: 0;
+      }
+
+      .delivery-table {
+        min-width: 900px;
+      }
+
+      .delivery-table th,
+      .delivery-table td {
+        padding: 6px 8px;
+        font-size: 10px;
+      }
+
+      .delivery-table th {
+        font-size: 9px;
+        padding: 6px 8px;
+      }
+
       .status-table th,
       .status-table td {
-        padding: 10px 8px;
-        font-size: 13px;
+        padding: 7px 5px;
+        font-size: 11px;
+      }
+
+      .status-badge {
+        padding: 2px 7px;
+        font-size: 10px;
+        letter-spacing: 0.06em;
+      }
+
+      .status-delete-btn {
+        padding: 4px 8px;
+        font-size: 11px;
       }
 
       .status-results {
@@ -240,14 +424,14 @@
           <table class="delivery-table">
             <thead>
               <tr>
-                <th>Barcode Number</th>
-                <th>Voucher Number</th>
+                <th>Bar Code</th>
+                <th>Count</th>
+                <th>Item Count</th>
                 <th>Order Qty</th>
-                <th>Packaged Qty This Voucher</th>
-                <th>Packaged Qty Total</th>
-                <th>Carton Qty Total</th>
+                <th>Count Total</th>
+                <th>Item Count Total</th>
+                <th>Job Number</th>
                 <th>Job Name</th>
-                <th>Job Booking Number</th>
               </tr>
             </thead>
             <tbody id="gpn-table-body">
@@ -292,11 +476,12 @@
                 <th>Category</th>
                 <th>Date &amp; Time</th>
                 <th>Job Booking No</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody id="status-table-body">
               <tr class="empty-row">
-                <td colspan="3" class="empty-message">Enter a barcode to view status history.</td>
+                <td colspan="4" class="empty-message">Enter a barcode to view status history.</td>
               </tr>
             </tbody>
           </table>
@@ -349,34 +534,37 @@
         <div class="page-header">
           <button id="btn-back-to-form" class="back-btn">← Back</button>
           <h2>Delivery Note Created</h2>
+          <button type="button" id="delivery-details-toggle" class="collapse-toggle" aria-expanded="true" aria-controls="delivery-details-panel" aria-label="Collapse delivery details">−</button>
         </div>
-        <div class="info">
-          <p><strong>Delivery Note Number:</strong> <span id="dn-number"></span></p>
-        </div>
-        <div class="confirmation-grid">
-          <div class="form-row">
-            <label>Client Name</label>
-            <input id="conf-client-name" type="text" readonly />
+        <div id="delivery-details-panel" class="delivery-details-panel">
+          <div class="info">
+            <p><strong>Delivery Note Number:</strong> <span id="dn-number"></span></p>
           </div>
-          <div class="form-row">
-            <label>Mode of Transport</label>
-            <input id="conf-mode-transport" type="text" readonly />
-          </div>
-          <div class="form-row">
-            <label>Transporter Name</label>
-            <input id="conf-transporter" type="text" readonly />
-          </div>
-          <div class="form-row">
-            <label>Container Number</label>
-            <input id="conf-container" type="text" readonly />
-          </div>
-          <div class="form-row">
-            <label>Vehicle Number</label>
-            <input id="conf-vehicle" type="text" readonly />
-          </div>
-          <div class="form-row">
-            <label>Seal Number</label>
-            <input id="conf-seal" type="text" readonly />
+          <div class="confirmation-grid">
+            <div class="form-row">
+              <label>Client Name</label>
+              <input id="conf-client-name" type="text" readonly />
+            </div>
+            <div class="form-row">
+              <label>Mode of Transport</label>
+              <input id="conf-mode-transport" type="text" readonly />
+            </div>
+            <div class="form-row">
+              <label>Transporter Name</label>
+              <input id="conf-transporter" type="text" readonly />
+            </div>
+            <div class="form-row">
+              <label>Container Number</label>
+              <input id="conf-container" type="text" readonly />
+            </div>
+            <div class="form-row">
+              <label>Vehicle Number</label>
+              <input id="conf-vehicle" type="text" readonly />
+            </div>
+            <div class="form-row">
+              <label>Seal Number</label>
+              <input id="conf-seal" type="text" readonly />
+            </div>
           </div>
         </div>
         <div class="form-row barcode-row">
@@ -389,12 +577,12 @@
             <thead>
               <tr>
                 <th>Barcode Number</th>
+                <th>Carton Count</th>
                 <th>Job Name</th>
                 <th>Ordered Quantity</th>
                 <th>GPN Qty</th>
                 <th>Delivered This Voucher</th>
                 <th>Delivered Total</th>
-                <th>Carton Count</th>
               </tr>
             </thead>
             <tbody id="delivery-table-body">

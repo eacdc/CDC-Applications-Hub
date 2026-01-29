@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GRN Web UI</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="app-header">
+      <h1>GRN Web UI</h1>
+      <div class="spacer"></div>
+      <button id="btn-logout" class="secondary hidden" title="Logout">Logout</button>
+    </header>
+
+    <main class="app-main">
+      <section id="login-section" class="card">
+        <h2>Login</h2>
+        <form id="login-form">
+          <div class="form-row">
+            <label for="username">Username</label>
+            <input id="username" name="username" type="text" autocomplete="username" required />
+          </div>
+          <div class="form-row">
+            <label for="database">Database</label>
+            <select id="database" name="database" required>
+              <option value="">Select database</option>
+              <option value="KOL">KOL</option>
+              <option value="AHM">AHM</option>
+            </select>
+          </div>
+          <div class="form-actions">
+            <button type="submit">Sign in</button>
+          </div>
+          <p id="login-error" class="error" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section id="landing-section" class="landing-section hidden">
+        <div class="page-header">
+          <h2>Select Portal</h2>
+        </div>
+        <div class="info">
+          <p><strong>User:</strong> <span id="info-username"></span></p>
+          <p><strong>Database:</strong> <span id="info-database"></span></p>
+        </div>
+        <div class="portal-cards">
+          <div class="portal-card" id="portal-grm">
+            <div class="portal-card-content">
+              <h3>Delivery Portal</h3>
+              <p class="portal-description">Delivery Note Management</p>
+            </div>
+          </div>
+          <div class="portal-card" id="portal-gpn">
+            <div class="portal-card-content">
+              <h3>GPN Portal</h3>
+              <p class="portal-description">Goods Packing Note</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="post-login-section" class="card hidden">
+        <div class="page-header">
+          <button id="btn-back-to-landing" class="back-btn">← Back</button>
+          <h2>Initiate Challan</h2>
+        </div>
+        <div class="info">
+          <p><strong>User:</strong> <span id="info-username-grm"></span></p>
+          <p><strong>Database:</strong> <span id="info-database-grm"></span></p>
+        </div>
+        <div class="form-row">
+          <label for="barcode">Barcode Number</label>
+          <input id="barcode" name="barcode" type="text" inputmode="numeric" />
+        </div>
+        <div class="form-actions">
+          <button id="btn-initiate">Innitiate Challan</button>
+        </div>
+      </section>
+
+      <section id="gpn-section" class="card hidden">
+        <div class="page-header">
+          <button id="btn-back-to-landing-gpn" class="back-btn">← Back</button>
+          <h2>GPN Portal</h2>
+        </div>
+        <div class="info">
+          <p><strong>User:</strong> <span id="info-username-gpn"></span></p>
+          <p><strong>Database:</strong> <span id="info-database-gpn"></span></p>
+        </div>
+        <div class="form-row">
+          <label for="gpn-barcode">Barcode Number</label>
+          <input id="gpn-barcode" name="gpn-barcode" type="text" inputmode="numeric" />
+        </div>
+        <div class="form-actions">
+          <button id="btn-submit-gpn">Submit</button>
+        </div>
+        <p id="gpn-error" class="error" aria-live="polite"></p>
+      </section>
+
+      <section id="gpn-confirmation" class="card delivery-note-card hidden">
+        <div class="page-header">
+          <button id="btn-back-to-gpn-form" class="back-btn">← Back</button>
+          <h2>GPN Entry Created</h2>
+        </div>
+        <div class="form-row barcode-row">
+          <label>Barcode Number</label>
+          <input id="gpn-conf-barcode" type="text" placeholder="Enter barcode number" />
+        </div>
+        
+        <div class="table-container">
+          <table class="delivery-table">
+            <thead>
+              <tr>
+                <th>Bar. No</th>
+                <th>Vch. No</th>
+                <th>Ord Qt</th>
+                <th>Pkg Qty Vch</th>
+                <th>Pkg Qty Total</th>
+                <th>Crt Qty Vch</th>
+                <th>Crt Qty Total</th>
+                <th>Job Name</th>
+                <th>Job Booking No</th>
+              </tr>
+            </thead>
+            <tbody id="gpn-table-body">
+              <!-- Rows will be populated here -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="form-actions">
+          <button id="btn-update-gpn" class="secondary">Update Entry</button>
+        </div>
+      </section>
+
+      <section id="challan-form-section" class="card hidden">
+        <div class="page-header">
+          <button id="btn-back-to-initiate" class="back-btn">← Back</button>
+          <h2>Delivery Note</h2>
+        </div>
+        <div class="form-row">
+          <label for="clientName">Client Name</label>
+          <input id="clientName" type="text" readonly />
+        </div>
+        <div class="form-row">
+          <label for="modeOfTransport">Mode of Transport</label>
+          <select id="modeOfTransport">
+            <option value="">Select</option>
+            <option value="AIR">Air</option>
+            <option value="SEA">Sea</option>
+            <option value="ROAD">Road</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="containerNumber">Container Number</label>
+          <input id="containerNumber" type="text" />
+        </div>
+        <div class="form-row">
+          <label for="sealNumber">Seal Number</label>
+          <input id="sealNumber" type="text" />
+        </div>
+        <div class="form-row">
+          <label for="transporterName">Transporter Name</label>
+          <select id="transporterName">
+            <option value="">Select Transporter</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="vehicleNumber">Vehicle Number</label>
+          <input id="vehicleNumber" type="text" />
+        </div>
+        <div class="form-actions">
+          <button id="btn-save-challan">Save</button>
+        </div>
+      </section>
+
+      <section id="delivery-note-confirmation" class="card delivery-note-card hidden">
+        <div class="page-header">
+          <button id="btn-back-to-form" class="back-btn">← Back</button>
+          <h2>Delivery Note Created</h2>
+        </div>
+        <div class="info">
+          <p><strong>Delivery Note Number:</strong> <span id="dn-number"></span></p>
+        </div>
+        <div class="confirmation-grid">
+          <div class="form-row">
+            <label>Client Name</label>
+            <input id="conf-client-name" type="text" readonly />
+          </div>
+          <div class="form-row">
+            <label>Mode of Transport</label>
+            <input id="conf-mode-transport" type="text" readonly />
+          </div>
+          <div class="form-row">
+            <label>Transporter Name</label>
+            <input id="conf-transporter" type="text" readonly />
+          </div>
+          <div class="form-row">
+            <label>Container Number</label>
+            <input id="conf-container" type="text" readonly />
+          </div>
+          <div class="form-row">
+            <label>Vehicle Number</label>
+            <input id="conf-vehicle" type="text" readonly />
+          </div>
+          <div class="form-row">
+            <label>Seal Number</label>
+            <input id="conf-seal" type="text" readonly />
+          </div>
+        </div>
+        <div class="form-row barcode-row">
+          <label>Barcode Number</label>
+          <input id="conf-barcode" type="text" placeholder="Enter barcode number" />
+        </div>
+        
+        <div class="table-container">
+          <table class="delivery-table">
+            <thead>
+              <tr>
+                <th>Barcode Number</th>
+                <th>Job Name</th>
+                <th>Ordered Quantity</th>
+                <th>GPN Qty</th>
+                <th>Delivered This Voucher</th>
+                <th>Delivered Total</th>
+                <th>Carton Count</th>
+              </tr>
+            </thead>
+            <tbody id="delivery-table-body">
+              <!-- 10 rows will be populated here -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="form-actions">
+          <button id="btn-update-delivery-note" class="secondary">Update Delivery Note</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <small>&copy; <span id="year"></span> CDC</small>
+    </footer>
+  </div>
+
+  <script src="script.js" defer></script>
+</body>
+</html>
+
+

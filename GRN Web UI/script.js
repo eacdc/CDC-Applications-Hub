@@ -25,26 +25,54 @@
       }
     }
   
+    function setButtonLoading(button, isLoading, loadingText = 'Loading...') {
+      if (!button) return;
+      if (isLoading) {
+        if (!button.dataset.originalText) {
+          button.dataset.originalText = button.textContent ?? '';
+        }
+        button.disabled = true;
+        button.textContent = loadingText;
+        button.classList.add('btn-loading');
+        button.setAttribute('aria-busy', 'true');
+      } else {
+        button.disabled = false;
+        if (button.dataset.originalText != null) {
+          button.textContent = button.dataset.originalText;
+          delete button.dataset.originalText;
+        }
+        button.classList.remove('btn-loading');
+        button.removeAttribute('aria-busy');
+      }
+    }
+
     // Barcode Status Lookup
-    async function runBarcodeStatusLookup() {
+    async function runBarcodeStatusLookup(barcodeOverride = null) {
       try {
         if (!session || !session.selectedDatabase || !session.userId) {
           if (statusError) statusError.textContent = 'Please login first.';
           return;
         }
   
-        const barcodeVal = String(statusBarcodeInput?.value || '').trim();
-        if (!barcodeVal) {
+        const barcodeInputValue = barcodeOverride != null
+          ? String(barcodeOverride).trim()
+          : String(statusBarcodeInput?.value || '').trim();
+
+        if (!barcodeInputValue) {
           if (statusError) statusError.textContent = 'Enter barcode number';
           if (statusBarcodeInput) statusBarcodeInput.focus();
           return;
         }
   
-        const barcodeNum = Number(barcodeVal);
+        const barcodeNum = Number(barcodeInputValue);
         if (!Number.isFinite(barcodeNum)) {
           if (statusError) statusError.textContent = 'Barcode must be a valid number';
           if (statusBarcodeInput) statusBarcodeInput.focus();
           return;
+        }
+
+        if (barcodeOverride != null && statusBarcodeInput) {
+          statusBarcodeInput.value = barcodeInputValue;
         }
   
         if (statusError) statusError.textContent = '';
@@ -54,15 +82,11 @@
         if (statusTableBody) {
           statusTableBody.innerHTML = `
             <tr class="empty-row">
-              <td colspan="3" class="empty-message">Fetching status history...</td>
+              <td colspan="4" class="empty-message">Fetching status history...</td>
             </tr>
           `;
         }
-        if (searchBarcodeStatusBtn) {
-          searchBarcodeStatusBtn.disabled = true;
-          searchBarcodeStatusBtn.dataset.originalText = searchBarcodeStatusBtn.textContent;
-          searchBarcodeStatusBtn.textContent = 'Searching...';
-        }
+        setButtonLoading(searchBarcodeStatusBtn, true, 'Searching...');
   
         const base = getApiBaseUrl();
         const url = new URL('grn/barcode-status', base);
@@ -99,15 +123,7 @@
         if (statusError) statusError.textContent = String(e.message || e);
         if (statusResults) statusResults.hidden = true;
       } finally {
-        if (searchBarcodeStatusBtn) {
-          searchBarcodeStatusBtn.disabled = false;
-          if (searchBarcodeStatusBtn.dataset.originalText) {
-            searchBarcodeStatusBtn.textContent = searchBarcodeStatusBtn.dataset.originalText;
-            delete searchBarcodeStatusBtn.dataset.originalText;
-          } else {
-            searchBarcodeStatusBtn.textContent = 'Search Barcode Status';
-          }
-        }
+        setButtonLoading(searchBarcodeStatusBtn, false);
       }
     }
 
@@ -208,12 +224,190 @@
     const confBarcode = document.getElementById('conf-barcode');
     const updateDeliveryNoteBtn = document.getElementById('btn-update-delivery-note');
     const deliveryTableBody = document.getElementById('delivery-table-body');
+    const deliveryDetailsPanel = document.getElementById('delivery-details-panel');
+    const deliveryDetailsToggle = document.getElementById('delivery-details-toggle');
     const statusBarcodeInput = document.getElementById('status-barcode');
     const searchBarcodeStatusBtn = document.getElementById('btn-search-barcode-status');
     const statusError = document.getElementById('status-error');
     const statusTableBody = document.getElementById('status-table-body');
     const backToInitiateBtn = document.getElementById('btn-back-to-initiate');
     const backToFormBtn = document.getElementById('btn-back-to-form');
+  
+    const SECTION_MAP = {
+      login: [loginSection],
+      landing: [landingSection],
+      'post-login': [postLoginSection],
+      'challan-form': [challanFormSection],
+      'delivery-confirmation': [deliveryNoteConfirmation],
+      gpn: [gpnSection],
+      'gpn-confirmation': [gpnConfirmation],
+      'barcode-status': [barcodeStatusSection]
+    };
+  
+    const ALL_SECTIONS = Array.from(
+      new Set(
+        Object.values(SECTION_MAP)
+          .flat()
+          .filter(Boolean)
+      )
+    );
+  
+    const VIEW_CONFIG = {
+      login: {
+        sections: SECTION_MAP['login'],
+        onEnter: () => {
+          if (usernameInput) {
+            setTimeout(() => usernameInput.focus(), 0);
+          }
+        }
+      },
+      landing: {
+        sections: SECTION_MAP['landing']
+      },
+      'post-login': {
+        sections: SECTION_MAP['post-login'],
+        onEnter: () => {
+          if (barcodeInput) {
+            setTimeout(() => barcodeInput.focus(), 0);
+          }
+        }
+      },
+      'challan-form': {
+        sections: SECTION_MAP['challan-form']
+      },
+      'delivery-confirmation': {
+        sections: SECTION_MAP['delivery-confirmation'],
+        onEnter: () => {
+          if (confBarcode) {
+            setTimeout(() => confBarcode.focus(), 0);
+          }
+        }
+      },
+      gpn: {
+        sections: SECTION_MAP['gpn'],
+        onEnter: () => {
+          if (gpnBarcodeInput) {
+            setTimeout(() => gpnBarcodeInput.focus(), 0);
+          }
+        }
+      },
+      'gpn-confirmation': {
+        sections: SECTION_MAP['gpn-confirmation'],
+        onEnter: () => {
+          if (gpnConfBarcode) {
+            setTimeout(() => gpnConfBarcode.focus(), 0);
+          }
+        }
+      },
+      'barcode-status': {
+        sections: SECTION_MAP['barcode-status'],
+        onEnter: () => {
+          if (statusBarcodeInput) {
+            setTimeout(() => statusBarcodeInput.focus(), 0);
+          }
+        }
+      }
+    };
+  
+    let currentView = null;
+    let historyDepth = 0;
+  
+    function applyView(view) {
+      const config = VIEW_CONFIG[view];
+      if (!config) return;
+  
+      ALL_SECTIONS.forEach(section => {
+        if (section) section.classList.add('hidden');
+      });
+  
+      (config.sections || []).forEach(section => {
+        if (section) section.classList.remove('hidden');
+      });
+  
+      if (logoutBtn) {
+        if (view === 'login') {
+          logoutBtn.classList.add('hidden');
+        } else {
+          logoutBtn.classList.remove('hidden');
+        }
+      }
+  
+      if (typeof config.onEnter === 'function') {
+        config.onEnter();
+      }
+    }
+  
+    function navigateTo(view, options = {}) {
+      const { replace = false, force = false, skipHistory = false } = options;
+      if (!force && currentView === view) return;
+      if (!VIEW_CONFIG[view]) return;
+  
+      applyView(view);
+      currentView = view;
+  
+      if (skipHistory) return;
+  
+      try {
+        if (replace) {
+          history.replaceState({ view }, document.title, undefined);
+        } else {
+          history.pushState({ view }, document.title, undefined);
+          historyDepth += 1;
+        }
+      } catch (err) {
+        console.warn('Failed to update navigation history:', err);
+      }
+    }
+  
+    function detectInitialView() {
+      const entries = Object.entries(SECTION_MAP);
+      for (const [view, sections] of entries) {
+        if (sections.some(section => section && !section.classList.contains('hidden'))) {
+          return view;
+        }
+      }
+      return 'login';
+    }
+  
+    function initializeNavigation() {
+      currentView = detectInitialView();
+      if (!VIEW_CONFIG[currentView]) {
+        currentView = 'login';
+      }
+      applyView(currentView);
+      try {
+        history.replaceState({ view: currentView }, document.title, undefined);
+      } catch (err) {
+        console.warn('Failed to initialize navigation history:', err);
+      }
+      historyDepth = 0;
+    }
+  
+    function handleBackNavigation(fallbackView) {
+      const target = (!session && fallbackView !== 'login') ? 'login' : fallbackView;
+      if (historyDepth > 0) {
+        history.back();
+      } else {
+        navigateTo(target, { replace: true, force: true });
+      }
+    }
+  
+    window.addEventListener('popstate', (event) => {
+      const stateView = event.state && event.state.view;
+      let targetView = VIEW_CONFIG[stateView] ? stateView : detectInitialView();
+      if (!session && targetView !== 'login') {
+        targetView = 'login';
+      }
+      if (targetView === 'login') {
+        historyDepth = 0;
+      } else if (historyDepth > 0) {
+        historyDepth -= 1;
+      }
+      applyView(targetView);
+      currentView = targetView;
+    });
+  
+    initializeNavigation();
   
     let session = null; // { userId, ledgerId, machines, selectedDatabase, username }
     let lastStatusBarcode = null;
@@ -226,6 +420,15 @@
       'delivery note': 'status-badge-delivery',
       'dn': 'status-badge-delivery'
     };
+    function normalizeStatusCategory(value) {
+      return String(value || '').toLowerCase().trim();
+    }
+    function getCanonicalStatusCategory(value) {
+      const normalized = normalizeStatusCategory(value);
+      if (normalized === 'goods packing note') return 'gpn';
+      if (normalized === 'dn') return 'delivery note';
+      return normalized;
+    }
     
     // Session storage keys
     const SESSION_KEY = 'grn_session';
@@ -289,12 +492,25 @@
       if (statusTableBody) {
         statusTableBody.innerHTML = `
           <tr class="empty-row">
-            <td colspan="3" class="empty-message">Enter a barcode to view status history.</td>
+            <td colspan="4" class="empty-message">Enter a barcode to view status history.</td>
           </tr>
         `;
       }
     }
   
+    function scrollBarcodeStatusIntoView() {
+      if (!statusResults) return;
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const isMobileViewport = window.innerWidth <= 768;
+      if (!isMobileViewport) return;
+      requestAnimationFrame(() => {
+        statusResults.scrollIntoView({
+          behavior: prefersReducedMotion ? 'auto' : 'smooth',
+          block: 'start'
+        });
+      });
+    }
+
     function formatTimestamp(value) {
       if (!value) return '—';
       try {
@@ -322,7 +538,7 @@
       if (!Array.isArray(records) || records.length === 0) {
         statusTableBody.innerHTML = `
           <tr class="empty-row">
-            <td colspan="3" class="empty-message">No records found${barcodeText ? ` for barcode ${barcodeText}` : ''}.</td>
+            <td colspan="4" class="empty-message">No records found${barcodeText ? ` for barcode ${barcodeText}` : ''}.</td>
           </tr>
         `;
         if (statusResultsSummary) {
@@ -330,26 +546,63 @@
             ? `No history available for barcode ${barcodeText}.`
             : 'No history available for the provided barcode.';
         }
+        scrollBarcodeStatusIntoView();
         return;
       }
 
       const jobBookingNumbers = new Set();
       statusTableBody.innerHTML = '';
+      const hasDeliveryNote = records.some(record => {
+        const categoryValue = record.Category ?? record.category ?? '—';
+        return getCanonicalStatusCategory(categoryValue) === 'delivery note';
+      });
+
       records.forEach(record => {
         const category = record.Category ?? record.category ?? '—';
         const eventDate = record.EventDate ?? record.eventDate ?? record.event_date ?? record.datetime ?? record.CreatedDate ?? '—';
         const jobBookingNo = record.JobBookingNo ?? record.jobBookingNo ?? record.jobbookingno ?? '—';
         if (jobBookingNo) jobBookingNumbers.add(jobBookingNo);
 
-        const normalizedCategory = String(category || '').toLowerCase().trim();
-        const badgeClass = STATUS_CATEGORY_CLASS_MAP[normalizedCategory] || 'status-badge-default';
+        const normalizedCategory = normalizeStatusCategory(category);
+        const canonicalCategory = getCanonicalStatusCategory(category);
+        const badgeClass = STATUS_CATEGORY_CLASS_MAP[normalizedCategory]
+          || STATUS_CATEGORY_CLASS_MAP[canonicalCategory]
+          || 'status-badge-default';
 
         const row = document.createElement('tr');
-        row.innerHTML = `
-          <td><span class="status-badge ${badgeClass}">${category}</span></td>
-          <td>${formatTimestamp(eventDate)}</td>
-          <td>${jobBookingNo}</td>
-        `;
+        const categoryCell = document.createElement('td');
+        categoryCell.innerHTML = `<span class="status-badge ${badgeClass}">${category}</span>`;
+        const dateCell = document.createElement('td');
+        dateCell.textContent = formatTimestamp(eventDate);
+        const jobCell = document.createElement('td');
+        jobCell.textContent = jobBookingNo;
+        const actionCell = document.createElement('td');
+        actionCell.classList.add('status-action-cell');
+
+        if (canonicalCategory === 'gpn' || canonicalCategory === 'delivery note') {
+          const deleteBtn = document.createElement('button');
+          deleteBtn.type = 'button';
+          deleteBtn.textContent = 'Delete';
+          deleteBtn.className = 'status-delete-btn';
+          const shouldDisableForDependency = canonicalCategory === 'gpn' && hasDeliveryNote;
+          if (shouldDisableForDependency) {
+            deleteBtn.disabled = true;
+            deleteBtn.title = 'Delete the Delivery Note entry first to enable this action.';
+          }
+          const resolvedBarcode = barcodeText ?? (lastStatusBarcode != null ? String(lastStatusBarcode) : '');
+          deleteBtn.addEventListener('click', () => {
+            handleBarcodeStatusDelete(canonicalCategory, resolvedBarcode, deleteBtn);
+          });
+          actionCell.appendChild(deleteBtn);
+        } else {
+          actionCell.textContent = '—';
+          actionCell.classList.add('status-action-placeholder');
+        }
+
+        row.appendChild(categoryCell);
+        row.appendChild(dateCell);
+        row.appendChild(jobCell);
+        row.appendChild(actionCell);
         statusTableBody.appendChild(row);
       });
 
@@ -363,8 +616,78 @@
           ? `${countText} found for barcode ${barcodeText} • ${jobText}`
           : `${countText} found • ${jobText}`;
       }
+      scrollBarcodeStatusIntoView();
     }
   
+    async function handleBarcodeStatusDelete(category, barcodeValue, triggerButton) {
+      const canonicalCategory = getCanonicalStatusCategory(category);
+      if (canonicalCategory !== 'gpn' && canonicalCategory !== 'delivery note') return;
+
+      if (!session || !session.selectedDatabase || !session.userId) {
+        alertWithSiren('Please login again before performing delete.');
+        return;
+      }
+
+      const resolvedBarcodeStr = String(barcodeValue || '').trim();
+      const resolvedBarcodeNum = Number(resolvedBarcodeStr);
+
+      if (!resolvedBarcodeStr || !Number.isFinite(resolvedBarcodeNum)) {
+        alertWithSiren('Unable to determine barcode for deletion.');
+        return;
+      }
+
+      const confirmationMessage = canonicalCategory === 'delivery note'
+        ? `Delete Delivery Note entry for barcode ${resolvedBarcodeStr}?`
+        : `Delete GPN entry for barcode ${resolvedBarcodeStr}?`;
+
+      if (!window.confirm(confirmationMessage)) {
+        return;
+      }
+
+      setButtonLoading(triggerButton, true, 'Deleting...');
+
+      try {
+        const base = getApiBaseUrl();
+        const endpoint = canonicalCategory === 'delivery note'
+          ? 'grn/delete-delivery-note'
+          : 'gpn/delete-finish-goods';
+        const url = new URL(endpoint, base);
+        const res = await fetch(url.toString(), {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            barcode: resolvedBarcodeNum,
+            database: session.selectedDatabase,
+            userId: session.userId,
+            companyId: 2,
+            branchId: 0
+          })
+        });
+
+        if (!res.ok) {
+          const t = await res.text().catch(() => '');
+          throw new Error(t || 'Failed to delete record');
+        }
+
+        const data = await res.json().catch(() => ({}));
+        if (!data || data.status !== true) {
+          throw new Error(data?.error || 'Failed to delete record');
+        }
+
+        const friendlyCategory = canonicalCategory === 'delivery note' ? 'Delivery Note' : 'GPN';
+        alert(`${friendlyCategory} entry deleted successfully. Refreshing status data...`);
+        await runBarcodeStatusLookup(resolvedBarcodeNum);
+      } catch (e) {
+        alertWithSiren(String(e.message || e));
+      } finally {
+        setButtonLoading(triggerButton, false);
+      }
+    }
+
     // Load transporter options from backend
     async function loadTransporters() {
       try {
@@ -485,9 +808,8 @@
   
       resetBarcodeStatusView();
   
-      if (loginSection) loginSection.classList.add('hidden');
-      if (landingSection) landingSection.classList.remove('hidden');
-      if (logoutBtn) logoutBtn.classList.remove('hidden');
+      navigateTo('landing', { replace: true });
+      historyDepth = 0;
     }
   
     if (loginForm) {
@@ -507,14 +829,9 @@
         // Clear backend session to prevent database conflicts
         await backendLogout();
         
-        // Force all screens to be hidden except login
-        if (landingSection) landingSection.classList.add('hidden');
-        if (postLoginSection) postLoginSection.classList.add('hidden');
-        if (challanFormSection) challanFormSection.classList.add('hidden');
-        if (deliveryNoteConfirmation) deliveryNoteConfirmation.classList.add('hidden');
-        if (gpnSection) gpnSection.classList.add('hidden');
-        if (gpnConfirmation) gpnConfirmation.classList.add('hidden');
-        if (loginSection) loginSection.classList.remove('hidden');
+        // Force navigation back to login before attempting authentication
+        navigateTo('login', { replace: true, force: true });
+        historyDepth = 0;
         
         // Clear all info displays immediately
         if (infoUsername) infoUsername.textContent = '';
@@ -556,6 +873,7 @@
           alert('Please login first.');
           return;
         }
+        setButtonLoading(initiateBtn, true, 'Initiating...');
         try {
           // Call backend to initiate challan
           const base = getApiBaseUrl();
@@ -588,8 +906,7 @@
           session.challanBarcode = Number(barcode);
           
           // Navigate to challan form view
-          if (postLoginSection) postLoginSection.classList.add('hidden');
-          if (challanFormSection) challanFormSection.classList.remove('hidden');
+          navigateTo('challan-form');
           await loadTransporters();
         } catch (e) {
           try {
@@ -598,6 +915,8 @@
           } catch(_) {
             alertWithSiren(String(e.message || e));
           }
+        } finally {
+          setButtonLoading(initiateBtn, false);
         }
       });
     }
@@ -618,6 +937,8 @@
         const vehicleNumber = String(vehicleNumberInput?.value || '').trim();
         // Find ledgerId for selected transporter name from current dropdown options using dataset if available later
         let transporterLedgerId = null;
+
+        setButtonLoading(saveChallanBtn, true, 'Saving...');
         try {
           // Attempt to fetch ledgerId list fresh to resolve selected name
           const base = getApiBaseUrl();
@@ -629,19 +950,23 @@
             const match = dataT.transporters.find(t => String(t.ledgerName).trim() === transporterName);
             transporterLedgerId = match ? match.ledgerId : null;
           }
-        } catch (_) {}
-  
+        } catch (_) {
+          // ignore transporters fetch failure; button state will reset below
+        }
+
         if (!transporterLedgerId) {
           alert('Could not resolve selected transporter. Please re-select transporter.');
+          setButtonLoading(saveChallanBtn, false);
           return;
         }
-  
+
         // Validate required fields
         if (!clientName || !modeOfTransport || !containerNumber || !sealNumber || !transporterName || !vehicleNumber) {
           alert('All fields are mandatory. Please fill in all required information.');
+          setButtonLoading(saveChallanBtn, false);
           return;
         }
-  
+
         try {
           const base = getApiBaseUrl();
           const url = new URL('grn/save-delivery-note', base);
@@ -688,8 +1013,14 @@
           if (confSeal) confSeal.value = data.data.sealNumber;
           // Don't prefill barcode - leave it empty for user input
   
-          if (challanFormSection) challanFormSection.classList.add('hidden');
-          if (deliveryNoteConfirmation) deliveryNoteConfirmation.classList.remove('hidden');
+          if (deliveryDetailsPanel) deliveryDetailsPanel.classList.remove('collapsed');
+          if (deliveryDetailsToggle) {
+            deliveryDetailsToggle.textContent = '−';
+            deliveryDetailsToggle.setAttribute('aria-expanded', 'true');
+            deliveryDetailsToggle.setAttribute('aria-label', 'Collapse delivery details');
+          }
+  
+          navigateTo('delivery-confirmation');
   
           // Add first row to table from SP output and form values
           if (deliveryTableBody) {
@@ -697,12 +1028,12 @@
             const row = document.createElement('tr');
             row.innerHTML = `
               <td>${data?.data?.barcode ?? session?.challanBarcode ?? ''}</td>
+              <td>${sp.cartonCount ?? '—'}</td>
               <td>${sp.jobName ?? '—'}</td>
               <td>${sp.orderQty ?? '—'}</td>
               <td>${sp.gpnQty ?? '—'}</td>
               <td>${sp.deliveredThisVoucher ?? '—'}</td>
               <td>${sp.deliveredTotal ?? '—'}</td>
-              <td>${sp.cartonCount ?? '—'}</td>
             `;
             deliveryTableBody.innerHTML = '';
             deliveryTableBody.appendChild(row);
@@ -713,6 +1044,8 @@
           }
         } catch (e) {
           alertWithSiren(String(e.message || e));
+        } finally {
+          setButtonLoading(saveChallanBtn, false);
         }
       });
     }
@@ -731,6 +1064,7 @@
             const fgId = window.__lastFgTransactionId;
             if (!fgId) { alert('Missing FGTransactionID from initial save. Please save the delivery note first.'); return; }
   
+            setButtonLoading(updateDeliveryNoteBtn, true, 'Updating...');
             const base = getApiBaseUrl();
             const url = new URL('grn/update-delivery-note', base);
             const res = await fetch(url.toString(), {
@@ -759,12 +1093,12 @@
               const newRow = document.createElement('tr');
               newRow.innerHTML = `
                 <td>${barcodeVal}</td>
+                <td>${sp.cartonCount ?? '—'}</td>
                 <td>${sp.jobName ?? '—'}</td>
                 <td>${sp.orderQty ?? '—'}</td>
                 <td>${sp.gpnQty ?? '—'}</td>
-              <td>${sp.deliveredThisVoucher ?? '—'}</td>
+                <td>${sp.deliveredThisVoucher ?? '—'}</td>
                 <td>${sp.deliveredTotal ?? '—'}</td>
-                <td>${sp.cartonCount ?? '—'}</td>
               `;
               deliveryTableBody.insertBefore(newRow, deliveryTableBody.firstChild);
             }
@@ -773,6 +1107,8 @@
             if (confBarcode) confBarcode.focus();
       } catch (e) {
         alertWithSiren(String(e.message || e));
+      } finally {
+        setButtonLoading(updateDeliveryNoteBtn, false);
       }
     }
   
@@ -815,26 +1151,20 @@
     // Portal navigation handlers
     if (portalGrm) {
       portalGrm.addEventListener('click', () => {
-        if (landingSection) landingSection.classList.add('hidden');
-        if (postLoginSection) postLoginSection.classList.remove('hidden');
-        if (barcodeInput) barcodeInput.focus();
+        navigateTo('post-login');
       });
     }
   
     if (portalGpn) {
       portalGpn.addEventListener('click', () => {
-        if (landingSection) landingSection.classList.add('hidden');
-        if (gpnSection) gpnSection.classList.remove('hidden');
-        if (gpnBarcodeInput) gpnBarcodeInput.focus();
+        navigateTo('gpn');
       });
     }
   
     if (portalBarcodeStatus) {
       portalBarcodeStatus.addEventListener('click', () => {
-        if (landingSection) landingSection.classList.add('hidden');
-        if (barcodeStatusSection) barcodeStatusSection.classList.remove('hidden');
         resetBarcodeStatusView();
-        if (statusBarcodeInput) statusBarcodeInput.focus();
+        navigateTo('barcode-status');
       });
     }
   
@@ -853,8 +1183,7 @@
         }
   
         if (gpnError) gpnError.textContent = '';
-        submitGpnBtn.disabled = true;
-        submitGpnBtn.textContent = 'Submitting...';
+        setButtonLoading(submitGpnBtn, true, 'Submitting...');
   
         try {
           const base = getApiBaseUrl();
@@ -903,32 +1232,30 @@
           // Populate first row in table
           if (gpnTableBody) {
             const firstRow = document.createElement('tr');
-            const voucherNo = responseData.VoucherNo || responseData.voucherno || responseData.VoucherNumber || '—';
             const orderQty = responseData.OrderQty || responseData.orderqty || 0;
             const packedQtyThisVoucher = responseData.PackedQtyThisVoucher || responseData.packedqtythisvoucher || responseData.PackagedQtyThisVoucher || 0;
             const packedQtyTotal = responseData.PackedQtyTotal || responseData.packedqtytotal || responseData.PackagedQtyTotal || 0;
-            const cartonQtyTotal = responseData.CartonQtyTotal || responseData.cartonqtytotal || responseData.CartonQty || 0;
+            const cartonQtyThisVoucher = responseData.CartonQtyThisVoucher || responseData.cartonqtythisvoucher || responseData.CartonQty || 0;
+            const cartonQtyTotal = responseData.CartonQtyTotal || responseData.cartonqtytotal || responseData.CartonQtyTotal || 0;
             const jobName = responseData.JobName || responseData.jobname || '—';
             const jobBookingNo = responseData.JobBookingNo || responseData.jobbookingno || responseData.JobBookingNumber || '—';
             
             firstRow.innerHTML = `
               <td>${barcode}</td>
-              <td>${voucherNo}</td>
-              <td>${orderQty}</td>
+              <td>${cartonQtyThisVoucher}</td>
               <td>${packedQtyThisVoucher}</td>
-              <td>${packedQtyTotal}</td>
+              <td>${orderQty}</td>
               <td>${cartonQtyTotal}</td>
-              <td>${jobName}</td>
+              <td>${packedQtyTotal}</td>
               <td>${jobBookingNo}</td>
+              <td>${jobName}</td>
             `;
             gpnTableBody.innerHTML = '';
             gpnTableBody.appendChild(firstRow);
           }
   
-          // Navigate to confirmation screen
-          if (gpnSection) gpnSection.classList.add('hidden');
-          if (gpnConfirmation) gpnConfirmation.classList.remove('hidden');
-          if (gpnConfBarcode) gpnConfBarcode.focus();
+        // Navigate to confirmation screen
+        navigateTo('gpn-confirmation');
         } catch (e) {
           try {
             const parsed = JSON.parse(e.message);
@@ -940,8 +1267,7 @@
             if (gpnError) gpnError.textContent = errorMsg;
           }
         } finally {
-          submitGpnBtn.disabled = false;
-          submitGpnBtn.textContent = 'Submit';
+          setButtonLoading(submitGpnBtn, false);
         }
       });
     }
@@ -978,6 +1304,7 @@
           return;
         }
   
+        setButtonLoading(updateGpnBtn, true, 'Updating...');
         const base = getApiBaseUrl();
         const url = new URL('gpn/save-finish-goods', base);
         const res = await fetch(url.toString(), {
@@ -1015,11 +1342,11 @@
           session.gpnFgTransactionId = updatedFgTransactionId;
           window.__gpnFgTransactionId = updatedFgTransactionId;
         }
-        const voucherNo = responseData.VoucherNo || responseData.voucherno || responseData.VoucherNumber || '—';
         const orderQty = responseData.OrderQty || responseData.orderqty || 0;
         const packedQtyThisVoucher = responseData.PackedQtyThisVoucher || responseData.packedqtythisvoucher || responseData.PackagedQtyThisVoucher || 0;
         const packedQtyTotal = responseData.PackedQtyTotal || responseData.packedqtytotal || responseData.PackagedQtyTotal || 0;
-        const cartonQtyTotal = responseData.CartonQtyTotal || responseData.cartonqtytotal || responseData.CartonQty || 0;
+        const cartonQtyThisVoucher = responseData.CartonQtyThisVoucher || responseData.cartonqtythisvoucher || responseData.CartonQty || 0;
+        const cartonQtyTotal = responseData.CartonQtyTotal || responseData.cartonqtytotal || responseData.CartonQtyTotal || 0;
         const jobName = responseData.JobName || responseData.jobname || '—';
         const jobBookingNo = responseData.JobBookingNo || responseData.jobbookingno || responseData.JobBookingNumber || '—';
   
@@ -1028,13 +1355,13 @@
           const newRow = document.createElement('tr');
           newRow.innerHTML = `
             <td>${barcodeVal}</td>
-            <td>${voucherNo}</td>
-            <td>${orderQty}</td>
+            <td>${cartonQtyThisVoucher}</td>
             <td>${packedQtyThisVoucher}</td>
-            <td>${packedQtyTotal}</td>
+            <td>${orderQty}</td>
             <td>${cartonQtyTotal}</td>
-            <td>${jobName}</td>
+            <td>${packedQtyTotal}</td>
             <td>${jobBookingNo}</td>
+            <td>${jobName}</td>
           `;
           // Insert at the top (prepend) - newest entries always at top
           gpnTableBody.insertBefore(newRow, gpnTableBody.firstChild);
@@ -1046,6 +1373,8 @@
         }
       } catch (e) {
         alertWithSiren(String(e.message || e));
+      } finally {
+        setButtonLoading(updateGpnBtn, false);
       }
     }
   
@@ -1066,47 +1395,49 @@
     // Back button handlers
     if (backToLandingBtn) {
       backToLandingBtn.addEventListener('click', () => {
-        if (postLoginSection) postLoginSection.classList.add('hidden');
-        if (challanFormSection) challanFormSection.classList.add('hidden');
-        if (landingSection) landingSection.classList.remove('hidden');
+        handleBackNavigation('landing');
       });
     }
   
     if (backToLandingGpnBtn) {
       backToLandingGpnBtn.addEventListener('click', () => {
-        if (gpnSection) gpnSection.classList.add('hidden');
-        if (landingSection) landingSection.classList.remove('hidden');
+        handleBackNavigation('landing');
       });
     }
   
     if (backToLandingStatusBtn) {
       backToLandingStatusBtn.addEventListener('click', () => {
-        if (barcodeStatusSection) barcodeStatusSection.classList.add('hidden');
-        if (landingSection) landingSection.classList.remove('hidden');
+        handleBackNavigation('landing');
       });
     }
   
     if (backToGpnFormBtn) {
       backToGpnFormBtn.addEventListener('click', () => {
-        if (gpnConfirmation) gpnConfirmation.classList.add('hidden');
-        if (gpnSection) gpnSection.classList.remove('hidden');
+        handleBackNavigation('gpn');
       });
     }
   
     if (backToInitiateBtn) {
       backToInitiateBtn.addEventListener('click', () => {
-        if (challanFormSection) challanFormSection.classList.add('hidden');
-        if (postLoginSection) postLoginSection.classList.remove('hidden');
+        handleBackNavigation('post-login');
       });
     }
   
     if (backToFormBtn) {
       backToFormBtn.addEventListener('click', () => {
-        if (deliveryNoteConfirmation) deliveryNoteConfirmation.classList.add('hidden');
-        if (challanFormSection) challanFormSection.classList.remove('hidden');
+        handleBackNavigation('challan-form');
       });
     }
-  
+
+    if (deliveryDetailsToggle && deliveryDetailsPanel) {
+      deliveryDetailsToggle.addEventListener('click', () => {
+        const isCollapsed = deliveryDetailsPanel.classList.toggle('collapsed');
+        deliveryDetailsToggle.textContent = isCollapsed ? '+' : '−';
+        deliveryDetailsToggle.setAttribute('aria-expanded', (!isCollapsed).toString());
+        deliveryDetailsToggle.setAttribute('aria-label', isCollapsed ? 'Expand delivery details' : 'Collapse delivery details');
+      });
+    }
+
     if (searchBarcodeStatusBtn) {
       searchBarcodeStatusBtn.addEventListener('click', () => { runBarcodeStatusLookup(); });
     }
@@ -1138,9 +1469,8 @@
         if (infoDatabaseStatus) infoDatabaseStatus.textContent = savedSession.selectedDatabase;
         
         // Show landing page
-        if (loginSection) loginSection.classList.add('hidden');
-        if (landingSection) landingSection.classList.remove('hidden');
-        if (logoutBtn) logoutBtn.classList.remove('hidden');
+        navigateTo('landing', { replace: true, force: true });
+        historyDepth = 0;
         
         return true;
       }
@@ -1184,14 +1514,8 @@
             if (infoDatabaseGpn) infoDatabaseGpn.textContent = '';
             
             // Reset UI to login screen
-            if (landingSection) landingSection.classList.add('hidden');
-            if (postLoginSection) postLoginSection.classList.add('hidden');
-            if (challanFormSection) challanFormSection.classList.add('hidden');
-            if (deliveryNoteConfirmation) deliveryNoteConfirmation.classList.add('hidden');
-            if (gpnSection) gpnSection.classList.add('hidden');
-            if (gpnConfirmation) gpnConfirmation.classList.add('hidden');
-            if (loginSection) loginSection.classList.remove('hidden');
-            if (logoutBtn) logoutBtn.classList.add('hidden');
+            navigateTo('login', { replace: true, force: true });
+            historyDepth = 0;
             
             alert('You have been logged out because a new login was detected in another tab.');
           }
@@ -1232,16 +1556,16 @@
       if (infoUsernameStatus) infoUsernameStatus.textContent = '';
       if (infoDatabaseStatus) infoDatabaseStatus.textContent = '';
       
+      if (deliveryDetailsPanel) deliveryDetailsPanel.classList.remove('collapsed');
+      if (deliveryDetailsToggle) {
+        deliveryDetailsToggle.textContent = '−';
+        deliveryDetailsToggle.setAttribute('aria-expanded', 'true');
+        deliveryDetailsToggle.setAttribute('aria-label', 'Collapse delivery details');
+      }
+      
       // Reset UI to login screen
-      if (landingSection) landingSection.classList.add('hidden');
-      if (postLoginSection) postLoginSection.classList.add('hidden');
-      if (challanFormSection) challanFormSection.classList.add('hidden');
-      if (deliveryNoteConfirmation) deliveryNoteConfirmation.classList.add('hidden');
-      if (gpnSection) gpnSection.classList.add('hidden');
-      if (gpnConfirmation) gpnConfirmation.classList.add('hidden');
-      if (barcodeStatusSection) barcodeStatusSection.classList.add('hidden');
-      if (loginSection) loginSection.classList.remove('hidden');
-      if (logoutBtn) logoutBtn.classList.add('hidden');
+      navigateTo('login', { replace: true, force: true });
+      historyDepth = 0;
       if (usernameInput) usernameInput.focus();
       resetBarcodeStatusView();
     }

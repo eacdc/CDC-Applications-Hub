@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: contractor-po-system
+    env: static
+    buildCommand: ""
+    staticPublishPath: Contractor PO System/frontend
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
