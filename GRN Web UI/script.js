@@ -18,10 +18,15 @@
     function getApiBaseUrl() {
       try {
         const stored = localStorage.getItem('grn_api_base');
-        const chosen = isValidAbsoluteUrl(stored) ? stored : DEFAULT_API_BASE;
+        const host = String(window.location.hostname || '').toLowerCase();
+        const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+        const defaultBase = isLocalHost ? LOCAL_API_BASE : DEFAULT_API_BASE;
+        const chosen = isValidAbsoluteUrl(stored) ? stored : defaultBase;
         return chosen.endsWith('/') ? chosen : chosen + '/';
       } catch (_) {
-        return DEFAULT_API_BASE;
+        const host = String(window.location.hostname || '').toLowerCase();
+        const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+        return isLocalHost ? LOCAL_API_BASE : DEFAULT_API_BASE;
       }
     }
   
@@ -176,6 +181,7 @@
     const gpnSection = document.getElementById('gpn-section');
     const gpnConfirmation = document.getElementById('gpn-confirmation');
     const barcodeStatusSection = document.getElementById('barcode-status-section');
+    const deliveryAmountSection = document.getElementById('delivery-amount-section');
     const statusResults = document.getElementById('status-results');
     const statusResultsSummary = document.getElementById('status-results-summary');
     const statusResultsTitle = document.getElementById('status-results-title');
@@ -191,6 +197,8 @@
     const infoDatabaseGpn = document.getElementById('info-database-gpn');
     const infoUsernameStatus = document.getElementById('info-username-status');
     const infoDatabaseStatus = document.getElementById('info-database-status');
+    const infoUsernameDeliveryAmount = document.getElementById('info-username-delivery-amount');
+    const infoDatabaseDeliveryAmount = document.getElementById('info-database-delivery-amount');
     const barcodeInput = document.getElementById('barcode');
     const gpnBarcodeInput = document.getElementById('gpn-barcode');
     const gpnConfBarcode = document.getElementById('gpn-conf-barcode');
@@ -205,6 +213,7 @@
     const portalGrm = document.getElementById('portal-grm');
     const portalGpn = document.getElementById('portal-gpn');
     const portalBarcodeStatus = document.getElementById('portal-barcode-status');
+    const portalEnterDeliveryAmount = document.getElementById('portal-enter-delivery-amount');
     const gpnError = document.getElementById('gpn-error');
     const gpnTableBody = document.getElementById('gpn-table-body');
     const clientNameInput = document.getElementById('clientName');
@@ -230,6 +239,19 @@
     const searchBarcodeStatusBtn = document.getElementById('btn-search-barcode-status');
     const statusError = document.getElementById('status-error');
     const statusTableBody = document.getElementById('status-table-body');
+    const deliveryAmountError = document.getElementById('delivery-amount-error');
+    const deliveryAmountTableBody = document.getElementById('delivery-amount-table-body');
+    const saveDeliveryAmountBtn = document.getElementById('btn-save-delivery-amount');
+    const backToLandingDeliveryAmountBtn = document.getElementById('btn-back-to-landing-delivery-amount');
+    const filterVoucherNo = document.getElementById('filter-voucher-no');
+    const filterVoucherDate = document.getElementById('filter-voucher-date');
+    const filterVehicleNo = document.getElementById('filter-vehicle-no');
+    const filterTransporterName = document.getElementById('filter-transporter-name');
+    const filterClientName = document.getElementById('filter-client-name');
+    const filterTransportType = document.getElementById('filter-transport-type');
+    const filterDeliveryAmount = document.getElementById('filter-delivery-amount');
+    const deliveryModePendingBtn = document.getElementById('btn-delivery-mode-pending');
+    const deliveryModeCompletedBtn = document.getElementById('btn-delivery-mode-completed');
     const backToInitiateBtn = document.getElementById('btn-back-to-initiate');
     const backToFormBtn = document.getElementById('btn-back-to-form');
   
@@ -241,7 +263,8 @@
       'delivery-confirmation': [deliveryNoteConfirmation],
       gpn: [gpnSection],
       'gpn-confirmation': [gpnConfirmation],
-      'barcode-status': [barcodeStatusSection]
+      'barcode-status': [barcodeStatusSection],
+      'delivery-amount': [deliveryAmountSection]
     };
   
     const ALL_SECTIONS = Array.from(
@@ -306,6 +329,9 @@
             setTimeout(() => statusBarcodeInput.focus(), 0);
           }
         }
+      },
+      'delivery-amount': {
+        sections: SECTION_MAP['delivery-amount']
       }
     };
   
@@ -411,6 +437,18 @@
   
     let session = null; // { userId, ledgerId, machines, selectedDatabase, username }
     let lastStatusBarcode = null;
+    let deliveryAmountRows = [];
+    let deliveryAmountDirty = false;
+    let deliveryAmountFilters = {
+      voucherNo: '',
+      voucherDate: '',
+      vehicleNo: '',
+      transporterName: '',
+      clientName: '',
+      transportType: '',
+      deliveryAmount: ''
+    };
+    let deliveryAmountMode = 'pending';
     const STATUS_CATEGORY_CLASS_MAP = {
       'packing slip': 'status-badge-packingslip',
       'packing-slip': 'status-badge-packingslip',
@@ -495,6 +533,293 @@
             <td colspan="4" class="empty-message">Enter a barcode to view status history.</td>
           </tr>
         `;
+      }
+    }
+
+    function setDeliveryAmountDirty(isDirty) {
+      deliveryAmountDirty = Boolean(isDirty);
+      if (saveDeliveryAmountBtn) {
+        const shouldShow = deliveryAmountMode === 'pending' && deliveryAmountDirty;
+        saveDeliveryAmountBtn.classList.toggle('hidden', !shouldShow);
+      }
+    }
+
+    function resetDeliveryAmountView() {
+      deliveryAmountRows = [];
+      deliveryAmountMode = 'pending';
+      if (deliveryModePendingBtn) deliveryModePendingBtn.classList.add('active');
+      if (deliveryModeCompletedBtn) deliveryModeCompletedBtn.classList.remove('active');
+      deliveryAmountFilters = {
+        voucherNo: '',
+        voucherDate: '',
+        vehicleNo: '',
+        transporterName: '',
+        clientName: '',
+        transportType: '',
+        deliveryAmount: ''
+      };
+      if (filterVoucherNo) filterVoucherNo.value = '';
+      if (filterVoucherDate) filterVoucherDate.value = '';
+      if (filterVehicleNo) filterVehicleNo.value = '';
+      if (filterTransporterName) filterTransporterName.value = '';
+      if (filterClientName) filterClientName.value = '';
+      if (filterTransportType) filterTransportType.value = '';
+      if (filterDeliveryAmount) filterDeliveryAmount.value = '';
+      setDeliveryFilterAvailability();
+      setDeliveryAmountDirty(false);
+      if (deliveryAmountError) deliveryAmountError.textContent = '';
+      if (deliveryAmountTableBody) {
+        deliveryAmountTableBody.innerHTML = `
+          <tr class="empty-row">
+            <td colspan="7" class="empty-message">Open this page to load pending vouchers.</td>
+          </tr>
+        `;
+      }
+    }
+
+    function setDeliveryFilterAvailability() {
+      const isPending = deliveryAmountMode === 'pending';
+      if (filterTransportType) {
+        filterTransportType.disabled = isPending;
+        if (isPending) filterTransportType.value = '';
+      }
+      if (filterDeliveryAmount) {
+        filterDeliveryAmount.disabled = isPending;
+        if (isPending) filterDeliveryAmount.value = '';
+      }
+    }
+
+    function formatVoucherDate(value) {
+      if (!value) return '—';
+      const dt = new Date(value);
+      if (Number.isNaN(dt.getTime())) return String(value);
+      return dt.toLocaleDateString('en-GB');
+    }
+
+    function normalizeDeliveryAmount(value) {
+      if (value == null || value === '') return null;
+      const n = Number(value);
+      if (!Number.isFinite(n)) return null;
+      return Number(n.toFixed(2));
+    }
+
+    function updateDeliveryRowDirtyState(rowObj) {
+      const currentAmount = normalizeDeliveryAmount(rowObj.deliveryAmount);
+      const originalAmount = normalizeDeliveryAmount(rowObj.originalDeliveryAmount);
+      rowObj.isModified = rowObj.transportType !== rowObj.originalTransportType || currentAmount !== originalAmount;
+      return rowObj.isModified;
+    }
+
+    function getFilteredDeliveryAmountRows(rows = []) {
+      const f = deliveryAmountFilters;
+      return rows
+        .map((row, sourceIndex) => ({ row, sourceIndex }))
+        .filter(({ row }) => {
+          const voucherNo = String(row.voucherNo ?? '').toLowerCase();
+          const voucherDate = formatVoucherDate(row.voucherDate).toLowerCase();
+          const vehicleNo = String(row.vehicleNo ?? '').toLowerCase();
+          const transporterName = String(row.transporterName ?? '').toLowerCase();
+          const clientName = String(row.clientName ?? '').toLowerCase();
+          const transportType = String(row.transportType ?? '').toLowerCase();
+          const deliveryAmount = row.deliveryAmount == null ? '' : String(row.deliveryAmount).toLowerCase();
+          if (f.voucherNo && !voucherNo.includes(f.voucherNo)) return false;
+          if (f.voucherDate && !voucherDate.includes(f.voucherDate)) return false;
+          if (f.vehicleNo && !vehicleNo.includes(f.vehicleNo)) return false;
+          if (f.transporterName && !transporterName.includes(f.transporterName)) return false;
+          if (f.clientName && !clientName.includes(f.clientName)) return false;
+          if (deliveryAmountMode !== 'pending' && f.transportType && transportType !== f.transportType) return false;
+          if (deliveryAmountMode !== 'pending' && f.deliveryAmount && !deliveryAmount.includes(f.deliveryAmount)) return false;
+          return true;
+        });
+    }
+
+    function renderDeliveryAmountRows(rows = []) {
+      if (!deliveryAmountTableBody) return;
+      if (!Array.isArray(rows) || rows.length === 0) {
+        deliveryAmountTableBody.innerHTML = `
+          <tr class="empty-row">
+            <td colspan="7" class="empty-message">No pending records found.</td>
+          </tr>
+        `;
+        return;
+      }
+      const filteredRows = getFilteredDeliveryAmountRows(rows);
+      if (filteredRows.length === 0) {
+        deliveryAmountTableBody.innerHTML = `
+          <tr class="empty-row">
+            <td colspan="7" class="empty-message">No records match current filters.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      deliveryAmountTableBody.innerHTML = '';
+      filteredRows.forEach(({ row, sourceIndex }) => {
+        const tr = document.createElement('tr');
+        if (row.isModified) tr.classList.add('delivery-row-modified');
+        const amountValue = row.deliveryAmount != null ? String(row.deliveryAmount) : '';
+        const isPending = deliveryAmountMode === 'pending';
+        const completedTransportTypeText = Number(row.deliveryAmount) > 0
+          ? 'non local'
+          : (row.transportTypeRaw || row.transportType || '—');
+        tr.innerHTML = `
+          <td>${row.voucherNo ?? '—'}</td>
+          <td>${formatVoucherDate(row.voucherDate)}</td>
+          <td>${row.vehicleNo ?? '—'}</td>
+          <td>${row.transporterName ?? '—'}</td>
+          <td>${row.clientName ?? '—'}</td>
+          <td>
+            ${isPending
+              ? `<select class="transport-type-select" data-row-index="${sourceIndex}">
+                  <option value="local" ${row.transportType === 'local' ? 'selected' : ''}>Local</option>
+                  <option value="non local" ${row.transportType === 'non local' ? 'selected' : ''}>Non Local</option>
+                </select>`
+              : `${completedTransportTypeText}`
+            }
+          </td>
+          <td>
+            ${isPending
+              ? `<input
+                  class="delivery-amount-input"
+                  data-row-index="${sourceIndex}"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value="${amountValue}"
+                  ${row.transportType === 'non local' ? '' : 'readonly'}
+                />`
+              : `${amountValue || '—'}`
+            }
+          </td>
+        `;
+        deliveryAmountTableBody.appendChild(tr);
+      });
+
+      if (deliveryAmountMode !== 'pending') return;
+
+      deliveryAmountTableBody.querySelectorAll('.transport-type-select').forEach((selectEl) => {
+        selectEl.addEventListener('change', (event) => {
+          const idx = Number(event.target.dataset.rowIndex);
+          if (!Number.isInteger(idx) || !deliveryAmountRows[idx]) return;
+          const transportType = String(event.target.value || '').toLowerCase();
+          deliveryAmountRows[idx].transportType = transportType;
+
+          const amountInput = deliveryAmountTableBody.querySelector(`.delivery-amount-input[data-row-index="${idx}"]`);
+          if (amountInput) {
+            if (transportType === 'non local') {
+              amountInput.readOnly = false;
+            } else {
+              amountInput.value = '';
+              amountInput.readOnly = true;
+              deliveryAmountRows[idx].deliveryAmount = null;
+            }
+          }
+          const isModified = updateDeliveryRowDirtyState(deliveryAmountRows[idx]);
+          const rowEl = event.target.closest('tr');
+          if (rowEl) rowEl.classList.toggle('delivery-row-modified', isModified);
+          setDeliveryAmountDirty(deliveryAmountRows.some((r) => r.isModified));
+        });
+      });
+
+      deliveryAmountTableBody.querySelectorAll('.delivery-amount-input').forEach((inputEl) => {
+        inputEl.addEventListener('input', (event) => {
+          const idx = Number(event.target.dataset.rowIndex);
+          if (!Number.isInteger(idx) || !deliveryAmountRows[idx]) return;
+          if (deliveryAmountRows[idx].transportType !== 'non local') return;
+          const numericVal = Number(event.target.value);
+          deliveryAmountRows[idx].deliveryAmount = Number.isFinite(numericVal) ? numericVal : null;
+          const isModified = updateDeliveryRowDirtyState(deliveryAmountRows[idx]);
+          const rowEl = event.target.closest('tr');
+          if (rowEl) rowEl.classList.toggle('delivery-row-modified', isModified);
+          setDeliveryAmountDirty(deliveryAmountRows.some((r) => r.isModified));
+        });
+      });
+    }
+
+    function bindDeliveryAmountFilters() {
+      const updateFiltersAndRender = () => {
+        const isPending = deliveryAmountMode === 'pending';
+        deliveryAmountFilters = {
+          voucherNo: String(filterVoucherNo?.value || '').trim().toLowerCase(),
+          voucherDate: String(filterVoucherDate?.value || '').trim().toLowerCase(),
+          vehicleNo: String(filterVehicleNo?.value || '').trim().toLowerCase(),
+          transporterName: String(filterTransporterName?.value || '').trim().toLowerCase(),
+          clientName: String(filterClientName?.value || '').trim().toLowerCase(),
+          transportType: isPending ? '' : String(filterTransportType?.value || '').trim().toLowerCase(),
+          deliveryAmount: isPending ? '' : String(filterDeliveryAmount?.value || '').trim().toLowerCase()
+        };
+        renderDeliveryAmountRows(deliveryAmountRows);
+      };
+
+      [filterVoucherNo, filterVoucherDate, filterVehicleNo, filterTransporterName, filterClientName, filterDeliveryAmount]
+        .forEach((el) => {
+          if (!el) return;
+          el.addEventListener('input', updateFiltersAndRender);
+        });
+      if (filterTransportType) {
+        filterTransportType.addEventListener('change', updateFiltersAndRender);
+      }
+    }
+
+    async function loadDeliveryAmountRows(mode = 'pending') {
+      try {
+        if (!session || !session.selectedDatabase) {
+          if (deliveryAmountError) deliveryAmountError.textContent = 'Please login first.';
+          return;
+        }
+        deliveryAmountMode = mode === 'completed' ? 'completed' : 'pending';
+        if (deliveryModePendingBtn) deliveryModePendingBtn.classList.toggle('active', deliveryAmountMode === 'pending');
+        if (deliveryModeCompletedBtn) deliveryModeCompletedBtn.classList.toggle('active', deliveryAmountMode === 'completed');
+        setDeliveryFilterAvailability();
+        if (deliveryAmountError) deliveryAmountError.textContent = '';
+        if (deliveryAmountTableBody) {
+          deliveryAmountTableBody.innerHTML = `
+            <tr class="empty-row">
+              <td colspan="7" class="empty-message">Loading pending records...</td>
+            </tr>
+          `;
+        }
+
+        const base = getApiBaseUrl();
+        const endpoint = deliveryAmountMode === 'completed' ? 'grn/completed-delivery-amount' : 'grn/pending-delivery-amount';
+        const url = new URL(endpoint, base);
+        url.searchParams.set('database', session.selectedDatabase);
+        const res = await fetch(url.toString(), {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+          credentials: 'include',
+          cache: 'no-store'
+        });
+        if (!res.ok) {
+          const t = await res.text().catch(() => '');
+          throw new Error(t || 'Failed to fetch pending records');
+        }
+        const data = await res.json();
+        if (!data || data.status !== true || !Array.isArray(data.records)) {
+          throw new Error(data?.error || 'Failed to fetch pending records');
+        }
+
+        deliveryAmountRows = data.records.map((record) => ({
+          fgTransactionId: record.fgTransactionId,
+          voucherNo: record.voucherNo,
+          voucherDate: record.voucherDate,
+          vehicleNo: record.vehicleNo,
+          transporterName: record.transporterName,
+          clientName: record.clientName,
+          transportTypeRaw: String(record.transportType || '').trim(),
+          transportType: record.transportType === 'non local' ? 'non local' : 'local',
+          deliveryAmount: record.deliveryAmount != null && Number.isFinite(Number(record.deliveryAmount)) ? Number(record.deliveryAmount) : null,
+          originalTransportType: record.transportType === 'non local' ? 'non local' : 'local',
+          originalDeliveryAmount: record.deliveryAmount != null && Number.isFinite(Number(record.deliveryAmount)) ? Number(record.deliveryAmount) : null,
+          isModified: false
+        }));
+        setDeliveryAmountDirty(false);
+        renderDeliveryAmountRows(deliveryAmountRows);
+      } catch (e) {
+        if (deliveryAmountError) deliveryAmountError.textContent = String(e.message || e);
+        deliveryAmountRows = [];
+        setDeliveryAmountDirty(false);
+        renderDeliveryAmountRows([]);
       }
     }
   
@@ -617,6 +942,68 @@
           : `${countText} found • ${jobText}`;
       }
       scrollBarcodeStatusIntoView();
+    }
+
+    async function saveDeliveryAmountChanges() {
+      try {
+        if (!session || !session.selectedDatabase || !session.userId) {
+          if (deliveryAmountError) deliveryAmountError.textContent = 'Please login first.';
+          return;
+        }
+
+        const entries = deliveryAmountRows
+          .filter((row) => row.isModified)
+          .map((row) => ({
+            fgTransactionId: row.fgTransactionId,
+            transportType: row.transportType,
+            deliveryAmount: row.transportType === 'non local' ? row.deliveryAmount : null
+          }));
+
+        if (entries.length === 0) {
+          if (deliveryAmountError) deliveryAmountError.textContent = 'No changed rows to save.';
+          return;
+        }
+
+        const invalidNonLocal = entries.find((entry) => entry.transportType === 'non local' && !(Number.isFinite(Number(entry.deliveryAmount))));
+        if (invalidNonLocal) {
+          if (deliveryAmountError) deliveryAmountError.textContent = 'Delivery amount is required for Non Local transport type.';
+          return;
+        }
+
+        if (deliveryAmountError) deliveryAmountError.textContent = '';
+        setButtonLoading(saveDeliveryAmountBtn, true, 'Saving...');
+        const base = getApiBaseUrl();
+        const url = new URL('grn/save-delivery-amount', base);
+        const res = await fetch(url.toString(), {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            database: session.selectedDatabase,
+            userId: session.userId,
+            entries
+          })
+        });
+        if (!res.ok) {
+          const t = await res.text().catch(() => '');
+          throw new Error(t || 'Failed to save delivery amount');
+        }
+        const data = await res.json();
+        if (!data || data.status !== true) {
+          throw new Error(data?.error || 'Failed to save delivery amount');
+        }
+
+        setDeliveryAmountDirty(false);
+        await loadDeliveryAmountRows(deliveryAmountMode);
+        alert('Delivery amount details saved successfully.');
+      } catch (e) {
+        if (deliveryAmountError) deliveryAmountError.textContent = String(e.message || e);
+      } finally {
+        setButtonLoading(saveDeliveryAmountBtn, false);
+      }
     }
   
     async function handleBarcodeStatusDelete(category, barcodeValue, triggerButton) {
@@ -805,8 +1192,11 @@
       if (infoDatabaseGpn) infoDatabaseGpn.textContent = data.selectedDatabase;
       if (infoUsernameStatus) infoUsernameStatus.textContent = username;
       if (infoDatabaseStatus) infoDatabaseStatus.textContent = data.selectedDatabase;
+      if (infoUsernameDeliveryAmount) infoUsernameDeliveryAmount.textContent = username;
+      if (infoDatabaseDeliveryAmount) infoDatabaseDeliveryAmount.textContent = data.selectedDatabase;
   
       resetBarcodeStatusView();
+      resetDeliveryAmountView();
   
       navigateTo('landing', { replace: true });
       historyDepth = 0;
@@ -1167,6 +1557,25 @@
         navigateTo('barcode-status');
       });
     }
+
+    if (portalEnterDeliveryAmount) {
+      portalEnterDeliveryAmount.addEventListener('click', async () => {
+        navigateTo('delivery-amount');
+        await loadDeliveryAmountRows('pending');
+      });
+    }
+
+    if (deliveryModePendingBtn) {
+      deliveryModePendingBtn.addEventListener('click', async () => {
+        await loadDeliveryAmountRows('pending');
+      });
+    }
+
+    if (deliveryModeCompletedBtn) {
+      deliveryModeCompletedBtn.addEventListener('click', async () => {
+        await loadDeliveryAmountRows('completed');
+      });
+    }
   
     // GPN Submit handler
     if (submitGpnBtn) {
@@ -1410,6 +1819,12 @@
         handleBackNavigation('landing');
       });
     }
+
+    if (backToLandingDeliveryAmountBtn) {
+      backToLandingDeliveryAmountBtn.addEventListener('click', () => {
+        handleBackNavigation('landing');
+      });
+    }
   
     if (backToGpnFormBtn) {
       backToGpnFormBtn.addEventListener('click', () => {
@@ -1441,6 +1856,10 @@
     if (searchBarcodeStatusBtn) {
       searchBarcodeStatusBtn.addEventListener('click', () => { runBarcodeStatusLookup(); });
     }
+
+    if (saveDeliveryAmountBtn) {
+      saveDeliveryAmountBtn.addEventListener('click', () => { saveDeliveryAmountChanges(); });
+    }
   
     if (statusBarcodeInput) {
       statusBarcodeInput.addEventListener('keydown', (e) => {
@@ -1450,6 +1869,8 @@
         }
       });
     }
+
+    bindDeliveryAmountFilters();
   
     // Restore session on page load
     function restoreSession() {
@@ -1467,6 +1888,8 @@
         if (infoDatabaseGpn) infoDatabaseGpn.textContent = savedSession.selectedDatabase;
         if (infoUsernameStatus) infoUsernameStatus.textContent = savedSession.username;
         if (infoDatabaseStatus) infoDatabaseStatus.textContent = savedSession.selectedDatabase;
+        if (infoUsernameDeliveryAmount) infoUsernameDeliveryAmount.textContent = savedSession.username;
+        if (infoDatabaseDeliveryAmount) infoDatabaseDeliveryAmount.textContent = savedSession.selectedDatabase;
         
         // Show landing page
         navigateTo('landing', { replace: true, force: true });
@@ -1512,6 +1935,10 @@
             if (infoDatabaseGrm) infoDatabaseGrm.textContent = '';
             if (infoUsernameGpn) infoUsernameGpn.textContent = '';
             if (infoDatabaseGpn) infoDatabaseGpn.textContent = '';
+            if (infoUsernameStatus) infoUsernameStatus.textContent = '';
+            if (infoDatabaseStatus) infoDatabaseStatus.textContent = '';
+            if (infoUsernameDeliveryAmount) infoUsernameDeliveryAmount.textContent = '';
+            if (infoDatabaseDeliveryAmount) infoDatabaseDeliveryAmount.textContent = '';
             
             // Reset UI to login screen
             navigateTo('login', { replace: true, force: true });
@@ -1555,6 +1982,8 @@
       if (infoDatabaseGpn) infoDatabaseGpn.textContent = '';
       if (infoUsernameStatus) infoUsernameStatus.textContent = '';
       if (infoDatabaseStatus) infoDatabaseStatus.textContent = '';
+      if (infoUsernameDeliveryAmount) infoUsernameDeliveryAmount.textContent = '';
+      if (infoDatabaseDeliveryAmount) infoDatabaseDeliveryAmount.textContent = '';
       
       if (deliveryDetailsPanel) deliveryDetailsPanel.classList.remove('collapsed');
       if (deliveryDetailsToggle) {
@@ -1568,6 +1997,7 @@
       historyDepth = 0;
       if (usernameInput) usernameInput.focus();
       resetBarcodeStatusView();
+      resetDeliveryAmountView();
     }
     
     // Logout - Clear in-memory session AND backend session

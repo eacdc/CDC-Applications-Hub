@@ -205,6 +205,10 @@
       background: rgba(37, 99, 235, 0.08);
     }
 
+    .delivery-table tbody tr.delivery-row-modified {
+      background: rgba(250, 204, 21, 0.18);
+    }
+
     .btn-loading {
       cursor: wait !important;
       opacity: 0.8;
@@ -242,6 +246,95 @@
       display: none;
     }
 
+    .delivery-amount-input {
+      width: 120px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(15, 23, 42, 0.6);
+      color: var(--text, #e2e8f0);
+      font-size: 12px;
+    }
+
+    .delivery-amount-input:read-only {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
+    .transport-type-select {
+      min-width: 120px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(15, 23, 42, 0.6);
+      color: var(--text, #e2e8f0);
+      font-size: 12px;
+    }
+
+    #delivery-amount-section {
+      width: min(1800px, 98vw);
+      max-width: 98vw;
+    }
+
+    .delivery-amount-table-container {
+      max-height: calc(100vh - 280px);
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .delivery-amount-table {
+      min-width: 0;
+      table-layout: fixed;
+    }
+
+    .delivery-amount-table th,
+    .delivery-amount-table td {
+      white-space: normal;
+      word-break: break-word;
+      padding: 6px 8px;
+      font-size: 12px;
+    }
+
+    .delivery-filter-row th {
+      text-transform: none;
+      letter-spacing: normal;
+      background: rgba(15, 23, 42, 0.45);
+      padding: 6px 8px;
+    }
+
+    .delivery-filter-input,
+    .delivery-filter-select {
+      width: 100%;
+      padding: 5px 6px;
+      border-radius: 6px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(15, 23, 42, 0.65);
+      color: var(--text, #e2e8f0);
+      font-size: 12px;
+      box-sizing: border-box;
+    }
+
+    .delivery-mode-toggle {
+      display: flex;
+      gap: 8px;
+      margin: 10px 0 12px;
+    }
+
+    .delivery-mode-btn {
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      background: rgba(15, 23, 42, 0.55);
+      color: var(--text, #e2e8f0);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .delivery-mode-btn.active {
+      background: rgba(59, 130, 246, 0.28);
+      border-color: rgba(96, 165, 250, 0.65);
+    }
+
     @media (max-width: 640px) {
       .card {
         width: 100% !important;
@@ -275,6 +368,10 @@
       }
 
       .delivery-table {
+        min-width: 900px;
+      }
+
+      .delivery-amount-table {
         min-width: 900px;
       }
 
@@ -370,6 +467,66 @@
               <p class="portal-description">Track barcode progress</p>
             </div>
           </div>
+          <div class="portal-card" id="portal-enter-delivery-amount">
+            <div class="portal-card-content">
+              <h3>Enter Delivery Amount</h3>
+              <p class="portal-description">Update transport type and delivery amount</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="delivery-amount-section" class="card hidden">
+        <div class="page-header">
+          <button id="btn-back-to-landing-delivery-amount" class="back-btn">← Back</button>
+          <h2>Enter Delivery Amount</h2>
+        </div>
+        <div class="info">
+          <p><strong>User:</strong> <span id="info-username-delivery-amount"></span></p>
+          <p><strong>Database:</strong> <span id="info-database-delivery-amount"></span></p>
+        </div>
+        <div class="delivery-mode-toggle">
+          <button id="btn-delivery-mode-pending" type="button" class="delivery-mode-btn active">Pending</button>
+          <button id="btn-delivery-mode-completed" type="button" class="delivery-mode-btn">Completed</button>
+        </div>
+        <p id="delivery-amount-error" class="error" aria-live="polite"></p>
+        <div class="table-container delivery-amount-table-container">
+          <table class="delivery-table delivery-amount-table">
+            <thead>
+              <tr>
+                <th>Voucher No</th>
+                <th>Voucher Date</th>
+                <th>Vehicle No</th>
+                <th>Transporter Name</th>
+                <th>Client Name</th>
+                <th>Transport Type</th>
+                <th>Delivery Amount</th>
+              </tr>
+              <tr class="delivery-filter-row">
+                <th><input id="filter-voucher-no" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
+                <th><input id="filter-voucher-date" class="delivery-filter-input" type="text" placeholder="dd/mm/yyyy" /></th>
+                <th><input id="filter-vehicle-no" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
+                <th><input id="filter-transporter-name" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
+                <th><input id="filter-client-name" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
+                <th>
+                  <select id="filter-transport-type" class="delivery-filter-select">
+                    <option value="">All</option>
+                    <option value="local">Local</option>
+                    <option value="non local">Non Local</option>
+                  </select>
+                </th>
+                <th><input id="filter-delivery-amount" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
+              </tr>
+            </thead>
+            <tbody id="delivery-amount-table-body">
+              <tr class="empty-row">
+                <td colspan="7" class="empty-message">Open this page to load pending vouchers.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="form-actions">
+          <button id="btn-save-delivery-amount" class="secondary hidden">Save</button>
         </div>
       </section>
 
