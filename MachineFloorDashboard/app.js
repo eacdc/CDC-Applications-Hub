@@ -26,13 +26,15 @@
         refreshButton: document.getElementById('refreshButton'),
         databaseSelect: document.getElementById('databaseSelect'),
         autoRefreshToggle: document.getElementById('autoRefreshToggle'),
-        machineIdInput: document.getElementById('machineIdInput'),
+        machineSelect: document.getElementById('machineSelect'),
         maximizeButton: document.getElementById('maximizeButton'),
         appShell: document.querySelector('.app-shell'),
         viewAllButton: document.getElementById('viewAllButton'),
         allMachinesDashboard: document.getElementById('allMachinesDashboard'),
         machinesGrid: document.getElementById('machinesGrid'),
         machineCardTemplate: document.getElementById('machineCardTemplate'),
+        machineNoDataLayout: document.getElementById('machineNoDataLayout'),
+        machineNoDataText: document.getElementById('machineNoDataText'),
     };
 
     let idleTimerInterval = null;
@@ -44,11 +46,16 @@
     let allMachinesAutoRefreshInterval = null;
 
     const allowedDatabases = ['KOL', 'AHM'];
-    const allMachineIds = [14, 47, 58, 61, 62, 63, 64, 65, 66, 33];
+    /** Fixed IDs for View All only (single view uses the API machine dropdown). */
+    const VIEW_ALL_MACHINE_IDS = {
+        KOL: [14, 47, 58, 61, 62, 63, 64, 65, 66, 33],
+        AHM: [1, 2, 3, 11, 12, 17],
+    };
 
     const state = {
         machineId: null,
         machineIdFromUrl: false,
+        machineCatalog: [],
         database: allowedDatabases.includes((config.defaultDatabase || '').toUpperCase())
             ? (config.defaultDatabase || '').toUpperCase()
             : 'KOL',
@@ -212,7 +219,85 @@
         return false;
     }
 
+    function floorDisplayName(machineId, machineName) {
+        if (machineName != null && String(machineName).trim() !== '') {
+            return String(machineName).trim();
+        }
+        return `Machine ${machineId}`;
+    }
+
+    function hideSingleMachineNoDataLayout() {
+        if (selectors.machineNoDataLayout) {
+            selectors.machineNoDataLayout.hidden = true;
+            selectors.machineNoDataLayout.style.display = 'none';
+        }
+    }
+
+    function showSingleMachineNoData(machineId, machineName) {
+        clearIdleTimer();
+        if (selectors.idleLayout) {
+            selectors.idleLayout.hidden = true;
+            selectors.idleLayout.style.display = 'none';
+        }
+        if (selectors.runningLayout) {
+            selectors.runningLayout.hidden = true;
+            selectors.runningLayout.style.display = 'none';
+        }
+        if (selectors.machineHeader) {
+            selectors.machineHeader.hidden = false;
+        }
+        const displayName = floorDisplayName(machineId, machineName);
+        if (selectors.machineName) {
+            selectors.machineName.textContent = displayName;
+        }
+        if (selectors.machineNoDataText) {
+            selectors.machineNoDataText.textContent = `No data found for machine - ${displayName}`;
+        }
+        if (selectors.machineNoDataLayout) {
+            selectors.machineNoDataLayout.hidden = false;
+            selectors.machineNoDataLayout.style.display = '';
+        }
+        if (selectors.machineCard) {
+            selectors.machineCard.dataset.state = 'no-data';
+            selectors.machineCard.removeAttribute('data-status-color');
+        }
+    }
+
+    function renderMachineCardNoData(cardElement, machineId, machineName) {
+        const displayName = floorDisplayName(machineId, machineName);
+        cardElement.dataset.machineId = String(machineId);
+        cardElement.dataset.state = 'no-data';
+        cardElement.removeAttribute('data-status-color');
+
+        const machineNameEl = cardElement.querySelector('.machine-name-centered');
+        if (machineNameEl) {
+            machineNameEl.textContent = displayName;
+        }
+
+        const idleLayout = cardElement.querySelector('.idle-layout-grid');
+        const runningLayout = cardElement.querySelector('.running-layout-grid');
+        const noDataLayout = cardElement.querySelector('.machine-no-data-layout');
+
+        if (idleLayout) {
+            idleLayout.hidden = true;
+            idleLayout.style.display = 'none';
+        }
+        if (runningLayout) {
+            runningLayout.hidden = true;
+            runningLayout.style.display = 'none';
+        }
+        if (noDataLayout) {
+            noDataLayout.hidden = false;
+            noDataLayout.style.display = '';
+            const msg = noDataLayout.querySelector('.machine-no-data-message');
+            if (msg) {
+                msg.textContent = `No data found for machine - ${displayName}`;
+            }
+        }
+    }
+
     function renderIdleState(data) {
+        hideSingleMachineNoDataLayout();
         selectors.idleLayout.hidden = false;
         selectors.idleLayout.style.display = '';
         selectors.runningLayout.hidden = true;
@@ -239,6 +324,7 @@
     }
 
     function renderRunningState(data) {
+        hideSingleMachineNoDataLayout();
         selectors.idleLayout.hidden = true;
         selectors.idleLayout.style.display = 'none';
         selectors.runningLayout.hidden = false;
@@ -275,11 +361,15 @@
     }
 
     function renderDashboard(data) {
+        hideSingleMachineNoDataLayout();
         selectors.machineName.textContent = data.MachineName ?? 'Unknown Machine';
         state.machineId = data.MachineID ?? state.machineId;
         state.machineIdFromUrl = false;
-        if (selectors.machineIdInput) {
-            selectors.machineIdInput.value = state.machineId ?? '';
+        if (selectors.machineSelect && state.machineId) {
+            const s = String(state.machineId);
+            if ([...selectors.machineSelect.options].some((o) => o.value === s)) {
+                selectors.machineSelect.value = s;
+            }
         }
 
         const isRunning = flagIsTrue(data.IsRunning);
@@ -291,7 +381,7 @@
         }
     }
 
-    async function fetchMachineData(machineId, database) {
+    async function fetchMachineFloorResult(machineId, database) {
         const baseUrl = config.apiBaseUrl?.replace(/\/$/, '') || '';
         const url = `${baseUrl}/machine-floor/${encodeURIComponent(machineId)}?database=${encodeURIComponent(database)}`;
 
@@ -306,13 +396,105 @@
         }
 
         const payload = await response.json();
-        if (!payload.status) {
-            throw new Error(payload.error || 'API returned an error');
+        if (payload.status && payload.data) {
+            console.log('[MachineFloorDashboard] Full procedure payload:', payload.data);
+            return { kind: 'ok', data: payload.data };
         }
 
-        console.log('[MachineFloorDashboard] Full procedure payload:', payload.data);
+        const errText = String(payload.error || '');
+        const looksLikeNoSpRow =
+            payload.noFloorData === true ||
+            /no floor screen data/i.test(errText);
 
-        return payload.data;
+        if (looksLikeNoSpRow) {
+            const midRaw = payload.machineId != null ? Number(payload.machineId) : Number(machineId);
+            const mid = Number.isInteger(midRaw) && midRaw > 0 ? midRaw : Number(machineId);
+            let machineName =
+                payload.machineName != null && String(payload.machineName).trim() !== ''
+                    ? String(payload.machineName).trim()
+                    : null;
+            if (!machineName) {
+                try {
+                    const list = await fetchMachineList(database);
+                    const row = list.find((m) => Number(m.machineId) === mid);
+                    if (row && row.machineName != null && String(row.machineName).trim() !== '') {
+                        machineName = String(row.machineName).trim();
+                    }
+                } catch (e) {
+                    console.warn('[MachineFloorDashboard] Could not resolve machine name from list', e);
+                }
+            }
+            return { kind: 'noData', machineId: mid, machineName };
+        }
+
+        throw new Error(payload.error || 'API returned an error');
+    }
+
+    async function fetchMachineList(database) {
+        const baseUrl = config.apiBaseUrl?.replace(/\/$/, '') || '';
+        const url = `${baseUrl}/schedule/machines?database=${encodeURIComponent(database)}`;
+        const response = await fetch(url, {
+            headers: {
+                Accept: 'application/json'
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`Machine list request failed with status ${response.status}`);
+        }
+        const payload = await response.json();
+        if (!Array.isArray(payload)) {
+            throw new Error('Invalid machine list response');
+        }
+        return payload;
+    }
+
+    async function populateMachineSelect({ preferredMachineId } = {}) {
+        if (!selectors.machineSelect) return;
+
+        const previousSelection = selectors.machineSelect.value || '';
+        let preferred = '';
+        if (preferredMachineId != null) {
+            const n = Number(preferredMachineId);
+            if (Number.isInteger(n) && n > 0) {
+                preferred = String(n);
+            }
+        } else if (previousSelection) {
+            preferred = previousSelection;
+        }
+
+        selectors.machineSelect.innerHTML = '';
+        const emptyOpt = document.createElement('option');
+        emptyOpt.value = '';
+        emptyOpt.textContent = 'Select machine…';
+        selectors.machineSelect.appendChild(emptyOpt);
+
+        try {
+            const list = await fetchMachineList(state.database);
+            const sorted = [...list].sort((a, b) =>
+                String(a.machineName || '').localeCompare(String(b.machineName || ''), undefined, { sensitivity: 'base' })
+            );
+            state.machineCatalog = sorted;
+            for (const m of sorted) {
+                const id = m.machineId;
+                if (id === undefined || id === null || String(id).trim() === '') continue;
+                const opt = document.createElement('option');
+                opt.value = String(id);
+                opt.textContent = m.machineName ? String(m.machineName) : `Machine ${id}`;
+                selectors.machineSelect.appendChild(opt);
+            }
+            const pick = preferred && [...selectors.machineSelect.options].some((o) => o.value === preferred)
+                ? preferred
+                : '';
+            selectors.machineSelect.value = pick;
+            if (pick) {
+                state.machineId = Number(pick);
+            }
+        } catch (error) {
+            console.error('Failed to load machine list', error);
+            state.machineCatalog = [];
+            setStatusMessage(error.message || 'Failed to load machine list.', 'error');
+            selectors.machineSelect.value = '';
+        }
     }
 
     async function loadData() {
@@ -320,13 +502,15 @@
             return; // Don't load single machine data when in all machines view
         }
 
-        const inputMachineId = selectors.machineIdInput ? selectors.machineIdInput.value.trim() : '';
+        const inputMachineId = selectors.machineSelect ? selectors.machineSelect.value.trim() : '';
         const parsedMachineId = Number(inputMachineId);
 
         if (!Number.isInteger(parsedMachineId) || parsedMachineId <= 0) {
             stopAutoRefresh();
             setStatusMessage('');
-            selectors.machineIdInput.value = '';
+            if (selectors.machineSelect) {
+                selectors.machineSelect.value = '';
+            }
             if (selectors.machineCard) {
                 selectors.machineCard.removeAttribute('data-status-color');
             }
@@ -340,12 +524,22 @@
         updateVisibility({ showPlaceholder: false, showDashboard: false, showAllMachines: false });
 
         try {
-            const data = await fetchMachineData(state.machineId, state.database);
-            renderDashboard(data);
-            setStatusMessage('');
-            updateVisibility({ showDashboard: true, showPlaceholder: false, showAllMachines: false });
-            if (selectors.autoRefreshToggle.checked) {
-                startAutoRefresh();
+            const result = await fetchMachineFloorResult(state.machineId, state.database);
+            if (result.kind === 'ok') {
+                renderDashboard(result.data);
+                setStatusMessage('');
+                updateVisibility({ showDashboard: true, showPlaceholder: false, showAllMachines: false });
+                if (selectors.autoRefreshToggle.checked) {
+                    startAutoRefresh();
+                }
+            } else if (result.kind === 'noData') {
+                state.machineId = result.machineId;
+                showSingleMachineNoData(result.machineId, result.machineName);
+                setStatusMessage('');
+                updateVisibility({ showDashboard: true, showPlaceholder: false, showAllMachines: false });
+                if (selectors.autoRefreshToggle.checked) {
+                    startAutoRefresh();
+                }
             }
         } catch (error) {
             console.error('Failed to load machine data', error);
@@ -431,6 +625,12 @@
     }
 
     function renderMachineCardInGrid(data, cardElement) {
+        const noDataLayout = cardElement.querySelector('.machine-no-data-layout');
+        if (noDataLayout) {
+            noDataLayout.hidden = true;
+            noDataLayout.style.display = 'none';
+        }
+
         const machineId = data.MachineID ?? data.machineid;
         cardElement.dataset.machineId = machineId;
         
@@ -574,32 +774,32 @@
 
         selectors.machinesGrid.innerHTML = '';
 
-        const promises = allMachineIds.map(async (machineId) => {
-            try {
-                const data = await fetchMachineData(machineId, state.database);
-                const cardElement = selectors.machineCardTemplate.content.cloneNode(true);
-                const card = cardElement.querySelector('.machine-card-grid');
-                
-                renderMachineCardInGrid(data, card);
-                
-                const maximizeBtn = card.querySelector('.card-maximize-btn');
-                if (maximizeBtn) {
-                    maximizeBtn.addEventListener('click', () => toggleCardMaximize(card));
-                }
+        const allMachineIds = VIEW_ALL_MACHINE_IDS[state.database] || VIEW_ALL_MACHINE_IDS.KOL;
 
-                return card;
+        const promises = allMachineIds.map(async (machineId) => {
+            const cardElement = selectors.machineCardTemplate.content.cloneNode(true);
+            const card = cardElement.querySelector('.machine-card-grid');
+            try {
+                const result = await fetchMachineFloorResult(machineId, state.database);
+                if (result.kind === 'ok') {
+                    renderMachineCardInGrid(result.data, card);
+                } else {
+                    renderMachineCardNoData(card, result.machineId, result.machineName);
+                }
             } catch (error) {
                 console.error(`Failed to load machine ${machineId}:`, error);
-                const cardElement = selectors.machineCardTemplate.content.cloneNode(true);
-                const card = cardElement.querySelector('.machine-card-grid');
-                card.dataset.machineId = machineId;
+                card.dataset.machineId = String(machineId);
                 const machineNameEl = card.querySelector('.machine-name-centered');
                 if (machineNameEl) {
                     machineNameEl.textContent = `Machine ${machineId} - Error`;
                 }
                 card.dataset.statusColor = 'red';
-                return card;
             }
+            const maximizeBtn = card.querySelector('.card-maximize-btn');
+            if (maximizeBtn) {
+                maximizeBtn.addEventListener('click', () => toggleCardMaximize(card));
+            }
+            return card;
         });
 
         const cards = await Promise.all(promises);
@@ -676,18 +876,17 @@
             selectors.viewAllButton.addEventListener('click', toggleViewAll);
         }
 
-        if (selectors.machineIdInput) {
-            selectors.machineIdInput.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter') {
-                    if (!allMachinesViewActive) {
-                        loadData();
-                    }
+        if (selectors.machineSelect) {
+            selectors.machineSelect.addEventListener('change', () => {
+                if (!allMachinesViewActive) {
+                    loadData();
                 }
             });
         }
 
-        selectors.databaseSelect.addEventListener('change', () => {
+        selectors.databaseSelect.addEventListener('change', async () => {
             state.database = selectors.databaseSelect.value;
+            await populateMachineSelect({});
             if (allMachinesViewActive) {
                 loadAllMachines();
             } else {
@@ -721,7 +920,7 @@
         const seconds = Number(config.refreshIntervalSeconds) || 300;
         
         // Check if we have a valid machine ID from input or state
-        const inputMachineId = selectors.machineIdInput ? selectors.machineIdInput.value.trim() : '';
+        const inputMachineId = selectors.machineSelect ? selectors.machineSelect.value.trim() : '';
         const parsedMachineId = Number(inputMachineId);
         const currentMachineId = Number.isInteger(parsedMachineId) && parsedMachineId > 0 
             ? parsedMachineId 
@@ -746,23 +945,18 @@
         }
     }
 
-    function init() {
+    async function init() {
         deriveStateFromUrl();
 
         if (selectors.databaseSelect) {
             selectors.databaseSelect.value = state.database;
         }
 
-        if (selectors.machineIdInput) {
-            if (state.machineIdFromUrl) {
-                selectors.machineIdInput.value = state.machineId;
-            } else if (Number.isInteger(config.defaultMachineId) && config.defaultMachineId > 0) {
-                selectors.machineIdInput.value = '';
-                selectors.machineIdInput.placeholder = `e.g. ${config.defaultMachineId}`;
-            } else {
-                selectors.machineIdInput.value = '';
-            }
-        }
+        await populateMachineSelect({
+            preferredMachineId: state.machineIdFromUrl && Number.isInteger(state.machineId) && state.machineId > 0
+                ? state.machineId
+                : undefined
+        });
 
         setupEventListeners();
 
@@ -773,6 +967,8 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', () => {
+        void init();
+    });
 })();
 

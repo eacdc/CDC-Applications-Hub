@@ -112,8 +112,8 @@ html:has(.card.maximized[data-status-color="green"]) {
     min-width: 110px;
 }
 
-.machine-field input {
-    min-width: 140px;
+.machine-field select {
+    min-width: 200px;
 }
 
 .field.toggle {
@@ -205,6 +205,46 @@ html:has(.card.maximized[data-status-color="green"]) {
 .card[data-status-color="green"] {
     background: #22c55e;
     color: #0f172a;
+}
+
+#machineCard[data-state="no-data"],
+.machine-card-grid[data-state="no-data"] {
+    background: rgba(30, 41, 59, 0.95);
+    color: var(--text);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.machine-no-data-layout {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 6rem;
+}
+
+.machine-no-data-message {
+    margin: 0;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    font-size: 1.05rem;
+    line-height: 1.5;
+    color: var(--muted);
+}
+
+.machine-card-grid[data-state="no-data"] .machine-name-centered,
+#machineCard[data-state="no-data"] .machine-name-centered {
+    color: var(--text);
+}
+
+.machine-card-grid[data-state="no-data"] .maximize-button,
+#machineCard[data-state="no-data"] .maximize-button {
+    border-color: rgba(255, 255, 255, 0.25);
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.machine-card-grid[data-state="no-data"] .maximize-button:hover,
+#machineCard[data-state="no-data"] .maximize-button:hover {
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .card-header {
@@ -325,7 +365,6 @@ body:has(.card.maximized) {
 }
 
 .app-shell.view-all-mode .header-controls > .machine-field,
-.app-shell.view-all-mode .header-controls > .field:not(.toggle),
 .app-shell.view-all-mode .header-controls > #refreshButton {
     display: none;
 }

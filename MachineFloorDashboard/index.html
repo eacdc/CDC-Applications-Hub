@@ -19,7 +19,9 @@
                 <button id="viewAllButton" class="primary view-all-btn">View All</button>
                 <label class="field machine-field">
                     <span>Machine</span>
-                    <input type="number" id="machineIdInput" min="1" step="1" placeholder="Enter machine ID" />
+                    <select id="machineSelect">
+                        <option value="">Select machine…</option>
+                    </select>
                 </label>
                 <label class="field">
                     <span>Database</span>
@@ -40,7 +42,7 @@
 
         <section id="noMachineSelected" class="no-machine-message" hidden>
             <div class="card">
-                <p class="no-machine-text">Provide Machine ID</p>
+                <p class="no-machine-text">Select a machine</p>
             </div>
         </section>
 
@@ -53,6 +55,9 @@
                             <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
                         </svg>
                     </button>
+                </div>
+                <div id="machineNoDataLayout" class="card-content layout machine-no-data-layout" hidden>
+                    <p id="machineNoDataText" class="machine-no-data-message"></p>
                 </div>
                 <div id="idleLayout" class="card-content layout" hidden>
                     <div class="idle-row idle-row-1">
@@ -141,6 +146,9 @@
                         <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
                     </svg>
                 </button>
+            </div>
+            <div class="card-content layout machine-no-data-layout" hidden>
+                <p class="machine-no-data-message"></p>
             </div>
             <div class="card-content layout idle-layout-grid" hidden>
                 <div class="idle-row idle-row-1">
