@@ -604,6 +604,10 @@
     }
 
     function updateDeliveryRowDirtyState(rowObj) {
+      if (!rowObj.transportType) {
+        rowObj.isModified = false;
+        return false;
+      }
       const currentAmount = normalizeDeliveryAmount(rowObj.deliveryAmount);
       const originalAmount = normalizeDeliveryAmount(rowObj.originalDeliveryAmount);
       rowObj.isModified = rowObj.transportType !== rowObj.originalTransportType || currentAmount !== originalAmount;
@@ -671,6 +675,7 @@
           <td>
             ${isPending
               ? `<select class="transport-type-select" data-row-index="${sourceIndex}">
+                  <option value="" ${!row.transportType ? 'selected' : ''}>Select</option>
                   <option value="local" ${row.transportType === 'local' ? 'selected' : ''}>Local</option>
                   <option value="non local" ${row.transportType === 'non local' ? 'selected' : ''}>Non Local</option>
                 </select>`
@@ -726,8 +731,13 @@
           const idx = Number(event.target.dataset.rowIndex);
           if (!Number.isInteger(idx) || !deliveryAmountRows[idx]) return;
           if (deliveryAmountRows[idx].transportType !== 'non local') return;
-          const numericVal = Number(event.target.value);
-          deliveryAmountRows[idx].deliveryAmount = Number.isFinite(numericVal) ? numericVal : null;
+          const rawVal = String(event.target.value ?? '').trim();
+          if (!rawVal) {
+            deliveryAmountRows[idx].deliveryAmount = null;
+          } else {
+            const numericVal = Number(rawVal);
+            deliveryAmountRows[idx].deliveryAmount = Number.isFinite(numericVal) ? numericVal : null;
+          }
           const isModified = updateDeliveryRowDirtyState(deliveryAmountRows[idx]);
           const rowEl = event.target.closest('tr');
           if (rowEl) rowEl.classList.toggle('delivery-row-modified', isModified);
@@ -807,9 +817,9 @@
           transporterName: record.transporterName,
           clientName: record.clientName,
           transportTypeRaw: String(record.transportType || '').trim(),
-          transportType: record.transportType === 'non local' ? 'non local' : 'local',
+          transportType: '',
           deliveryAmount: record.deliveryAmount != null && Number.isFinite(Number(record.deliveryAmount)) ? Number(record.deliveryAmount) : null,
-          originalTransportType: record.transportType === 'non local' ? 'non local' : 'local',
+          originalTransportType: '',
           originalDeliveryAmount: record.deliveryAmount != null && Number.isFinite(Number(record.deliveryAmount)) ? Number(record.deliveryAmount) : null,
           isModified: false
         }));

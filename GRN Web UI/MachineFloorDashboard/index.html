@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Machine Floor Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <script defer src="config.js"></script>
+    <script defer src="app.js"></script>
+</head>
+<body>
+    <main class="app-shell">
+        <header class="app-header">
+            <div class="title-block">
+                <h1>Machine Floor Dashboard</h1>
+                <p class="subtitle">Real-time view of production floor performance</p>
+            </div>
+            <div class="header-controls">
+                <div class="machine-chip">
+                    <span class="label">Machine</span>
+                    <span id="machineIdDisplay" class="value">—</span>
+                </div>
+                <label class="field">
+                    <span>Database</span>
+                    <select id="databaseSelect">
+                        <option value="KOL">KOL</option>
+                        <option value="AHM">AHM</option>
+                    </select>
+                </label>
+                <label class="field toggle">
+                    <input type="checkbox" id="autoRefreshToggle" checked />
+                    <span>Auto refresh</span>
+                </label>
+                <button id="refreshButton" class="primary">Refresh</button>
+            </div>
+        </header>
+
+        <section id="statusMessage" class="status-message" hidden></section>
+
+        <section id="dashboard" class="dashboard" hidden>
+            <article class="card" id="machineCard">
+                <div class="card-header">
+                    <div>
+                        <h2 id="machineName">Machine</h2>
+                        <p id="machineIdLabel" class="muted"></p>
+                    </div>
+                    <span id="machineStatusBadge" class="badge">Status</span>
+                </div>
+                <div id="idleLayout" class="card-content layout" hidden>
+                    <div class="info-grid">
+                        <div>
+                            <h3>Status</h3>
+                            <p id="idleStatusText" class="status-text"></p>
+                        </div>
+                        <div>
+                            <h3>Last Job Completed</h3>
+                            <p id="lastJobCompleted"></p>
+                        </div>
+                        <div>
+                            <h3>Idle Since</h3>
+                            <p id="idleDuration">&mdash;</p>
+                        </div>
+                    </div>
+                    <div class="backlog">
+                        <h3>Total Backlog</h3>
+                        <ul>
+                            <li><strong>On this machine:</strong> <span id="backlogMachine">0</span></li>
+                            <li><strong>For this process:</strong> <span id="backlogProcess">0</span></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div id="runningLayout" class="card-content layout" hidden>
+                    <div class="info-grid">
+                        <div>
+                            <h3>Current Job</h3>
+                            <p id="currentJob"></p>
+                        </div>
+                        <div>
+                            <h3>Started At</h3>
+                            <p id="startTime"></p>
+                        </div>
+                        <div>
+                            <h3>Running For</h3>
+                            <p id="runningDuration"></p>
+                        </div>
+                        <div>
+                            <h3>Target Finish In</h3>
+                            <p id="targetFinishIn"></p>
+                        </div>
+                        <div>
+                            <h3>ETA</h3>
+                            <p id="eta"></p>
+                        </div>
+                        <div>
+                            <h3>Status</h3>
+                            <p id="runningStatusText" class="status-text"></p>
+                        </div>
+                    </div>
+                    <div class="progress">
+                        <h3>Progress</h3>
+                        <div class="progress-bar">
+                            <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                        </div>
+                        <p class="progress-text" id="progressText"></p>
+                        <p class="muted" id="remainingText"></p>
+                    </div>
+                </div>
+            </article>
+
+            <article class="card" id="metaCard">
+                <div class="card-header">
+                    <h2>Machine Metrics</h2>
+                </div>
+                <div class="card-content metrics">
+                    <div>
+                        <h3>Speed (UPM)</h3>
+                        <p id="machineSpeed">&mdash;</p>
+                    </div>
+                    <div>
+                        <h3>Changeover</h3>
+                        <p id="changeOver">&mdash;</p>
+                    </div>
+                    <div>
+                        <h3>Plan Quantity</h3>
+                        <p id="planQty">&mdash;</p>
+                    </div>
+                </div>
+            </article>
+        </section>
+    </main>
+
+    <template id="loadingTemplate">
+        <div class="loading">Loading machine data…</div>
+    </template>
+</body>
+</html>
+

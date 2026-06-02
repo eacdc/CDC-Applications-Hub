@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GRN Web UI</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .status-results {
+      margin-top: 24px;
+      background: var(--card, #111827);
+      border: 1px solid var(--border, rgba(148, 163, 184, 0.16));
+      border-radius: 12px;
+      padding: 18px 20px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.35);
+    }
+
+    .status-results[hidden] {
+      display: none;
+    }
+
+    .status-results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .status-results-summary {
+      margin: 4px 0 0;
+      color: var(--muted, #94a3b8);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .status-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: transparent;
+      border-radius: 12px;
+      overflow: hidden;
+      table-layout: fixed;
+    }
+
+    .status-table thead {
+      background: rgba(148, 163, 184, 0.08);
+    }
+
+    .status-table th {
+      text-align: left;
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted, #a5b4fc);
+      padding: 10px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+    }
+
+    .status-table td {
+      padding: 10px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+      font-size: 12px;
+      color: var(--text, #e2e8f0);
+      word-break: break-word;
+      white-space: normal;
+      line-height: 1.35;
+    }
+
+    .status-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .status-table tbody tr:hover {
+      background: rgba(37, 99, 235, 0.08);
+      transition: background 0.2s ease;
+    }
+
+    .status-action-cell {
+      width: 120px;
+      text-align: right;
+    }
+
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: auto;
+      max-height: 320px;
+    }
+
+    .table-container::-webkit-scrollbar {
+      height: 6px;
+      width: 6px;
+    }
+
+    .table-container::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.4);
+      border-radius: 999px;
+    }
+
+    .table-container::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.8);
+    }
+
+    .status-action-placeholder {
+      color: var(--muted, #94a3b8);
+      font-style: italic;
+    }
+
+    .status-delete-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 10px;
+      border-radius: 6px;
+      border: none;
+      background: #ef4444;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+    .status-delete-btn:hover:not(:disabled) {
+      background: #dc2626;
+      transform: translateY(-1px);
+    }
+
+    .status-delete-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+      background: rgba(239, 68, 68, 0.45);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: rgba(96, 165, 250, 0.18);
+      color: #bfdbfe;
+    }
+
+    .status-badge-packingslip {
+      background: rgba(16, 185, 129, 0.18);
+      color: #6ee7b7;
+    }
+
+    .status-badge-gpn {
+      background: rgba(129, 140, 248, 0.18);
+      color: #c7d2fe;
+    }
+
+    .status-badge-delivery {
+      background: rgba(251, 191, 36, 0.18);
+      color: #fde68a;
+    }
+
+    .status-badge-default {
+      background: rgba(148, 163, 184, 0.18);
+      color: #e2e8f0;
+    }
+
+    .empty-message {
+      text-align: center;
+      color: var(--muted, #94a3b8);
+      padding: 20px 0;
+      font-size: 14px;
+    }
+
+    .delivery-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: transparent;
+      min-width: 800px;
+    }
+
+    .delivery-table th,
+    .delivery-table td {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .delivery-table th {
+      background: rgba(148, 163, 184, 0.08);
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--muted, #a5b4fc);
+    }
+
+    .delivery-table tbody tr:hover {
+      background: rgba(37, 99, 235, 0.08);
+    }
+
+    .btn-loading {
+      cursor: wait !important;
+      opacity: 0.8;
+    }
+
+    .collapse-toggle {
+      margin-left: auto;
+      width: 32px;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      background: rgba(15, 23, 42, 0.6);
+      color: var(--text, #e2e8f0);
+      font-size: 20px;
+      font-weight: 600;
+      line-height: 1;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+    .collapse-toggle:hover {
+      background: rgba(59, 130, 246, 0.24);
+      transform: translateY(-1px);
+    }
+
+    .collapse-toggle:focus-visible {
+      outline: 2px solid rgba(96, 165, 250, 0.7);
+      outline-offset: 2px;
+    }
+
+    .delivery-details-panel.collapsed {
+      display: none;
+    }
+
+    @media (max-width: 640px) {
+      .card {
+        width: 100% !important;
+        max-width: 100vw !important;
+        overflow: hidden !important;
+      }
+
+      .delivery-note-card {
+        overflow: hidden !important;
+      }
+
+      .barcode-row {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: var(--card, #111827);
+        padding-bottom: 12px;
+        margin-left: 0;
+        margin-right: 0;
+      }
+
+      .table-container {
+        max-height: 240px;
+        width: 100%;
+        overflow-x: auto;
+        overflow-y: auto;
+        margin-left: 0;
+        margin-right: 0;
+        padding-left: 0;
+        padding-right: 0;
+      }
+
+      .delivery-table {
+        min-width: 900px;
+      }
+
+      .delivery-table th,
+      .delivery-table td {
+        padding: 6px 8px;
+        font-size: 10px;
+      }
+
+      .delivery-table th {
+        font-size: 9px;
+        padding: 6px 8px;
+      }
+
+      .status-table th,
+      .status-table td {
+        padding: 7px 5px;
+        font-size: 11px;
+      }
+
+      .status-badge {
+        padding: 2px 7px;
+        font-size: 10px;
+        letter-spacing: 0.06em;
+      }
+
+      .status-delete-btn {
+        padding: 4px 8px;
+        font-size: 11px;
+      }
+
+      .status-results {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header class="app-header">
+      <h1>GRN Web UI</h1>
+      <div class="spacer"></div>
+      <button id="btn-logout" class="secondary hidden" title="Logout">Logout</button>
+    </header>
+
+    <main class="app-main">
+      <section id="login-section" class="card">
+        <h2>Login</h2>
+        <form id="login-form">
+          <div class="form-row">
+            <label for="username">Username</label>
+            <input id="username" name="username" type="text" autocomplete="username" required />
+          </div>
+          <div class="form-row">
+            <label for="database">Database</label>
+            <select id="database" name="database" required>
+              <option value="">Select database</option>
+              <option value="KOL">KOL</option>
+              <option value="AHM">AHM</option>
+            </select>
+          </div>
+          <div class="form-actions">
+            <button type="submit">Sign in</button>
+          </div>
+          <p id="login-error" class="error" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section id="landing-section" class="landing-section hidden">
+        <div class="page-header">
+          <h2>Select Portal</h2>
+        </div>
+        <div class="info">
+          <p><strong>User:</strong> <span id="info-username"></span></p>
+          <p><strong>Database:</strong> <span id="info-database"></span></p>
+        </div>
+        <div class="portal-cards">
+          <div class="portal-card" id="portal-grm">
+            <div class="portal-card-content">
+              <h3>Delivery Portal</h3>
+              <p class="portal-description">Delivery Note Management</p>
+            </div>
+          </div>
+          <div class="portal-card" id="portal-gpn">
+            <div class="portal-card-content">
+              <h3>GPN Portal</h3>
+              <p class="portal-description">Goods Packing Note</p>
+            </div>
+          </div>
+          <div class="portal-card" id="portal-barcode-status">
+            <div class="portal-card-content">
+              <h3>Barcode Status</h3>
+              <p class="portal-description">Track barcode progress</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="post-login-section" class="card hidden">
+        <div class="page-header">
+          <button id="btn-back-to-landing" class="back-btn">← Back</button>
+          <h2>Initiate Challan</h2>
+        </div>
+        <div class="info">
+          <p><strong>User:</strong> <span id="info-username-grm"></span></p>
+          <p><strong>Database:</strong> <span id="info-database-grm"></span></p>
+        </div>
+        <div class="form-row">
+          <label for="barcode">Barcode Number</label>
+          <input id="barcode" name="barcode" type="text" inputmode="numeric" />
+        </div>
+        <div class="form-actions">
+          <button id="btn-initiate">Innitiate Challan</button>
+        </div>
+      </section>
+
+      <section id="gpn-section" class="card hidden">
+        <div class="page-header">
+          <button id="btn-back-to-landing-gpn" class="back-btn">← Back</button>
+          <h2>GPN Portal</h2>
+        </div>
+        <div class="info">
+          <p><strong>User:</strong> <span id="info-username-gpn"></span></p>
+          <p><strong>Database:</strong> <span id="info-database-gpn"></span></p>
+        </div>
+        <div class="form-row">
+          <label for="gpn-barcode">Barcode Number</label>
+          <input id="gpn-barcode" name="gpn-barcode" type="text" inputmode="numeric" />
+        </div>
+        <div class="form-actions">
+          <button id="btn-submit-gpn">Submit</button>
+        </div>
+        <p id="gpn-error" class="error" aria-live="polite"></p>
+      </section>
+
+      <section id="gpn-confirmation" class="card delivery-note-card hidden">
+        <div class="page-header">
+          <button id="btn-back-to-gpn-form" class="back-btn">← Back</button>
+          <h2>GPN Entry Created</h2>
+        </div>
+        <div class="form-row barcode-row">
+          <label>Barcode Number</label>
+          <input id="gpn-conf-barcode" type="text" placeholder="Enter barcode number" />
+        </div>
+        
+        <div class="table-container">
+          <table class="delivery-table">
+            <thead>
+              <tr>
+                <th>Bar Code</th>
+                <th>Count</th>
+                <th>Item Count</th>
+                <th>Order Qty</th>
+                <th>Count Total</th>
+                <th>Item Count Total</th>
+                <th>Job Number</th>
+                <th>Job Name</th>
+              </tr>
+            </thead>
+            <tbody id="gpn-table-body">
+              <!-- Rows will be populated here -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="form-actions">
+          <button id="btn-update-gpn" class="secondary">Update Entry</button>
+        </div>
+      </section>
+
+      <section id="barcode-status-section" class="card hidden">
+        <div class="page-header">
+          <button id="btn-back-to-landing-status" class="back-btn">← Back</button>
+          <h2>Barcode Status Lookup</h2>
+        </div>
+        <div class="info">
+          <p><strong>User:</strong> <span id="info-username-status"></span></p>
+          <p><strong>Database:</strong> <span id="info-database-status"></span></p>
+        </div>
+        <div class="form-row">
+          <label for="status-barcode">Barcode Number</label>
+          <input id="status-barcode" name="status-barcode" type="text" inputmode="numeric" />
+        </div>
+        <div class="form-actions">
+          <button id="btn-search-barcode-status">Search Barcode Status</button>
+        </div>
+        <p id="status-error" class="error" aria-live="polite"></p>
+        <div class="status-results" id="status-results" hidden>
+          <div class="status-results-header">
+            <div>
+              <h3 id="status-results-title">Status Timeline</h3>
+              <p id="status-results-summary" class="status-results-summary"></p>
+            </div>
+          </div>
+          <div class="table-container">
+            <table class="status-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Date &amp; Time</th>
+                <th>Job Booking No</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="status-table-body">
+              <tr class="empty-row">
+                <td colspan="4" class="empty-message">Enter a barcode to view status history.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        </div>
+      </section>
+
+      <section id="challan-form-section" class="card hidden">
+        <div class="page-header">
+          <button id="btn-back-to-initiate" class="back-btn">← Back</button>
+          <h2>Delivery Note</h2>
+        </div>
+        <div class="form-row">
+          <label for="clientName">Client Name</label>
+          <input id="clientName" type="text" readonly />
+        </div>
+        <div class="form-row">
+          <label for="modeOfTransport">Mode of Transport</label>
+          <select id="modeOfTransport">
+            <option value="">Select</option>
+            <option value="AIR">Air</option>
+            <option value="SEA">Sea</option>
+            <option value="ROAD">Road</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="containerNumber">Container Number</label>
+          <input id="containerNumber" type="text" />
+        </div>
+        <div class="form-row">
+          <label for="sealNumber">Seal Number</label>
+          <input id="sealNumber" type="text" />
+        </div>
+        <div class="form-row">
+          <label for="transporterName">Transporter Name</label>
+          <select id="transporterName">
+            <option value="">Select Transporter</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="vehicleNumber">Vehicle Number</label>
+          <input id="vehicleNumber" type="text" />
+        </div>
+        <div class="form-actions">
+          <button id="btn-save-challan">Save</button>
+        </div>
+      </section>
+
+      <section id="delivery-note-confirmation" class="card delivery-note-card hidden">
+        <div class="page-header">
+          <button id="btn-back-to-form" class="back-btn">← Back</button>
+          <h2>Delivery Note Created</h2>
+          <button type="button" id="delivery-details-toggle" class="collapse-toggle" aria-expanded="true" aria-controls="delivery-details-panel" aria-label="Collapse delivery details">−</button>
+        </div>
+        <div id="delivery-details-panel" class="delivery-details-panel">
+          <div class="info">
+            <p><strong>Delivery Note Number:</strong> <span id="dn-number"></span></p>
+          </div>
+          <div class="confirmation-grid">
+            <div class="form-row">
+              <label>Client Name</label>
+              <input id="conf-client-name" type="text" readonly />
+            </div>
+            <div class="form-row">
+              <label>Mode of Transport</label>
+              <input id="conf-mode-transport" type="text" readonly />
+            </div>
+            <div class="form-row">
+              <label>Transporter Name</label>
+              <input id="conf-transporter" type="text" readonly />
+            </div>
+            <div class="form-row">
+              <label>Container Number</label>
+              <input id="conf-container" type="text" readonly />
+            </div>
+            <div class="form-row">
+              <label>Vehicle Number</label>
+              <input id="conf-vehicle" type="text" readonly />
+            </div>
+            <div class="form-row">
+              <label>Seal Number</label>
+              <input id="conf-seal" type="text" readonly />
+            </div>
+          </div>
+        </div>
+        <div class="form-row barcode-row">
+          <label>Barcode Number</label>
+          <input id="conf-barcode" type="text" placeholder="Enter barcode number" />
+        </div>
+        
+        <div class="table-container">
+          <table class="delivery-table">
+            <thead>
+              <tr>
+                <th>Barcode Number</th>
+                <th>Carton Count</th>
+                <th>Job Name</th>
+                <th>Ordered Quantity</th>
+                <th>GPN Qty</th>
+                <th>Delivered This Voucher</th>
+                <th>Delivered Total</th>
+              </tr>
+            </thead>
+            <tbody id="delivery-table-body">
+              <!-- 10 rows will be populated here -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="form-actions">
+          <button id="btn-update-delivery-note" class="secondary">Update Delivery Note</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <small>&copy; <span id="year"></span> CDC</small>
+    </footer>
+  </div>
+
+  <script src="script.js" defer></script>
+</body>
+</html>
+

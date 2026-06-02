@@ -1,13 +1,46 @@
 // API Configuration
-// Automatically detect environment: use production URL if not on localhost
-// Points to contractor-po backend in main backend folder
 const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:3000/api'  // Local: contractor-po backend runs on port 3000
-  : 'https://contractor-po-backend.onrender.com/api';  // Production: contractor-po backend subfolder
+  ? 'http://localhost:3001/api'
+  : 'https://cdcapi.onrender.com/api';
+
+// Main backend base (non contractor-po prefixed routes in backend/src/routes.js)
+const MAIN_API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:3001/api'
+  : 'https://cdcapi.onrender.com/api';
 
 // Helper function for API calls
 async function apiCall(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
+  const config = {
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    },
+    ...options
+  };
+
+  if (config.body && typeof config.body === 'object') {
+    config.body = JSON.stringify(config.body);
+  }
+
+  try {
+    const response = await fetch(url, config);
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'API request failed');
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+}
+
+// Helper for main backend routes mounted at /api
+async function apiCallMain(endpoint, options = {}) {
+  const url = `${MAIN_API_BASE_URL}${endpoint}`;
   const config = {
     headers: {
       'Content-Type': 'application/json',
@@ -41,6 +74,10 @@ export const authAPI = {
     method: 'POST',
     body: { userId, passkey }
   }),
+  contractorLogin: (contractorIdOrName, password) => apiCall('/auth/contractor-login', {
+    method: 'POST',
+    body: { contractorIdOrName, password }
+  }),
   register: (userId, passkey, name, role) => apiCall('/auth/register', {
     method: 'POST',
     body: { userId, passkey, name, role }
@@ -61,7 +98,7 @@ export const jobsAPI = {
     body: { operations }
   }),
   // Save to JobopsMaster (jobid = job number)
-  // extraJobData can include qty, clientName, jobTitle, productCat, unitPrice
+  // extraJobData can include qty, clientName, jobTitle, productCat, segmentName, unitPrice
   saveJobOpsMaster: (jobNumber, operations, extraJobData = {}) => apiCall('/jobs/jobopsmaster', {
     method: 'POST',
     body: { jobNumber, operations, ...extraJobData }
@@ -87,14 +124,19 @@ export const operationsAPI = {
     const query = search ? `?search=${encodeURIComponent(search)}` : '';
     return apiCall(`/operations${query}`);
   },
+  getByCategory: (category) => {
+    if (!category || !String(category).trim()) return Promise.resolve([]);
+    return apiCall(`/operations?category=${encodeURIComponent(String(category).trim())}`);
+  },
+  getCategories: () => apiCall('/operations/categories'),
   getById: (id) => apiCall(`/operations/${id}`),
-  create: (opsName, type, ratePerUnit) => apiCall('/operations', {
+  create: (opsName, type, ratePerUnit, categories, isAdhocOp = false) => apiCall('/operations', {
     method: 'POST',
-    body: { opsName, type, ratePerUnit }
+    body: { opsName, type, ratePerUnit, isAdhocOp: !!isAdhocOp, categories: Array.isArray(categories) ? categories : (categories != null && categories !== '' ? [String(categories)] : []) }
   }),
-  update: (id, opsName, type, ratePerUnit) => apiCall(`/operations/${id}`, {
+  update: (id, opsName, type, ratePerUnit, categories, isAdhocOp = false) => apiCall(`/operations/${id}`, {
     method: 'PUT',
-    body: { opsName, type, ratePerUnit }
+    body: { opsName, type, ratePerUnit, isAdhocOp: !!isAdhocOp, categories: Array.isArray(categories) ? categories : (categories != null && categories !== '' ? [String(categories)] : []) }
   }),
   delete: (id) => apiCall(`/operations/${id}`, {
     method: 'DELETE'
@@ -112,6 +154,35 @@ export const workAPI = {
   updateJobOpsMaster: (contractorId, jobNumber, operations) => apiCall('/work/update/jobopsmaster', {
     method: 'POST',
     body: { contractorId, jobNumber, operations }
+  }),
+  // Save-only (no bill): reduces pending in JobOpsMaster + writes Contractor_WD with savedInBill:'No'
+  saveJobOpsMaster: (contractorId, jobNumber, operations) => apiCall('/work/save/jobopsmaster', {
+    method: 'POST',
+    body: { contractorId, jobNumber, operations }
+  }),
+  // Save-only for ad-hoc
+  saveAdhoc: (adhocOrderId, contractorId, operations) => apiCall('/work/save/adhoc', {
+    method: 'POST',
+    body: { adhocOrderId, contractorId, operations }
+  }),
+  // Fetch ALL Contractor_WD entries not yet in a bill, for a contractor (all jobs + adhoc)
+  getAllUnsaved: (contractorId) =>
+    apiCall(`/work/unsaved/all/${encodeURIComponent(contractorId)}`),
+  // Fetch Contractor_WD entries not yet in a bill, for a job
+  getUnsaved: (contractorId, jobNumber) =>
+    apiCall(`/work/unsaved/${encodeURIComponent(contractorId)}/${encodeURIComponent(jobNumber)}`),
+  // Fetch Contractor_WD entries not yet in a bill, for an ad-hoc order
+  getUnsavedAdhoc: (contractorId, adhocOrderId) =>
+    apiCall(`/work/unsaved/adhoc/${encodeURIComponent(contractorId)}/${encodeURIComponent(adhocOrderId)}`),
+  // After bill creation, mark those Contractor_WD entries as savedInBill:'Yes'
+  markBilled: (contractorId, items) => apiCall('/work/mark-billed', {
+    method: 'POST',
+    body: { contractorId, items }
+  }),
+  // Reverse a save: restores pending in JobOpsMaster/AdhocWorkOrder + removes Contractor_WD entry
+  unsave: (contractorId, items) => apiCall('/work/unsave', {
+    method: 'POST',
+    body: { contractorId, items }
   })
 };
 
@@ -134,6 +205,7 @@ export const contractorsAPI = {
 // Bills API
 export const billsAPI = {
   getAll: () => apiCall('/bills'),
+  getByJobNumber: (jobNumber) => apiCall(`/bills/by-job/${encodeURIComponent(jobNumber)}`),
   getByBillNumber: (billNumber) => apiCall(`/bills/${billNumber}`),
   create: (contractorName, jobs) => apiCall('/bills', {
     method: 'POST',
@@ -162,6 +234,19 @@ export const billEditAPI = {
     })
 };
 
+// Summary API
+export const summaryAPI = {
+  getSummary: () => apiCall('/summary'),
+  getChartData: (filterType = 'year', year, month, quarter) => {
+    const params = new URLSearchParams();
+    params.set('filterType', filterType);
+    if (year != null) params.set('year', String(year));
+    if (month != null) params.set('month', String(month));
+    if (quarter != null) params.set('quarter', String(quarter));
+    return apiCall(`/summary/chart?${params.toString()}`);
+  }
+};
+
 // Series API
 export const seriesAPI = {
   getAll: () => apiCall('/series'),
@@ -171,5 +256,28 @@ export const seriesAPI = {
     body: { jobNumbers }
   }),
   searchByJobNumber: (jobNumber) => apiCall(`/series/search/${encodeURIComponent(jobNumber)}`)
+};
+
+// Ad-hoc work orders API
+export const adhocOrdersAPI = {
+  getAll: () => apiCallMain('/adhoc-orders'),
+  getById: (id) => apiCallMain(`/adhoc-orders/${id}`),
+  getStatus: (id) => apiCallMain(`/adhoc-orders/${id}/status`),
+  getPending: (id) => apiCallMain(`/work/pending/adhoc/${id}`),
+  create: (data) => apiCallMain('/adhoc-orders', {
+    method: 'POST',
+    body: data
+  }),
+  update: (id, data) => apiCallMain(`/adhoc-orders/${id}`, {
+    method: 'PUT',
+    body: data
+  }),
+  delete: (id) => apiCallMain(`/adhoc-orders/${id}`, {
+    method: 'DELETE'
+  }),
+  updateWorkDone: (adhocOrderId, contractorId, operations) => apiCallMain('/work/update/adhoc', {
+    method: 'POST',
+    body: { adhocOrderId, contractorId, operations }
+  })
 };
 

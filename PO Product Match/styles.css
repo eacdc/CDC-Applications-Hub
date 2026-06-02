@@ -1,0 +1,91 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #121212;
+  color: #e6e6e6;
+}
+.app { max-width: 960px; margin: 0 auto; padding: 20px; }
+.header h1 { margin: 0 0 8px; }
+.header p { margin: 0 0 20px; color: #bfbfbf; }
+.panel {
+  background: #1c1c1c;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+.panel h2 { margin-top: 0; }
+.tabs { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.tab {
+  border: 1px solid #3a3a3a;
+  background: #222;
+  color: #ddd;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.tab.active { background: #2f4f8f; border-color: #2f4f8f; }
+.mode { display: none; margin-bottom: 10px; }
+.mode.active { display: block; }
+textarea, input, select {
+  width: 100%;
+  background: #111;
+  color: #ddd;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  padding: 8px;
+}
+textarea { resize: vertical; }
+.inline-label {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 10px;
+  align-items: center;
+  margin: 10px 0;
+  font-size: 14px;
+  color: #ccc;
+}
+.actions { margin: 18px 0; }
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 14px;
+}
+.btn-primary { background: #3a7afe; color: white; }
+#status { color: #9ec1ff; min-height: 1.2em; }
+.meta pre {
+  background: #111;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 10px;
+  overflow: auto;
+  font-size: 12px;
+  max-height: 240px;
+}
+.results h3 { margin-top: 0; }
+.result-card {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.result-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.match-pct { font-size: 1.25rem; font-weight: bold; color: #7eb6ff; }
+.reason { font-size: 13px; color: #aaa; margin-bottom: 8px; }
+.row-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 6px;
+  font-size: 12px;
+}
+.row-grid div { word-break: break-word; }
+.row-grid span { color: #888; }

@@ -1,0 +1,352 @@
+:root {
+    color-scheme: light dark;
+    font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    --surface: rgba(255, 255, 255, 0.85);
+    --surface-alt: rgba(255, 255, 255, 0.6);
+    --backdrop: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    --text: #f9fafb;
+    --muted: rgba(249, 250, 251, 0.7);
+    --accent: #38bdf8;
+    --shadow: 0 24px 48px rgba(15, 23, 42, 0.35);
+    --border: rgba(148, 163, 184, 0.2);
+    --badge-green: #22c55e;
+    --badge-red: #ef4444;
+    --badge-amber: #f59e0b;
+    --progress-bg: rgba(255, 255, 255, 0.15);
+    --progress-fill: #38bdf8;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    padding: 0;
+    background: var(--backdrop);
+    color: var(--text);
+    display: flex;
+}
+
+.app-shell {
+    width: min(1100px, 95vw);
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 2.5rem 0 3rem;
+}
+
+.app-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.title-block h1 {
+    font-size: clamp(1.75rem, 2vw + 1.5rem, 2.5rem);
+    margin: 0;
+}
+
+.subtitle {
+    margin: 0.25rem 0 0;
+    color: var(--muted);
+}
+
+.header-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.machine-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.85rem;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.18);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    color: var(--text);
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.machine-chip .label {
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    opacity: 0.75;
+    letter-spacing: 0.08em;
+}
+
+.machine-chip .value {
+    font-variant-numeric: tabular-nums;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
+.field input,
+.field select {
+    padding: 0.45rem 0.6rem;
+    border-radius: 0.75rem;
+    border: 1px solid var(--border);
+    background: rgba(15, 23, 42, 0.65);
+    color: var(--text);
+    font-size: 0.95rem;
+    min-width: 110px;
+}
+
+.field.toggle {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.field.toggle input {
+    width: unset;
+    min-width: unset;
+    accent-color: var(--accent);
+}
+
+.primary {
+    padding: 0.6rem 1.25rem;
+    border-radius: 999px;
+    border: none;
+    background: var(--accent);
+    color: #0f172a;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 30px rgba(56, 189, 248, 0.35);
+}
+
+.status-message {
+    border-radius: 1rem;
+    padding: 1rem 1.25rem;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid var(--border);
+}
+
+.status-message.error {
+    background: rgba(239, 68, 68, 0.18);
+    border-color: rgba(239, 68, 68, 0.35);
+    color: #fecaca;
+}
+
+.status-message.info {
+    background: rgba(59, 130, 246, 0.18);
+    border-color: rgba(59, 130, 246, 0.35);
+    color: #bfdbfe;
+}
+
+.dashboard {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+}
+
+.card {
+    background: var(--surface);
+    border-radius: 1.5rem;
+    padding: 1.75rem;
+    backdrop-filter: blur(18px);
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #0f172a;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.card-header h2 {
+    margin: 0;
+    font-size: 1.4rem;
+}
+
+.card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.layout {
+    color: #0f172a;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1.25rem;
+}
+
+.info-grid h3 {
+    margin: 0 0 0.35rem;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: rgba(15, 23, 42, 0.6);
+}
+
+.info-grid p {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+.muted {
+    color: rgba(15, 23, 42, 0.55);
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+.badge {
+    padding: 0.45rem 0.9rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: var(--badge-amber);
+    color: white;
+}
+
+.badge.green {
+    background: var(--badge-green);
+}
+
+.badge.red {
+    background: var(--badge-red);
+}
+
+.status-text {
+    font-weight: 700;
+    font-size: 1.05rem;
+}
+
+.backlog ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.backlog li {
+    font-size: 1rem;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.progress {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.progress-bar {
+    position: relative;
+    width: 100%;
+    height: 12px;
+    border-radius: 999px;
+    background: var(--progress-bg);
+    overflow: hidden;
+}
+
+.progress-fill {
+    position: absolute;
+    inset: 0;
+    width: 0%;
+    background: linear-gradient(90deg, var(--progress-fill), #2563eb);
+    box-shadow: 0 6px 15px rgba(37, 99, 235, 0.4);
+    transition: width 0.4s ease;
+}
+
+.progress-text {
+    margin: 0;
+    font-weight: 600;
+}
+
+.metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1.25rem;
+}
+
+.metrics h3 {
+    margin: 0 0 0.35rem;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: rgba(15, 23, 42, 0.6);
+}
+
+.metrics p {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.loading {
+    padding: 1rem 1.25rem;
+    border-radius: 1rem;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid var(--border);
+    text-align: center;
+    font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+    .app-shell {
+        width: 100%;
+        padding: 1.5rem;
+    }
+
+    .card {
+        padding: 1.35rem;
+    }
+
+    .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .header-controls {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .field input,
+    .field select {
+        width: 100%;
+        min-width: unset;
+    }
+
+    .primary {
+        width: 100%;
+    }
+}
+

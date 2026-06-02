@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PO Product Match</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1>PO Product Match</h1>
+      <p>Upload a client PO (or paste text). Finds prior ProductMaster rows and ranks them by match %.</p>
+    </header>
+
+    <main>
+      <section class="panel">
+        <h2>Purchase order</h2>
+        <div class="tabs" data-side="po">
+          <button type="button" class="tab active" data-side="po" data-mode="file">Image / PDF / text file</button>
+          <button type="button" class="tab" data-side="po" data-mode="text">Paste text</button>
+        </div>
+        <div class="mode mode-file active" id="poFileMode">
+          <input id="poFile" type="file" accept=".pdf,.txt,image/*">
+        </div>
+        <div class="mode mode-text" id="poTextMode">
+          <textarea id="poText" rows="8" placeholder="Paste PO text"></textarea>
+        </div>
+        <label class="inline-label">
+          Database
+          <select id="database">
+            <option value="KOL">KOL</option>
+            <option value="AHM">AHM</option>
+          </select>
+        </label>
+        <label class="inline-label">
+          Top N rows (max 150)
+          <input id="topN" type="number" min="1" max="150" value="80">
+        </label>
+        <textarea id="extractedPreview" rows="6" readonly placeholder="Extracted PO text appears here"></textarea>
+      </section>
+
+      <section class="actions">
+        <button type="button" id="runBtn" class="btn-primary">Search &amp; score</button>
+        <p id="status"></p>
+      </section>
+
+      <section class="panel meta" id="metaSection" hidden>
+        <h3>Search meta</h3>
+        <pre id="metaJson"></pre>
+      </section>
+
+      <section class="results" id="resultsSection" hidden>
+        <h3>Results (match % high → low)</h3>
+        <div id="resultsList"></div>
+      </section>
+    </main>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>

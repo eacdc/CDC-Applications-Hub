@@ -6,14 +6,27 @@
     <title>Contractor PO System - Work Done</title>
     <link rel="stylesheet" href="styles.css" />
     <style>
-      /* Disabled Save Bill button cursor */
-      #saveBillBtn:disabled {
+      #saveBillBtn:disabled,
+      #submitBillBtn:disabled {
         cursor: not-allowed;
         opacity: 0.6;
       }
     </style>
   </head>
   <body>
+    <script>
+      (function() {
+        try {
+          var userJson = localStorage.getItem('user');
+          if (userJson) {
+            var user = JSON.parse(userJson);
+            if (user && user.type === 'contractor') {
+              window.location.replace('add-ops.html');
+            }
+          }
+        } catch (e) {}
+      })();
+    </script>
     <div class="app">
       <header class="app-header">
         <div class="brand">
@@ -96,7 +109,7 @@
 
             <div class="button-row">
               <button class="secondary-btn primary-btn--sm" type="button" id="addBtn">
-                ADD
+                SAVE
               </button>
             </div>
 
@@ -114,13 +127,22 @@
               <table class="data-table" id="billTable">
                 <thead>
                   <tr>
-                    <th>Job Number</th>
+                    <th>Reference</th>
                     <th>Operation</th>
                     <th>Qty/Book</th>
                     <th>Rate / Book</th>
                     <th>Qty Completed</th>
                     <th>Total Value</th>
                     <th>Action</th>
+                  </tr>
+                  <tr>
+                    <th><input type="text" id="billFilterReference" placeholder="Filter reference" style="width: 100%;" /></th>
+                    <th><input type="text" id="billFilterOperation" placeholder="Filter operation" style="width: 100%;" /></th>
+                    <th><input type="text" id="billFilterQtyBook" placeholder="Filter qty/book" style="width: 100%;" /></th>
+                    <th><input type="text" id="billFilterRate" placeholder="Filter rate" style="width: 100%;" /></th>
+                    <th><input type="text" id="billFilterQtyCompleted" placeholder="Filter qty completed" style="width: 100%;" /></th>
+                    <th><input type="text" id="billFilterTotalValue" placeholder="Filter total value" style="width: 100%;" /></th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody id="billTableBody">
@@ -132,11 +154,49 @@
               </table>
             </div>
 
-            <div class="button-row">
-              <button class="primary-btn primary-btn--sm" type="button" id="saveBillBtn">
-                Save Bill
+            <div class="button-row" style="gap: 12px;">
+              <button class="primary-btn primary-btn--sm" type="button" id="submitBillBtn" disabled>
+                SUBMIT
+              </button>
+              <button class="secondary-btn primary-btn--sm" type="button" id="exportBillBtn" disabled title="Export Bill Details to Excel">
+                Export to Excel
               </button>
             </div>
+          </div>
+        </section>
+
+        <section class="panel panel--collapsible" id="adhocPendingPanel">
+          <header class="panel-header">
+            <h3>Ad-hoc Work</h3>
+          </header>
+          <div class="panel-body">
+            <div class="field field--inline">
+              <label for="adhocOrderSelect">Ad-hoc Order</label>
+              <select id="adhocOrderSelect">
+                <option value="">Select ad-hoc order</option>
+              </select>
+            </div>
+
+            <div class="table-wrapper">
+              <table class="data-table" id="adhocPendingTable">
+                <thead>
+                  <tr>
+                    <th>Operations</th>
+                    <th>Total Qty</th>
+                    <th>Pending Qty</th>
+                    <th>Qty to Add</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+
+            <div class="button-row">
+              <button class="secondary-btn primary-btn--sm" type="button" id="addAdhocBtn">
+                SAVE AD-HOC
+              </button>
+            </div>
+            <p class="inline-warning" id="adhocWorkWarning"></p>
           </div>
         </section>
       </main>
@@ -149,7 +209,7 @@
     </div>
 
     <script type="module">
-      import { workAPI, contractorsAPI, jobsAPI, billsAPI, seriesAPI, operationsAPI } from './api.js';
+      import { workAPI, contractorsAPI, jobsAPI, billsAPI, seriesAPI, operationsAPI, adhocOrdersAPI } from './api.js';
 
       const workSearchForm = document.getElementById("workSearchForm");
       const opsPendingPanel = document.getElementById("opsPendingPanel");
@@ -159,11 +219,26 @@
       const contractorSelect = document.getElementById("contractorName");
       const jobNumberInput = document.getElementById("jobNumberWork");
       const jobNumberList = document.getElementById("jobNumberList");
-      const saveBtn = document.getElementById("saveBillBtn");
+      const submitBtn = document.getElementById("submitBillBtn");
+      const exportBillBtn = document.getElementById("exportBillBtn");
       const addBtn = document.getElementById("addBtn");
       const billTablePanel = document.getElementById("billTablePanel");
       const billTableBody = document.getElementById("billTableBody");
+      const billFilterReference = document.getElementById("billFilterReference");
+      const billFilterOperation = document.getElementById("billFilterOperation");
+      const billFilterQtyBook = document.getElementById("billFilterQtyBook");
+      const billFilterRate = document.getElementById("billFilterRate");
+      const billFilterQtyCompleted = document.getElementById("billFilterQtyCompleted");
+      const billFilterTotalValue = document.getElementById("billFilterTotalValue");
       const homeBtn = document.querySelector(".home-btn");
+      const adhocPendingPanel = document.getElementById("adhocPendingPanel");
+      const adhocOrderSelect = document.getElementById("adhocOrderSelect");
+      const adhocPendingTable = document.getElementById("adhocPendingTable");
+      const adhocPendingBody = adhocPendingTable?.querySelector('tbody');
+      const addAdhocBtn = document.getElementById("addAdhocBtn");
+      const adhocWorkWarning = document.getElementById("adhocWorkWarning");
+      // Keep saveBtn as alias so legacy references still work
+      const saveBtn = submitBtn;
       let currentContractor = null;
       let currentJobNumber = null;
       let currentOperationsData = []; // Store operations data for bill table
@@ -176,23 +251,214 @@
       let seriesJobs = []; // Array to store multiple jobs from series
       let currentSeriesId = null; // Store series ID when pulling series
       let allOperations = []; // Store all operations for type lookup
+      let adhocOrders = [];
+      let currentAdhocOrder = null;
+      let currentAdhocOperationsData = [];
+      let adhocPendingQtyCache = {};
+      let filteredBillRowIndices = [];
       // Store clientName and jobTitle per job number
       // Structure: { jobNumber: { clientName: '', jobTitle: '' } }
       let jobDetailsMap = {};
+      let billFilterState = {
+        reference: '',
+        operation: '',
+        qtyBook: '',
+        rate: '',
+        qtyCompleted: '',
+        totalValue: '',
+      };
+      // Packaging segment: per operation max "qty to add" = totalQty*0.05 + that op's pending. Key: jobNumber, value: totalQty or null.
+      let jobPackagingTotalQtyMap = {};
 
       // Load all operations on page load
       async function loadOperations() {
         try {
           allOperations = await operationsAPI.getAll();
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/3a23d043-9df2-40a4-abfb-c396acbfe70e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'work-done.html:182',message:'Operations loaded',data:{count:allOperations?.length,firstOp:allOperations?.[0]?._id,firstOpType:allOperations?.[0]?.type},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-          // #endregion
         } catch (error) {
           console.error('Error loading operations:', error);
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/3a23d043-9df2-40a4-abfb-c396acbfe70e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'work-done.html:184',message:'Error loading operations',data:{error:error.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-          // #endregion
         }
+      }
+
+      function buildBillRowFromUnsavedItem(item, { jobNumber = '', isAdhoc = false, adhocOrderId = '', adhocLabel = '' } = {}) {
+        return {
+          jobNumber: isAdhoc ? '' : jobNumber,
+          opId: item.opsId,
+          opsId: item.opsId,
+          opsName: item.opsName,
+          qtyBook: item.qtyBook || (isAdhoc ? 1 : 0),
+          rate: item.valuePerBook,
+          qtyCompleted: item.qtyCompleted,
+          totalValue: item.totalValue,
+          valuePerBook: item.valuePerBook,
+          pendingOpsQty: 0,
+          isAdhoc,
+          adhocOrderId,
+          adhocLabel,
+          fromContractorWD: true
+        };
+      }
+
+      // Sync Bill Details rows for a job from Contractor_WD unsaved entries (backend is source of truth)
+      async function loadUnsavedForJob(contractorId, jobNumber) {
+        try {
+          const result = await workAPI.getUnsaved(contractorId, jobNumber);
+          const clientName = result?.clientName || '';
+          const jobTitle = result?.jobTitle || '';
+          if (!jobDetailsMap[jobNumber]) {
+            jobDetailsMap[jobNumber] = { clientName, jobTitle };
+          }
+
+          // Drop stale auto-loaded rows for this job, then re-add from backend
+          billData = billData.filter(bd => !( !bd.isAdhoc && bd.jobNumber === jobNumber && bd.fromContractorWD));
+
+          const items = result?.items || [];
+          if (items.length === 0) {
+            refreshBillTable();
+            updateSubmitButtonState();
+            return;
+          }
+
+          for (const item of items) {
+            billData.push(buildBillRowFromUnsavedItem(item, { jobNumber }));
+          }
+
+          hasUnsavedBillData = true;
+          refreshBillTable();
+          updateSubmitButtonState();
+          if (billTablePanel) billTablePanel.classList.remove('panel-collapsed');
+        } catch (e) {
+          console.error('Error loading unsaved work for job:', e);
+        }
+      }
+
+      // Sync Bill Details rows for an ad-hoc order from Contractor_WD unsaved entries
+      async function loadUnsavedForAdhoc(contractorId, adhocOrderId) {
+        try {
+          const result = await workAPI.getUnsavedAdhoc(contractorId, adhocOrderId);
+          const adhocLabel = result?.adhocLabel || adhocOrderId;
+
+          billData = billData.filter(bd => !(bd.isAdhoc && bd.adhocOrderId === adhocOrderId && bd.fromContractorWD));
+
+          const items = result?.items || [];
+          if (items.length === 0) {
+            refreshBillTable();
+            updateSubmitButtonState();
+            return;
+          }
+
+          for (const item of items) {
+            billData.push(buildBillRowFromUnsavedItem(item, { isAdhoc: true, adhocOrderId, adhocLabel }));
+          }
+
+          hasUnsavedBillData = true;
+          refreshBillTable();
+          updateSubmitButtonState();
+          if (billTablePanel) billTablePanel.classList.remove('panel-collapsed');
+        } catch (e) {
+          console.error('Error loading unsaved ad-hoc work:', e);
+        }
+      }
+
+      // Fetch ALL unsaved Contractor_WD entries for a contractor and load into Bill Details
+      async function loadAllUnsavedForContractor(contractorId) {
+        if (!contractorId) return;
+        try {
+          const groups = await workAPI.getAllUnsaved(contractorId);
+
+          // Replace all auto-loaded rows with fresh backend data
+          billData = billData.filter(bd => !bd.fromContractorWD);
+
+          if (!groups || groups.length === 0) {
+            refreshBillTable();
+            updateSubmitButtonState();
+            return;
+          }
+
+          for (const group of groups) {
+            if (group.isAdhoc) {
+              const { adhocOrderId, adhocLabel } = group;
+              for (const item of (group.items || [])) {
+                billData.push(buildBillRowFromUnsavedItem(item, { isAdhoc: true, adhocOrderId, adhocLabel }));
+              }
+            } else {
+              const { jobNumber, clientName, jobTitle } = group;
+              if (!jobDetailsMap[jobNumber]) {
+                jobDetailsMap[jobNumber] = { clientName, jobTitle };
+              }
+              for (const item of (group.items || [])) {
+                billData.push(buildBillRowFromUnsavedItem(item, { jobNumber }));
+              }
+            }
+          }
+
+          hasUnsavedBillData = billData.length > 0;
+          refreshBillTable();
+          updateSubmitButtonState();
+          if (billData.length > 0 && billTablePanel) billTablePanel.classList.remove('panel-collapsed');
+        } catch (e) {
+          console.error('Error loading all unsaved work for contractor:', e);
+        }
+      }
+
+      // Enable/disable Submit button based on Bill Details content
+      function updateSubmitButtonState() {
+        if (submitBtn) {
+          submitBtn.disabled = billData.length === 0;
+        }
+        if (exportBillBtn) {
+          exportBillBtn.disabled = billData.length === 0;
+        }
+      }
+
+      // Export Bill Details table to an Excel-compatible file
+      function exportBillToExcel() {
+        if (!billData.length) return;
+
+        const contractorName = contractorSelect?.options[contractorSelect.selectedIndex]?.text || '';
+        const dateStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
+
+        // Build rows
+        const headers = ['Reference', 'Operation', 'Qty/Book', 'Rate/Book', 'Qty Completed', 'Total Value'];
+        const rows = billData
+          .filter(item => item.opsName && item.opsName.trim())
+          .map(item => {
+            const ref = item.isAdhoc ? `Ad-hoc: ${item.adhocLabel || '-'}` : item.jobNumber;
+            return [
+              ref,
+              item.opsName,
+              Number(item.qtyBook ?? 0).toFixed(4),
+              (Number(item.valuePerBook) || 0).toFixed(8),
+              item.qtyCompleted,
+              (Number(item.totalValue) || 0).toFixed(4)
+            ];
+          });
+
+        const totalValue = billData.reduce((s, item) => s + (Number(item.totalValue) || 0), 0);
+        rows.push(['', '', '', '', 'Total:', totalValue.toFixed(4)]);
+
+        // Build CSV content
+        const escape = val => {
+          const s = String(val ?? '');
+          return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+        };
+        const csvLines = [headers, ...rows].map(r => r.map(escape).join(','));
+
+        // Add contractor & date as a header comment row at the top
+        csvLines.unshift(`Bill Details - Contractor: ${contractorName} - Date: ${dateStr}`);
+
+        const csvContent = csvLines.join('\r\n');
+        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Bill_Details_${contractorName.replace(/\s+/g,'_')}_${dateStr}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+      }
+
+      if (exportBillBtn) {
+        exportBillBtn.addEventListener('click', exportBillToExcel);
       }
 
 
@@ -230,9 +496,104 @@
         }
       }
 
+      async function loadAdhocOrders() {
+        try {
+          adhocOrders = await adhocOrdersAPI.getAll();
+          if (!adhocOrderSelect) return;
+          adhocOrderSelect.innerHTML = '<option value="">Select ad-hoc order</option>';
+          adhocOrders.forEach(order => {
+            const option = document.createElement('option');
+            option.value = order._id;
+            option.textContent = order.adhocId || order._id;
+            adhocOrderSelect.appendChild(option);
+          });
+        } catch (error) {
+          console.error('Error loading ad-hoc orders:', error);
+          if (adhocWorkWarning) {
+            adhocWorkWarning.textContent = 'Error loading ad-hoc orders.';
+          }
+        }
+      }
+
+      function renderAdhocPendingTable(operations) {
+        if (!adhocPendingBody) return;
+        adhocPendingBody.innerHTML = '';
+        if (!operations || operations.length === 0) {
+          adhocPendingBody.innerHTML = '<tr><td colspan="4">No pending ad-hoc operations.</td></tr>';
+          if (addAdhocBtn) addAdhocBtn.style.display = 'none';
+          return;
+        }
+
+        operations.forEach(op => {
+          const row = document.createElement('tr');
+          const cacheKey = `${currentAdhocOrder?._id || ''}_${op.opId}`;
+          const reduced = adhocPendingQtyCache[cacheKey] || 0;
+          const pendingNow = Math.max(0, Number(op.pendingOpsQty || 0) - reduced);
+          row.innerHTML = `
+            <td>${op.opsName || '-'}</td>
+            <td>${Number(op.totalOpsQty || 0)}</td>
+            <td class="pending-cell">${pendingNow}</td>
+            <td>
+              <input type="number" class="adhoc-qty-input" data-op-id="${op.opId}" data-pending="${pendingNow}" min="0" max="${pendingNow}" step="0.0001" placeholder="0" />
+            </td>
+          `;
+          // Cap input at pending qty in real time
+          const qtyInput = row.querySelector('.adhoc-qty-input');
+          if (qtyInput) {
+            qtyInput.addEventListener('input', () => {
+              const maxAllowed = parseFloat(qtyInput.dataset.pending || '0');
+              const entered = parseFloat(qtyInput.value || '0');
+              if (!isNaN(entered) && entered > maxAllowed) {
+                qtyInput.value = maxAllowed;
+              }
+            });
+          }
+          adhocPendingBody.appendChild(row);
+        });
+        if (addAdhocBtn) addAdhocBtn.style.display = 'inline-block';
+        updateAdhocAddButtonState();
+      }
+
+      function updateAdhocAddButtonState() {
+        if (!addAdhocBtn || !contractorSelect) return;
+        const hasContractor = !!String(contractorSelect.value || '').trim();
+        addAdhocBtn.disabled = !hasContractor;
+        addAdhocBtn.style.opacity = hasContractor ? '' : '0.6';
+        addAdhocBtn.style.cursor = hasContractor ? '' : 'not-allowed';
+      }
+
       // Load data on page load
       loadContractors();
       loadJobNumbers();
+      loadAdhocOrders();
+
+      // Contractor change: update context; if there is data in the page ask for confirmation then clear
+      if (contractorSelect) {
+        contractorSelect.addEventListener('change', async () => {
+          const newId = contractorSelect.value || null;
+          if (newId === currentContractor) return;
+
+          const hasData = billData.length > 0 || currentJobNumber || (opsPendingBody && opsPendingBody.children.length > 0);
+          if (hasData) {
+            const ok = confirm(
+              'Changing the contractor will clear all current operations and bill data. Continue?'
+            );
+            if (!ok) {
+              contractorSelect.value = currentContractor || '';
+              return;
+            }
+          }
+
+          currentContractor = newId;
+          clearAllData();
+          updateAdhocAddButtonState();
+
+          // Auto-load any saved-but-not-yet-submitted work for the newly selected contractor
+          if (newId) {
+            await loadAllUnsavedForContractor(newId);
+          }
+        });
+      }
       
       // Initialize "Pull in Series" checkbox state on page load
       updatePullInSeriesCheckboxState();
@@ -332,10 +693,13 @@
         // Populate operations
         const opsBody = table.querySelector('tbody');
         if (operations && operations.length > 0) {
+          const packagingTotalQty = jobPackagingTotalQtyMap[jobNumber];
           operations.forEach(op => {
             const cachedReduction = pendingQtyCache[jobNumber]?.[op.opId] || 0;
             const adjustedPendingQty = Math.max(0, (op.pendingOpsQty || 0) - cachedReduction);
-            
+            const inputMax = packagingTotalQty != null
+              ? Math.round(packagingTotalQty * 0.05 + adjustedPendingQty)
+              : adjustedPendingQty;
             const row = document.createElement("tr");
             row.innerHTML = `
               <td>${op.opsName || '-'}</td>
@@ -346,7 +710,7 @@
                   type="number"
                   class="work-qty-input"
                   min="0"
-                  max="${adjustedPendingQty}"
+                  max="${inputMax}"
                   step="1"
                   data-op-id="${op.opId}"
                   data-job="${jobNumber}"
@@ -403,17 +767,25 @@
             
             checkAndShowCopyOptions(jobNumber);
             
-            // Also attach validation
+            // Validation: Packaging = cap per op at totalQty*0.05 + pending; non-Packaging = cap at pending
             const row = e.target.closest("tr");
             const pendingCell = row?.querySelector(".pending-cell");
             if (pendingCell) {
               const pending = parseFloat(pendingCell.textContent || "0") || 0;
               let value = parseFloat(e.target.value || "0");
-              if (value > pending) {
-                e.target.value = pending.toString();
+              const packagingTotalQty = jobPackagingTotalQtyMap[jobNumber];
+              const maxForRow = packagingTotalQty != null
+                ? packagingTotalQty * 0.05 + pending
+                : pending;
+              if (value > maxForRow) {
+                e.target.value = String(Math.round(maxForRow));
                 if (workDoneWarning) {
-                  workDoneWarning.textContent = "Entered quantity cannot exceed pending quantity.";
+                  workDoneWarning.textContent = packagingTotalQty != null
+                    ? "Packaging segment: qty to add cannot exceed (total qty × 5% + pending) for this operation. Value limited."
+                    : "Entered quantity cannot exceed pending quantity.";
                 }
+              } else {
+                if (workDoneWarning) workDoneWarning.textContent = "";
               }
             }
           }
@@ -425,9 +797,6 @@
 
       // Attach copy checkbox listeners
       function attachCopyListeners(jobNumber, jobRow) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/3a23d043-9df2-40a4-abfb-c396acbfe70e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'work-done.html:410',message:'attachCopyListeners called',data:{jobNumber,hasJobRow:!!jobRow},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
         
         // If jobRow is not provided, try to find it
         if (!jobRow) {
@@ -435,17 +804,11 @@
         }
         
         if (!jobRow) {
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/3a23d043-9df2-40a4-abfb-c396acbfe70e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'work-done.html:413',message:'jobRow not found',data:{jobNumber},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-          // #endregion
           return;
         }
         
         // Check if listeners are already attached to avoid duplicates
         if (jobRow.dataset.copyListenersAttached === 'true') {
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/3a23d043-9df2-40a4-abfb-c396acbfe70e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'work-done.html:416',message:'listeners already attached',data:{jobNumber},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-          // #endregion
           return;
         }
         jobRow.dataset.copyListenersAttached = 'true';
@@ -455,8 +818,6 @@
         const copyToSelected = jobRow.querySelector(`.copy-to-selected-checkbox[data-job="${jobNumber}"]`);
         
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/3a23d043-9df2-40a4-abfb-c396acbfe70e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'work-done.html:425',message:'checkboxes found',data:{jobNumber,hasCopyToAll:!!copyToAll,hasCopyToSelected:!!copyToSelected},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
         
         if (!copyToAll || !copyToSelected) return;
         
@@ -465,16 +826,9 @@
         
         // Handle "Copy to All" checkbox change event - ensure mutual exclusivity
         copyToAll.addEventListener('change', function(e) {
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/3a23d043-9df2-40a4-abfb-c396acbfe70e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'work-done.html:485',message:'copyToAll change fired',data:{jobNumber,thisChecked:this.checked,copyToSelectedChecked:copyToSelected?.checked,isUncheckingOther},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'D'})}).catch(()=>{});
-          // #endregion
-          
           if (this.checked) {
             // This checkbox is being checked - ensure the other is unchecked
             if (copyToSelected && copyToSelected.checked && !isUncheckingOther) {
-              // #region agent log
-              fetch('http://127.0.0.1:7243/ingest/3a23d043-9df2-40a4-abfb-c396acbfe70e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'work-done.html:491',message:'unchecking copyToSelected in copyToAll change',data:{jobNumber},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'D'})}).catch(()=>{});
-              // #endregion
               isUncheckingOther = true;
               copyToSelected.checked = false;
               // Don't dispatch change event on copyToSelected to avoid recursion
@@ -495,25 +849,13 @@
             });
           }
           
-          // #region agent log
-          setTimeout(() => {
-            fetch('http://127.0.0.1:7243/ingest/3a23d043-9df2-40a4-abfb-c396acbfe70e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'work-done.html:512',message:'copyToAll change final state',data:{jobNumber,copyToAllChecked:copyToAll.checked,copyToSelectedChecked:copyToSelected.checked,bothChecked:copyToAll.checked&&copyToSelected.checked},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'D'})}).catch(()=>{});
-          }, 10);
-          // #endregion
         });
         
         // Handle "Copy to Selected" checkbox change event - ensure mutual exclusivity
         copyToSelected.addEventListener('change', function(e) {
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/3a23d043-9df2-40a4-abfb-c396acbfe70e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'work-done.html:520',message:'copyToSelected change fired',data:{jobNumber,thisChecked:this.checked,copyToAllChecked:copyToAll?.checked,isUncheckingOther},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'D'})}).catch(()=>{});
-          // #endregion
-          
           if (this.checked) {
             // This checkbox is being checked - ensure the other is unchecked
             if (copyToAll && copyToAll.checked && !isUncheckingOther) {
-              // #region agent log
-              fetch('http://127.0.0.1:7243/ingest/3a23d043-9df2-40a4-abfb-c396acbfe70e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'work-done.html:526',message:'unchecking copyToAll in copyToSelected change',data:{jobNumber},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'D'})}).catch(()=>{});
-              // #endregion
               isUncheckingOther = true;
               copyToAll.checked = false;
               // Don't dispatch change event on copyToAll to avoid recursion
@@ -534,11 +876,6 @@
             });
           }
           
-          // #region agent log
-          setTimeout(() => {
-            fetch('http://127.0.0.1:7243/ingest/3a23d043-9df2-40a4-abfb-c396acbfe70e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'work-done.html:543',message:'copyToSelected change final state',data:{jobNumber,copyToAllChecked:copyToAll.checked,copyToSelectedChecked:copyToSelected.checked,bothChecked:copyToAll.checked&&copyToSelected.checked},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'D'})}).catch(()=>{});
-          }, 10);
-          // #endregion
         });
         
       }
@@ -915,6 +1252,7 @@
 
           currentContractor = contractor;
           currentJobNumber = jobNumber;
+          jobPackagingTotalQtyMap = {};
 
           try {
             let jobNumbersToLoad = [jobNumber];
@@ -967,6 +1305,19 @@
                     };
                   }
                   
+                  // Packaging segment: per-op max = totalQty*0.05 + that op's pending
+                  try {
+                    const jobDetails = await jobsAPI.getJobDetails(jn);
+                    const seg = (jobDetails.segmentName || '').trim();
+                    if (seg === 'Packaging') {
+                      jobPackagingTotalQtyMap[jn] = Number(jobDetails.qty) || 0;
+                    } else {
+                      jobPackagingTotalQtyMap[jn] = null;
+                    }
+                  } catch (_) {
+                    jobPackagingTotalQtyMap[jn] = null;
+                  }
+                  
                   seriesJobs.push({
                     jobNumber: jn,
                     operations: result.operations || []
@@ -976,6 +1327,11 @@
                   const jobRow = createJobRowWithOps(jn, result.operations || []);
                   if (multipleJobsContainer) {
                     multipleJobsContainer.appendChild(jobRow);
+                  }
+                  
+                  // Auto-populate Bill Details with any unsaved Contractor_WD items
+                  if (currentContractor) {
+                    await loadUnsavedForJob(currentContractor, jn);
                   }
                 } catch (error) {
                   console.error(`Error loading job ${jn}:`, error);
@@ -990,7 +1346,7 @@
                 addAllButtonRow.style.marginBottom = '16px';
                 addAllButtonRow.innerHTML = `
                   <button class="secondary-btn primary-btn--sm" type="button" id="addAllJobsBtn">
-                    ADD ALL JOBS
+                    SAVE ALL JOBS
                   </button>
                 `;
                 multipleJobsContainer.appendChild(addAllButtonRow);
@@ -1015,17 +1371,32 @@
                 };
               }
 
+              // Packaging segment: per-op max = totalQty*0.05 + that op's pending
+              try {
+                const jobDetails = await jobsAPI.getJobDetails(jobNumber);
+                const seg = (jobDetails.segmentName || '').trim();
+                if (seg === 'Packaging') {
+                  jobPackagingTotalQtyMap[jobNumber] = Number(jobDetails.qty) || 0;
+                } else {
+                  jobPackagingTotalQtyMap[jobNumber] = null;
+                }
+              } catch (_) {
+                jobPackagingTotalQtyMap[jobNumber] = null;
+              }
+
               // Populate table
               if (opsPendingBody) {
                 opsPendingBody.innerHTML = "";
                 
                 if (result.operations && result.operations.length > 0) {
                   currentOperationsData = result.operations;
-                  
+                  const packagingTotalQty = jobPackagingTotalQtyMap[jobNumber];
                   result.operations.forEach(op => {
                     const cachedReduction = pendingQtyCache[jobNumber]?.[op.opId] || 0;
                     const adjustedPendingQty = Math.max(0, (op.pendingOpsQty || 0) - cachedReduction);
-                    
+                    const inputMax = packagingTotalQty != null
+                      ? Math.round(packagingTotalQty * 0.05 + adjustedPendingQty)
+                      : adjustedPendingQty;
                     const row = document.createElement("tr");
                     row.innerHTML = `
                       <td>${op.opsName || '-'}</td>
@@ -1036,16 +1407,14 @@
                           type="number"
                           class="work-qty-input"
                           min="0"
-                          max="${adjustedPendingQty}"
+                          max="${inputMax}"
                           step="1"
                           data-op-id="${op.opId}"
+                          data-job="${jobNumber}"
                           data-value-per-book="${op.valuePerBook || 0}"
                         />
                       </td>
                     `;
-                    // #region agent log
-                    fetch('http://127.0.0.1:7243/ingest/3a23d043-9df2-40a4-abfb-c396acbfe70e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'work-done.html:1062',message:'DOM input valuePerBook',data:{opsName:op.opsName,opId:op.opId,valuePerBook:op.valuePerBook},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-                    // #endregion
                     opsPendingBody.appendChild(row);
                   });
 
@@ -1062,6 +1431,11 @@
                   }
                 }
               }
+              
+              // Auto-populate Bill Details with unsaved Contractor_WD items for this job
+              if (currentContractor) {
+                await loadUnsavedForJob(currentContractor, jobNumber);
+              }
             }
           } catch (error) {
             workDoneWarning.textContent = error.message || "Error loading pending work.";
@@ -1069,7 +1443,7 @@
         });
       }
 
-      // Enforce that entered qty is not more than pending qty
+      // Non-Packaging: cap each row at pending. Packaging: cap each row at totalQty*0.05 + that op's pending.
       function attachQtyListeners() {
       document.querySelectorAll(".work-qty-input").forEach((input) => {
         input.addEventListener("input", () => {
@@ -1079,285 +1453,320 @@
 
           const pending = parseFloat(pendingCell.textContent || "0") || 0;
           let value = parseFloat(input.value || "0");
+          const jobNum = input.dataset.job || currentJobNumber;
+          const packagingTotalQty = jobNum ? jobPackagingTotalQtyMap[jobNum] : null;
+          const maxForRow = packagingTotalQty != null
+            ? packagingTotalQty * 0.05 + pending
+            : pending;
 
-          if (value > pending) {
-            input.value = pending.toString();
-              if (workDoneWarning) {
-                workDoneWarning.textContent =
-                "Entered quantity cannot exceed pending quantity. It has been limited to the pending qty.";
+          if (value > maxForRow) {
+            input.value = String(Math.round(maxForRow));
+            if (workDoneWarning) {
+              workDoneWarning.textContent = packagingTotalQty != null
+                ? "Packaging segment: qty to add cannot exceed (total qty × 5% + pending) for this operation. Value limited."
+                : "Entered quantity cannot exceed pending quantity. It has been limited to the pending qty.";
             }
           } else {
-              if (workDoneWarning) {
-                workDoneWarning.textContent = "";
-            }
+            if (workDoneWarning) workDoneWarning.textContent = "";
           }
         });
       });
       }
 
-      // Save work done
-      // Hide buttons initially and disable Save Bill button
-      if (saveBtn) {
-        saveBtn.style.display = "none";
-        saveBtn.disabled = true;
+      // Hide ADD/SAVE button and Submit button initially
+      if (submitBtn) {
+        submitBtn.disabled = true;
       }
       if (addBtn) {
         addBtn.style.display = "none";
       }
 
-      // ADD button click handler - populate bill table
+      // SAVE button click handler (single-job mode)
+      // Saves qty to Contractor_WD (savedInBill:'No') + reduces JobOpsMaster pending
       if (addBtn) {
-        addBtn.addEventListener("click", () => {
+        addBtn.addEventListener("click", async () => {
           if (!currentJobNumber || !currentOperationsData || currentOperationsData.length === 0) {
             workDoneWarning.textContent = "Please search for a job with pending operations first.";
             return;
           }
 
-          // Get qty to add values from the operations pending table
+          const selectedContractorId = contractorSelect?.value || '';
+          if (!selectedContractorId) {
+            workDoneWarning.textContent = "Please select a contractor.";
+            return;
+          }
+          currentContractor = selectedContractorId;
+
+          // Collect qty inputs
           const qtyInputs = document.querySelectorAll(".work-qty-input");
-          const qtyToAddMap = {};
-          
+          const operations = [];
+          const qtyToAddMap = {}; // for local UI update
+
           qtyInputs.forEach(input => {
             const opId = input.dataset.opId;
             const valuePerBook = parseFloat((parseFloat(input.dataset.valuePerBook || "0") || 0).toFixed(2));
             const qtyToAdd = parseFloat(input.value || "0") || 0;
             if (opId && qtyToAdd > 0) {
-              // Use composite key: opId_valuePerBook to handle cases where same opId exists with different valuePerBook (rounded to 2 decimals)
               const key = `${opId}_${valuePerBook}`;
               qtyToAddMap[key] = qtyToAdd;
             }
           });
 
-          // Check if any quantities were entered
-          if (Object.keys(qtyToAddMap).length === 0) {
+          // Build operations list from currentOperationsData
+          currentOperationsData.forEach(op => {
+            const opValuePerBook = parseFloat((parseFloat(op.valuePerBook || 0) || 0).toFixed(2));
+            const key = `${op.opId}_${opValuePerBook}`;
+            const qty = qtyToAddMap[key] || 0;
+            if (qty > 0) {
+              operations.push({ opId: op.opId, opsName: op.opsName, valuePerBook: op.valuePerBook || 0, qtyToAdd: qty });
+            }
+          });
+
+          if (operations.length === 0) {
             workDoneWarning.textContent = "Please enter quantities in 'Qty to Add' fields first.";
             return;
           }
 
-          // Add operations to bill data (accumulate across job numbers)
-          currentOperationsData.forEach(op => {
-            // Match using composite key: opId_valuePerBook (rounded to 2 decimals)
-            const opValuePerBook = parseFloat((parseFloat(op.valuePerBook || 0) || 0).toFixed(2));
-            const key = `${op.opId}_${opValuePerBook}`;
-            const qtyCompleted = qtyToAddMap[key] || 0;
-            
-            // Only add operations where qty to add > 0
-            if (qtyCompleted > 0) {
-              const valuePerBook = op.valuePerBook || 0;
-              const totalValue = qtyCompleted * valuePerBook;
-              
-              // Ensure opsName is available - it should come from the backend response
-              const opsName = op.opsName;
-              
-              if (!opsName || !opsName.trim() || opsName.trim() === 'Unknown' || opsName.trim() === '-') {
-                console.error('Missing or invalid opsName for operation:', op);
-                console.error('Full operation object:', JSON.stringify(op, null, 2));
-                workDoneWarning.textContent = `Error: Operation name is missing. Please refresh the page and try again.`;
-                return;
-              }
-              
-              // #region agent log
-              fetch('http://127.0.0.1:7243/ingest/3a23d043-9df2-40a4-abfb-c396acbfe70e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'work-done.html:1170',message:'Adding to billData',data:{opsName:op.opsName,opId:op.opId,valuePerBook:op.valuePerBook,qtyPerBook:op.qtyPerBook},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-              // #endregion
-              
-              billData.push({
-                jobNumber: currentJobNumber,
-                opId: op.opId, // Store opId for updating JobOpsMaster and Contractor_WD
-                opsName: opsName.trim(),
-                qtyBook: op.qtyPerBook || 0,
-                rate: op.rate || 0, // Keep rate for backward compatibility if needed
-                qtyCompleted: qtyCompleted,
-                totalValue: totalValue,
-                valuePerBook: valuePerBook // Store valuePerBook for matching and display
-              });
-              
-              hasUnsavedBillData = true;
-            }
-          });
+          addBtn.disabled = true;
+          addBtn.textContent = 'Saving…';
+          try {
+            await workAPI.saveJobOpsMaster(currentContractor, currentJobNumber, operations);
 
-          // Refresh bill table with all accumulated data
-          refreshBillTable();
-
-          // Update pending quantities in the operations table and cache
-          qtyInputs.forEach(input => {
-            const opId = input.dataset.opId;
-            const qtyAdded = parseFloat(input.value || "0") || 0;
-            
-            if (opId && qtyAdded > 0) {
-              // Update cache
-              if (!pendingQtyCache[currentJobNumber]) {
-                pendingQtyCache[currentJobNumber] = {};
-              }
-              if (!pendingQtyCache[currentJobNumber][opId]) {
-                pendingQtyCache[currentJobNumber][opId] = 0;
-              }
-              pendingQtyCache[currentJobNumber][opId] += qtyAdded;
-              
-              // Find the corresponding row
-              const row = input.closest("tr");
-              const pendingCell = row?.querySelector(".pending-cell");
-              
-              if (pendingCell) {
-                const currentPending = parseFloat(pendingCell.textContent || "0") || 0;
-                const newPending = Math.max(0, currentPending - qtyAdded);
-                pendingCell.textContent = newPending;
-                
-                // Update the max value of the input field
-                input.max = newPending;
-              }
-            }
-            
-            // Clear the input field
-            input.value = "";
-          });
-
-          // Enable Save Bill button since data was just added to bill table
-          if (saveBtn) {
-            saveBtn.disabled = false;
-            saveBtn.style.display = "inline-block";
-          }
-
-          // Show bill table panel
-          if (billTablePanel) {
-            billTablePanel.classList.remove("panel-collapsed");
-          }
-          
-          // Update "Pull in Series" checkbox state (will be disabled if billData has items)
-          updatePullInSeriesCheckboxState();
-        });
-      }
-
-      // Handler for "ADD ALL JOBS" button in series mode
-      document.addEventListener('click', async (e) => {
-        if (e.target.id === 'addAllJobsBtn') {
-          if (!isSeriesMode || !seriesJobs || seriesJobs.length === 0) {
-            workDoneWarning.textContent = "No jobs found to add.";
-            return;
-          }
-          
-          let hasAnyQuantities = false;
-          let totalOperationsAdded = 0;
-          
-          // Process all jobs in the series
-          for (const jobData of seriesJobs) {
-            const jobNumber = jobData.jobNumber;
-            const jobRow = document.querySelector(`[data-job-number="${jobNumber}"]`);
-            if (!jobRow) continue;
-            
-            // Get qty to add values for this job
-            const qtyInputs = jobRow.querySelectorAll(`.work-qty-input[data-job="${jobNumber}"]`);
-            const qtyToAddMap = {};
-            
-            qtyInputs.forEach(input => {
-              const opId = input.dataset.opId;
-              const valuePerBook = parseFloat((parseFloat(input.dataset.valuePerBook || "0") || 0).toFixed(2));
-              const qtyToAdd = parseFloat(input.value || "0") || 0;
-              if (opId && qtyToAdd > 0) {
-                // Use composite key: opId_valuePerBook to handle cases where same opId exists with different valuePerBook (rounded to 2 decimals)
-                const key = `${opId}_${valuePerBook}`;
-                qtyToAddMap[key] = qtyToAdd;
-                hasAnyQuantities = true;
-              }
-            });
-
-            // Add operations to bill data for this job
-            jobData.operations.forEach(op => {
-              // Match using composite key: opId_valuePerBook (rounded to 2 decimals)
-              const opValuePerBook = parseFloat((parseFloat(op.valuePerBook || 0) || 0).toFixed(2));
-              const key = `${op.opId}_${opValuePerBook}`;
-              const qtyCompleted = qtyToAddMap[key] || 0;
-              
-              if (qtyCompleted > 0) {
-                const valuePerBook = op.valuePerBook || 0;
-                const totalValue = qtyCompleted * valuePerBook;
-                const opsName = op.opsName;
-                
-                if (!opsName || !opsName.trim() || opsName.trim() === 'Unknown' || opsName.trim() === '-') {
-                  console.error('Missing or invalid opsName for operation:', op);
-                  return;
-                }
-                
-              const jobDetails = jobDetailsMap[jobNumber] || { clientName: '', jobTitle: '' };
-              billData.push({
-                jobNumber: jobNumber,
-                clientName: jobDetails.clientName || '',
-                jobTitle: jobDetails.jobTitle || '',
-                opId: op.opId,
-                opsName: opsName.trim(),
-                qtyBook: op.qtyPerBook || 0,
-                rate: op.rate || 0, // Keep rate for backward compatibility if needed
-                qtyCompleted: qtyCompleted,
-                totalValue: totalValue,
-                valuePerBook: valuePerBook // Store valuePerBook for matching and display
-              });
-                
-                totalOperationsAdded++;
-                hasUnsavedBillData = true;
-              }
-            });
-
-            // Update pending quantities and cache for this job
+            // Update local pending cells and cache
             qtyInputs.forEach(input => {
               const opId = input.dataset.opId;
               const qtyAdded = parseFloat(input.value || "0") || 0;
-              
               if (opId && qtyAdded > 0) {
-                // Update cache
-                if (!pendingQtyCache[jobNumber]) {
-                  pendingQtyCache[jobNumber] = {};
-                }
-                if (!pendingQtyCache[jobNumber][opId]) {
-                  pendingQtyCache[jobNumber][opId] = 0;
-                }
-                pendingQtyCache[jobNumber][opId] += qtyAdded;
-                
-                // Update pending cell
+                if (!pendingQtyCache[currentJobNumber]) pendingQtyCache[currentJobNumber] = {};
+                pendingQtyCache[currentJobNumber][opId] = (pendingQtyCache[currentJobNumber][opId] || 0) + qtyAdded;
                 const row = input.closest("tr");
                 const pendingCell = row?.querySelector(".pending-cell");
-                
                 if (pendingCell) {
-                  const currentPending = parseFloat(pendingCell.textContent || "0") || 0;
-                  const newPending = Math.max(0, currentPending - qtyAdded);
+                  const newPending = Math.max(0, parseFloat(pendingCell.textContent || "0") - qtyAdded);
                   pendingCell.textContent = newPending;
                   input.max = newPending;
                 }
-                
-                // Clear the input field
-                input.value = "";
               }
+              input.value = "";
             });
-          }
 
-          // Check if any quantities were entered
-          if (!hasAnyQuantities) {
-            workDoneWarning.textContent = "Please enter quantities in 'Qty to Add' fields for at least one job.";
+            // Reload Bill Details from backend for this job
+            await loadUnsavedForJob(currentContractor, currentJobNumber);
+            if (billTablePanel) billTablePanel.classList.remove("panel-collapsed");
+            updatePullInSeriesCheckboxState();
+            workDoneWarning.textContent = "";
+          } catch (err) {
+            workDoneWarning.textContent = err.message || "Error saving work.";
+          } finally {
+            addBtn.disabled = false;
+            addBtn.textContent = 'SAVE';
+          }
+        });
+      }
+
+      if (adhocOrderSelect) {
+        adhocOrderSelect.addEventListener('change', async () => {
+          const orderId = adhocOrderSelect.value;
+          currentAdhocOrder = adhocOrders.find(o => o._id === orderId) || null;
+          currentAdhocOperationsData = [];
+          if (!orderId) {
+            if (adhocPendingBody) adhocPendingBody.innerHTML = '';
+            if (addAdhocBtn) addAdhocBtn.style.display = 'none';
+            return;
+          }
+          try {
+            const pending = await adhocOrdersAPI.getPending(orderId);
+            currentAdhocOperationsData = Array.isArray(pending.operations) ? pending.operations : [];
+            if (currentAdhocOrder) {
+              currentAdhocOrder = { ...currentAdhocOrder, adhocId: pending.adhocId || currentAdhocOrder.adhocId };
+            }
+            if (adhocPendingPanel) adhocPendingPanel.classList.remove("panel-collapsed");
+            renderAdhocPendingTable(currentAdhocOperationsData);
+            if (adhocWorkWarning) adhocWorkWarning.textContent = '';
+            
+            // Auto-populate Bill Details with unsaved Contractor_WD items
+            if (currentContractor) {
+              await loadUnsavedForAdhoc(currentContractor, orderId);
+            }
+          } catch (error) {
+            if (adhocWorkWarning) {
+              adhocWorkWarning.textContent = error.message || 'Failed to load ad-hoc pending operations.';
+            }
+          }
+        });
+      }
+
+      if (addAdhocBtn) {
+        addAdhocBtn.style.display = 'none';
+        updateAdhocAddButtonState();
+        addAdhocBtn.addEventListener('click', async () => {
+          const selectedContractor = String(contractorSelect?.value || '').trim();
+          if (!selectedContractor) {
+            if (adhocWorkWarning) {
+              adhocWorkWarning.textContent = 'Please select Contractor Name before saving ad-hoc work.';
+              adhocWorkWarning.style.color = '#ef4444';
+            }
+            return;
+          }
+          currentContractor = selectedContractor;
+          if (!currentAdhocOrder || !currentAdhocOperationsData.length) {
+            if (adhocWorkWarning) adhocWorkWarning.textContent = 'Please select an ad-hoc order first.';
+            return;
+          }
+          const qtyInputs = document.querySelectorAll('.adhoc-qty-input');
+          const operations = [];
+
+          qtyInputs.forEach(input => {
+            const qtyToAdd = parseFloat(input.value || '0') || 0;
+            if (qtyToAdd <= 0) return;
+            const opId = input.dataset.opId;
+            const op = currentAdhocOperationsData.find(item => String(item.opId) === String(opId));
+            if (!op) return;
+            const maxAllowed = parseFloat(input.dataset.pending || '0') || Number(op.pendingOpsQty || 0);
+            if (qtyToAdd > maxAllowed + 0.0001) {
+              input.value = maxAllowed;
+              return;
+            }
+            operations.push({ opId: op.opId, opsName: op.opsName, qtyToAdd: Math.min(qtyToAdd, maxAllowed) });
+          });
+
+          if (operations.length === 0) {
+            if (adhocWorkWarning) adhocWorkWarning.textContent = 'Enter Qty to Add for at least one ad-hoc operation.';
             return;
           }
 
-          // Refresh bill table with all accumulated data
-          refreshBillTable();
+          addAdhocBtn.disabled = true;
+          addAdhocBtn.textContent = 'Saving…';
+          try {
+            await workAPI.saveAdhoc(currentAdhocOrder._id, currentContractor, operations);
 
-          // Enable Save Bill button
-          if (saveBtn) {
-            saveBtn.disabled = false;
-            saveBtn.style.display = "inline-block";
+            // Update local adhoc pending cache + cells
+            qtyInputs.forEach(input => {
+              const opId = input.dataset.opId;
+              const qty = parseFloat(input.value || '0') || 0;
+              if (opId && qty > 0) {
+                const cacheKey = `${currentAdhocOrder._id}_${opId}`;
+                adhocPendingQtyCache[cacheKey] = (adhocPendingQtyCache[cacheKey] || 0) + qty;
+              }
+              input.value = '';
+            });
+            renderAdhocPendingTable(currentAdhocOperationsData);
+
+            // Reload Bill Details from backend
+            await loadUnsavedForAdhoc(currentContractor, currentAdhocOrder._id);
+            if (billTablePanel) billTablePanel.classList.remove("panel-collapsed");
+
+            if (adhocWorkWarning) {
+              adhocWorkWarning.style.color = '#4ade80';
+              adhocWorkWarning.textContent = `Saved ${operations.length} ad-hoc operation(s).`;
+              setTimeout(() => {
+                if (adhocWorkWarning) { adhocWorkWarning.textContent = ''; adhocWorkWarning.style.color = ''; }
+              }, 2000);
+            }
+          } catch (err) {
+            if (adhocWorkWarning) adhocWorkWarning.textContent = err.message || 'Error saving ad-hoc work.';
+          } finally {
+            addAdhocBtn.disabled = false;
+            addAdhocBtn.textContent = 'SAVE AD-HOC';
+            updateAdhocAddButtonState();
+          }
+        });
+      }
+
+      // Handler for "SAVE ALL JOBS" button in series mode
+      document.addEventListener('click', async (e) => {
+        if (e.target.id === 'addAllJobsBtn') {
+          if (!isSeriesMode || !seriesJobs || seriesJobs.length === 0) {
+            workDoneWarning.textContent = "No jobs found to save.";
+            return;
           }
 
-          // Show bill table panel
-          if (billTablePanel) {
-            billTablePanel.classList.remove("panel-collapsed");
+          const selectedContractorId = contractorSelect?.value || '';
+          if (!selectedContractorId) {
+            workDoneWarning.textContent = "Please select a contractor.";
+            return;
           }
-          
-          // Reset all checkboxes after adding
-          resetAllCheckboxes();
-          
-          // Update "Pull in Series" checkbox state (will be disabled if billData has items)
-          updatePullInSeriesCheckboxState();
-          
-          workDoneWarning.textContent = `Added ${totalOperationsAdded} operation(s) from all jobs.`;
-          setTimeout(() => {
-            workDoneWarning.textContent = "";
-          }, 3000);
+          currentContractor = selectedContractorId;
+
+          let hasAnyQuantities = false;
+          let totalSaved = 0;
+          const saveAllBtn = e.target;
+          saveAllBtn.disabled = true;
+          saveAllBtn.textContent = 'Saving…';
+
+          try {
+            for (const jobData of seriesJobs) {
+              const jobNumber = jobData.jobNumber;
+              const jobRow = document.querySelector(`[data-job-number="${jobNumber}"]`);
+              if (!jobRow) continue;
+
+              const qtyInputs = jobRow.querySelectorAll(`.work-qty-input[data-job="${jobNumber}"]`);
+              const operations = [];
+              const qtyToAddMap = {};
+
+              qtyInputs.forEach(input => {
+                const opId = input.dataset.opId;
+                const valuePerBook = parseFloat((parseFloat(input.dataset.valuePerBook || "0") || 0).toFixed(2));
+                const qty = parseFloat(input.value || "0") || 0;
+                if (opId && qty > 0) {
+                  qtyToAddMap[`${opId}_${valuePerBook}`] = qty;
+                  hasAnyQuantities = true;
+                }
+              });
+
+              jobData.operations.forEach(op => {
+                const opVpb = parseFloat((parseFloat(op.valuePerBook || 0) || 0).toFixed(2));
+                const qty = qtyToAddMap[`${op.opId}_${opVpb}`] || 0;
+                if (qty > 0 && op.opsName && op.opsName.trim() && op.opsName.trim() !== 'Unknown') {
+                  operations.push({ opId: op.opId, opsName: op.opsName, valuePerBook: op.valuePerBook || 0, qtyToAdd: qty });
+                }
+              });
+
+              if (operations.length === 0) continue;
+
+              try {
+                await workAPI.saveJobOpsMaster(currentContractor, jobNumber, operations);
+
+                // Update local pending cells and cache
+                qtyInputs.forEach(input => {
+                  const opId = input.dataset.opId;
+                  const qtyAdded = parseFloat(input.value || "0") || 0;
+                  if (opId && qtyAdded > 0) {
+                    if (!pendingQtyCache[jobNumber]) pendingQtyCache[jobNumber] = {};
+                    pendingQtyCache[jobNumber][opId] = (pendingQtyCache[jobNumber][opId] || 0) + qtyAdded;
+                    const row = input.closest("tr");
+                    const pendingCell = row?.querySelector(".pending-cell");
+                    if (pendingCell) {
+                      const newPending = Math.max(0, parseFloat(pendingCell.textContent || "0") - qtyAdded);
+                      pendingCell.textContent = newPending;
+                      input.max = newPending;
+                    }
+                  }
+                  input.value = "";
+                });
+
+                // Reload unsaved items for this job into Bill Details
+                await loadUnsavedForJob(currentContractor, jobNumber);
+                totalSaved += operations.length;
+              } catch (err) {
+                console.error(`Error saving job ${jobNumber}:`, err);
+              }
+            }
+
+            if (!hasAnyQuantities) {
+              workDoneWarning.textContent = "Please enter quantities in 'Qty to Add' fields for at least one job.";
+              return;
+            }
+
+            if (billTablePanel) billTablePanel.classList.remove("panel-collapsed");
+            resetAllCheckboxes();
+            updatePullInSeriesCheckboxState();
+            workDoneWarning.textContent = `Saved ${totalSaved} operation(s) from all jobs.`;
+            setTimeout(() => { workDoneWarning.textContent = ""; }, 3000);
+          } finally {
+            saveAllBtn.disabled = false;
+            saveAllBtn.textContent = 'SAVE ALL JOBS';
+          }
         }
       });
 
@@ -1365,9 +1774,37 @@
       function updatePullInSeriesCheckboxState() {
         const pullInSeriesCheckbox = document.getElementById('pullInSeriesCheckbox');
         if (pullInSeriesCheckbox) {
-          // Disable if there's any data in billData, enable if empty
-          pullInSeriesCheckbox.disabled = billData.length > 0;
+          // Keep enabled even when Bill Details has rows.
+          pullInSeriesCheckbox.disabled = false;
         }
+      }
+
+      function containsFilterValue(text, filterValue) {
+        if (!filterValue) return true;
+        return String(text).toLowerCase().includes(String(filterValue).toLowerCase());
+      }
+
+      function getFilteredBillEntries() {
+        const entries = [];
+        billData.forEach((item, index) => {
+          if (!item.opsName || !item.opsName.trim()) return;
+          const referenceText = item.isAdhoc ? `Ad-hoc: ${item.adhocLabel || '-'}` : item.jobNumber;
+          const qtyBookText = Number(item.qtyBook ?? 0).toFixed(4);
+          const rateText = (Number(item.valuePerBook) || 0).toFixed(8);
+          const qtyCompletedText = String(item.qtyCompleted ?? '');
+          const totalValueText = (Number(item.totalValue) || 0).toFixed(4);
+
+          const matches =
+            containsFilterValue(referenceText, billFilterState.reference) &&
+            containsFilterValue(item.opsName, billFilterState.operation) &&
+            containsFilterValue(qtyBookText, billFilterState.qtyBook) &&
+            containsFilterValue(rateText, billFilterState.rate) &&
+            containsFilterValue(qtyCompletedText, billFilterState.qtyCompleted) &&
+            containsFilterValue(totalValueText, billFilterState.totalValue);
+
+          if (matches) entries.push({ item, index });
+        });
+        return entries;
       }
 
       // Function to refresh bill table with accumulated data
@@ -1378,25 +1815,24 @@
           billTableBody.innerHTML = "";
           
           let totalValueSum = 0;
-          
-          billData.forEach((item, index) => {
-            // Skip items without opsName (legacy data)
-            if (!item.opsName || !item.opsName.trim()) {
-              console.warn('Skipping item without opsName:', item);
-              return;
-            }
+          filteredBillRowIndices = [];
+          const filteredEntries = getFilteredBillEntries();
             
-            totalValueSum += item.totalValue;
+          filteredEntries.forEach(({ item, index }) => {
+            const totalValue = Number(item.totalValue) || 0;
+            totalValueSum += totalValue;
+            filteredBillRowIndices.push(index);
             
             const row = document.createElement("tr");
             row.setAttribute('data-bill-index', index);
+            const referenceText = item.isAdhoc ? `Ad-hoc: ${item.adhocLabel || '-'}` : item.jobNumber;
             row.innerHTML = `
-              <td>${item.jobNumber}</td>
+              <td>${referenceText}</td>
               <td>${item.opsName}</td>
-              <td>${item.qtyBook}</td>
-              <td>${(item.valuePerBook || 0).toFixed(4)}</td>
+              <td>${Number(item.qtyBook ?? 0).toFixed(4)}</td>
+              <td>${(Number(item.valuePerBook) || 0).toFixed(8)}</td>
               <td>${item.qtyCompleted}</td>
-              <td>${item.totalValue.toFixed(2)}</td>
+              <td>${totalValue.toFixed(4)}</td>
               <td>
                 <button class="secondary-btn primary-btn--sm" type="button" data-delete-index="${index}" style="background-color: #ef4444; color: white; border: 1px solid #dc2626; padding: 7px 16px; cursor: pointer;">
                   Delete
@@ -1411,155 +1847,138 @@
             billTableFooter.innerHTML = `
               <tr>
                 <td colspan="6" style="text-align: right; font-weight: bold;">Total:</td>
-                <td style="font-weight: bold;">${totalValueSum.toFixed(2)}</td>
+                <td style="font-weight: bold;">${totalValueSum.toFixed(4)}</td>
               </tr>
             `;
           }
         }
         
-        // Freeze/unfreeze contractor name field based on bill data
-        if (contractorSelect) {
-          if (billData.length > 0) {
-            contractorSelect.disabled = true;
-          } else {
-            contractorSelect.disabled = false;
-          }
-        }
+        // Update Submit button state
+        updateSubmitButtonState();
         
         // Update "Pull in Series" checkbox state after refreshing bill table
         updatePullInSeriesCheckboxState();
       }
 
-      // Function to delete a bill row and adjust pending quantities
-      function deleteBillRow(index) {
-        if (index < 0 || index >= billData.length) {
-          console.error('Invalid index for delete:', index);
-          return;
-        }
-
+      // Function to delete a bill row: reverses the save in MongoDB + updates UI
+      async function deleteBillRow(index) {
+        if (index < 0 || index >= billData.length) return;
         const item = billData[index];
-        if (!item) {
-          console.error('Item not found at index:', index);
-          return;
-        }
+        if (!item) return;
 
         const jobNumber = item.jobNumber;
-        const opId = item.opId;
+        const opId = item.opId || item.opsId;
         const qtyCompleted = item.qtyCompleted;
 
-        // Remove from billData
+        // Remove from billData immediately so UI reacts fast
         billData.splice(index, 1);
 
-        // Adjust pending quantity cache
-        if (pendingQtyCache[jobNumber] && pendingQtyCache[jobNumber][opId]) {
-          pendingQtyCache[jobNumber][opId] = Math.max(0, pendingQtyCache[jobNumber][opId] - qtyCompleted);
-          
-          // If cache becomes 0, we can remove it (optional cleanup)
-          if (pendingQtyCache[jobNumber][opId] === 0) {
-            delete pendingQtyCache[jobNumber][opId];
-          }
-        }
-
-        // Update pending quantity display in operations table
-        // For single job mode
-        if (!isSeriesMode && currentJobNumber === jobNumber) {
-          const opsRows = opsPendingBody?.querySelectorAll('tr');
-          if (opsRows) {
-            opsRows.forEach(row => {
-              const input = row.querySelector(`.work-qty-input[data-op-id="${opId}"]`);
-              if (input) {
+        // Restore Operations Pending cell display (+= qtyCompleted)
+        if (!item.isAdhoc && jobNumber) {
+          try {
+            const matchingInputs = document.querySelectorAll(
+              `.work-qty-input[data-op-id="${opId}"][data-job="${jobNumber}"]`
+            );
+            matchingInputs.forEach(input => {
+              const row = input.closest('tr');
+              if (row) {
                 const pendingCell = row.querySelector('.pending-cell');
                 if (pendingCell) {
-                  // Get original pending qty from the operation data
-                  const op = currentOperationsData.find(o => o.opId === opId);
-                  if (op) {
-                    const cachedReduction = pendingQtyCache[jobNumber]?.[opId] || 0;
-                    const adjustedPendingQty = Math.max(0, (op.pendingOpsQty || 0) - cachedReduction);
-                    pendingCell.textContent = adjustedPendingQty;
-                    input.max = adjustedPendingQty;
-                  }
+                  const restored = (parseFloat(pendingCell.textContent || '0') || 0) + qtyCompleted;
+                  pendingCell.textContent = restored;
+                  input.max = restored;
                 }
               }
             });
-          }
-        } else if (isSeriesMode) {
-          // For series mode - update the specific job row
-          const jobRow = document.querySelector(`[data-job-number="${jobNumber}"]`);
-          if (jobRow) {
-            const opsBody = jobRow.querySelector(`tbody#ops-body-${jobNumber}`);
-            if (opsBody) {
-              const opsRows = opsBody.querySelectorAll('tr');
-              opsRows.forEach(row => {
-                const input = row.querySelector(`.work-qty-input[data-op-id="${opId}"][data-job="${jobNumber}"]`);
-                if (input) {
-                  const pendingCell = row.querySelector('.pending-cell');
-                  if (pendingCell) {
-                    // Find the operation in seriesJobs
-                    const jobData = seriesJobs.find(j => j.jobNumber === jobNumber);
-                    if (jobData) {
-                      const op = jobData.operations.find(o => o.opId === opId);
-                      if (op) {
-                        const cachedReduction = pendingQtyCache[jobNumber]?.[opId] || 0;
-                        const adjustedPendingQty = Math.max(0, (op.pendingOpsQty || 0) - cachedReduction);
-                        pendingCell.textContent = adjustedPendingQty;
-                        input.max = adjustedPendingQty;
-                      }
-                    }
-                  }
-                }
-              });
+            // Update cache
+            if (pendingQtyCache[jobNumber]?.[opId]) {
+              pendingQtyCache[jobNumber][opId] = Math.max(0, (pendingQtyCache[jobNumber][opId] || 0) - qtyCompleted);
+              if (pendingQtyCache[jobNumber][opId] === 0) delete pendingQtyCache[jobNumber][opId];
             }
+          } catch (uiErr) {
+            console.warn('Could not update pending qty display:', uiErr);
           }
         }
 
-        // Refresh bill table
+        // Restore adhoc pending table
+        if (item.isAdhoc) {
+          // Reduce the cache (for items saved in this session)
+          const cacheKey = `${item.adhocOrderId || ''}_${opId}`;
+          adhocPendingQtyCache[cacheKey] = Math.max(0, (adhocPendingQtyCache[cacheKey] || 0) - qtyCompleted);
+          if (adhocPendingQtyCache[cacheKey] === 0) delete adhocPendingQtyCache[cacheKey];
+
+          // Add qty back directly in currentAdhocOperationsData so renderAdhocPendingTable
+          // recalculates correctly regardless of whether there was a cache entry or not.
+          if (currentAdhocOperationsData && item.adhocOrderId &&
+              currentAdhocOrder && String(currentAdhocOrder._id) === String(item.adhocOrderId)) {
+            const opData = currentAdhocOperationsData.find(o => String(o.opId) === String(opId));
+            if (opData) {
+              opData.pendingOpsQty = Number(opData.pendingOpsQty || 0) + qtyCompleted;
+            }
+            renderAdhocPendingTable(currentAdhocOperationsData);
+          }
+        }
+
         refreshBillTable();
-
-        // Update "Pull in Series" checkbox state
         updatePullInSeriesCheckboxState();
+        updateSubmitButtonState();
 
-        // If billData is empty, disable Save Bill button and unfreeze contractor name
-        if (billData.length === 0) {
-          if (saveBtn) {
-            saveBtn.disabled = true;
-            saveBtn.style.display = "none";
-          }
-          if (contractorSelect) {
-            contractorSelect.disabled = false;
-          }
+        // Reverse in MongoDB (fire-and-forget, log errors but don't block UI)
+        if (currentContractor) {
+          const unsaveItem = {
+            jobNumber: item.jobNumber || '',
+            isAdhoc: !!item.isAdhoc,
+            adhocOrderId: item.adhocOrderId || '',
+            opsId: item.opsId || item.opId || '',
+            opsName: item.opsName || '',
+            valuePerBook: item.valuePerBook || 0,
+            qtyToRestore: qtyCompleted
+          };
+          workAPI.unsave(currentContractor, [unsaveItem]).catch(err => {
+            console.error('Failed to reverse saved work in MongoDB:', err);
+          });
         }
       }
 
-      // Event delegation for delete buttons
+      // Event delegation for delete buttons (async handler)
       if (billTableBody) {
-        billTableBody.addEventListener('click', (e) => {
-          if (e.target.hasAttribute('data-delete-index')) {
-            const index = parseInt(e.target.getAttribute('data-delete-index'));
-            deleteBillRow(index);
+        billTableBody.addEventListener('click', async (e) => {
+          const btn = e.target.closest('[data-delete-index]');
+          if (btn) {
+            btn.disabled = true;
+            const index = parseInt(btn.getAttribute('data-delete-index'));
+            await deleteBillRow(index);
           }
         });
       }
 
+      [
+        [billFilterReference, 'reference'],
+        [billFilterOperation, 'operation'],
+        [billFilterQtyBook, 'qtyBook'],
+        [billFilterRate, 'rate'],
+        [billFilterQtyCompleted, 'qtyCompleted'],
+        [billFilterTotalValue, 'totalValue'],
+      ].forEach(([input, key]) => {
+        if (!input) return;
+        input.addEventListener('input', () => {
+          billFilterState[key] = (input.value || '').trim();
+          refreshBillTable();
+        });
+      });
+
       // Function to clear all data with confirmation
       async function clearAllDataWithConfirmation() {
-        if (hasUnsavedBillData) {
-          const confirmed = confirm("You have unsaved bill data. Do you want to save it before clearing? Click OK to save, Cancel to discard.");
-          
+        if (hasUnsavedBillData && billData.length > 0) {
+          const confirmed = confirm("You have un-submitted bill items. Submit them before leaving?\n\nOK = Submit  |  Cancel = Leave without submitting");
           if (confirmed) {
-            // User wants to save - trigger Save Bill
-            await saveBill();
-            return true; // Data was saved
+            await submitBill();
           } else {
-            // User wants to discard
-            const discardConfirmed = confirm("Are you sure you want to discard all unsaved bill data?");
-            if (!discardConfirmed) {
-              return false; // User cancelled, don't clear
-            }
+            clearAllData();
           }
+        } else {
+          clearAllData();
         }
-        
-        // Clear all data
-        clearAllData();
         return true;
       }
 
@@ -1570,230 +1989,204 @@
         currentOperationsData = [];
         billData = [];
         hasUnsavedBillData = false;
-        pendingQtyCache = {}; // Clear pending qty cache
-        jobDetailsMap = {}; // Clear job details map
-        
-        // Unfreeze contractor name field since bill data is cleared
-        if (contractorSelect) {
-          contractorSelect.disabled = false;
+        pendingQtyCache = {};
+        adhocPendingQtyCache = {};
+        jobDetailsMap = {};
+        currentAdhocOrder = null;
+        currentAdhocOperationsData = [];
+
+        // Reset series mode
+        if (isSeriesMode) {
+          const mc = document.getElementById('multipleJobsWorkContainer');
+          if (mc) { mc.innerHTML = ''; mc.style.display = 'none'; }
+          seriesJobs = [];
+          isSeriesMode = false;
+          currentSeriesId = null;
         }
-        
+        resetAllCheckboxes();
+
+        opsPendingPanel.style.display = 'block';
         opsPendingPanel.classList.add("panel-collapsed");
         billTablePanel.classList.add("panel-collapsed");
-        
-        if (opsPendingBody) {
-          opsPendingBody.innerHTML = "";
-        }
-        if (billTableBody) {
-          billTableBody.innerHTML = "";
-        }
-        
-        if (saveBtn) {
-          saveBtn.style.display = "none";
-        }
-        if (addBtn) {
-          addBtn.style.display = "none";
-        }
-        
-        // Update "Pull in Series" checkbox state (will be enabled since billData is empty)
+        if (opsPendingBody) opsPendingBody.innerHTML = "";
+        if (adhocPendingBody) adhocPendingBody.innerHTML = "";
+        if (adhocOrderSelect) adhocOrderSelect.value = "";
+        if (billTableBody) billTableBody.innerHTML = "";
+        if (addBtn) addBtn.style.display = "none";
+
+        const addAllJobsBtn = document.getElementById('addAllJobsBtn');
+        if (addAllJobsBtn) addAllJobsBtn.remove();
+
+        updateSubmitButtonState();
         updatePullInSeriesCheckboxState();
       }
 
-      // Save Bill button handler
-      async function saveBill() {
-        if (!currentContractor || billData.length === 0) {
-          workDoneWarning.textContent = "Please add operations to the bill first.";
+      // -----------------------------------------------------------------------
+      // SUBMIT handler
+      // Creates the bill from all items in Bill Details, then marks those
+      // Contractor_WD entries as savedInBill:'Yes'.
+      // -----------------------------------------------------------------------
+      async function submitBill() {
+        const selectedContractorId = contractorSelect?.value || '';
+        if (!selectedContractorId) {
+          workDoneWarning.textContent = "Please select a contractor.";
+          return false;
+        }
+        currentContractor = selectedContractorId;
+
+        if (billData.length === 0) {
+          workDoneWarning.textContent = "No items in Bill Details to submit.";
           return false;
         }
 
-        // Get contractor name
         const contractorName = contractorSelect.options[contractorSelect.selectedIndex]?.textContent || '';
         if (!contractorName) {
           workDoneWarning.textContent = "Please select a contractor.";
           return false;
         }
 
-        // Group bill data by job number
+        // Group bill data by reference (job or ad-hoc order) for bill creation
         const jobsMap = {};
         for (const item of billData) {
-          // Ensure opsName is present and not empty
           if (!item.opsName || !item.opsName.trim()) {
-            console.error('Missing opsName for item:', item);
-            workDoneWarning.textContent = `Error: Operation name is missing for job ${item.jobNumber}. Please clear bill data and re-add operations.`;
+            workDoneWarning.textContent = `Error: Operation name missing for reference ${item.jobNumber || item.adhocOrderId}. Please clear and re-save.`;
             return false;
           }
-          
-          if (!jobsMap[item.jobNumber]) {
-            jobsMap[item.jobNumber] = [];
+          const groupKey = item.isAdhoc ? `adhoc:${item.adhocOrderId || ''}` : `job:${item.jobNumber}`;
+          if (!jobsMap[groupKey]) {
+            jobsMap[groupKey] = {
+              isAdhoc: !!item.isAdhoc,
+              jobNumber: item.jobNumber || '',
+              adhocOrderId: item.adhocOrderId || '',
+              adhocLabel: item.adhocLabel || '',
+              ops: []
+            };
           }
-          
-          jobsMap[item.jobNumber].push({
-            opId: item.opId, // Include opId for operation type lookup
+          jobsMap[groupKey].ops.push({
+            opId: item.opId,
             opsName: item.opsName.trim(),
-            qtyBook: item.qtyBook, // Save qtyBook as is, no calculation
-            rate: item.valuePerBook || 0, // Save valuePerBook in rate field, no calculation
+            qtyBook: item.qtyBook,
+            rate: item.valuePerBook || 0,
             qtyCompleted: item.qtyCompleted,
             totalValue: item.totalValue
           });
         }
 
-        // Convert to jobs array format
-        const jobs = Object.keys(jobsMap).map(jobNumber => {
-          const jobDetails = jobDetailsMap[jobNumber] || { clientName: '', jobTitle: '' };
+        const jobs = Object.keys(jobsMap).map(groupKey => {
+          const group = jobsMap[groupKey];
+          const jobDetails = group.isAdhoc
+            ? { clientName: '', jobTitle: '' }
+            : (jobDetailsMap[group.jobNumber] || { clientName: '', jobTitle: '' });
           return {
-            jobNumber: jobNumber,
+            jobNumber: group.jobNumber || '',
             clientName: jobDetails.clientName || '',
             jobTitle: jobDetails.jobTitle || '',
-            ops: jobsMap[jobNumber]
+            isAdhoc: !!group.isAdhoc,
+            adhocOrderId: group.adhocOrderId || '',
+            adhocLabel: group.adhocLabel || '',
+            ops: group.ops
           };
         });
 
         try {
+          // 1. Create the bill
           const savedBill = await billsAPI.create(contractorName, jobs);
-          
-          // Update JobOpsMaster and Contractor_WD for each job in the bill
-          // Group bill data by job number for updates
-          const updatesByJob = {};
-          billData.forEach(item => {
-            if (!updatesByJob[item.jobNumber]) {
-              updatesByJob[item.jobNumber] = [];
-            }
-            updatesByJob[item.jobNumber].push({
-              opId: item.opId,
-              opsName: item.opsName,
-              valuePerBook: item.valuePerBook,
-              qtyToAdd: item.qtyCompleted
-            });
-          });
 
-          // Update each job's JobOpsMaster and Contractor_WD
-          const updatePromises = Object.keys(updatesByJob).map(jobNumber => {
-            return workAPI.updateJobOpsMaster(
-              currentContractor,
-              jobNumber,
-              updatesByJob[jobNumber]
-            );
-          });
+          // 2. Mark Contractor_WD entries as savedInBill:'Yes'
+          const markItems = billData.map(item => ({
+            jobNumber: item.jobNumber || '',
+            isAdhoc: !!item.isAdhoc,
+            adhocOrderId: item.adhocOrderId || '',
+            opsId: item.opsId || item.opId || '',
+            opsName: item.opsName || '',
+            valuePerBook: item.valuePerBook || 0
+          }));
+          await workAPI.markBilled(currentContractor, markItems);
 
-          await Promise.all(updatePromises);
-          
-          // Show alert with bill number
-          alert(`Bill has been saved!\nBill Number: ${savedBill.billNumber}`);
-          
-          workDoneWarning.textContent = "";
+          alert(`Bill submitted!\nBill Number: ${savedBill.billNumber}`);
+
           workDoneWarning.style.color = "#4ade80";
-          workDoneWarning.textContent = "Bill saved successfully!";
-          
-          // Clear all fields except contractor name
+          workDoneWarning.textContent = "Bill submitted successfully!";
+
+          // Clear state
           jobNumberInput.value = "";
           currentJobNumber = null;
           currentOperationsData = [];
           billData = [];
           hasUnsavedBillData = false;
-          pendingQtyCache = {}; // Clear pending qty cache
-          jobDetailsMap = {}; // Clear job details map
-          
-          // Unfreeze contractor name field since bill data is cleared
-          if (contractorSelect) {
-            contractorSelect.disabled = false;
-          }
-          
-          // Reset all checkboxes
+          pendingQtyCache = {};
+          adhocPendingQtyCache = {};
+          jobDetailsMap = {};
+          currentAdhocOrder = null;
+          currentAdhocOperationsData = [];
+
           resetAllCheckboxes();
-          
-          // Update "Pull in Series" checkbox state (will be enabled since billData is empty)
           updatePullInSeriesCheckboxState();
-          
-          // Handle series mode - clear multiple jobs container
+
           if (isSeriesMode) {
-            const multipleJobsContainer = document.getElementById('multipleJobsWorkContainer');
-            if (multipleJobsContainer) {
-              multipleJobsContainer.innerHTML = '';
-              multipleJobsContainer.style.display = 'none';
-            }
+            const mc = document.getElementById('multipleJobsWorkContainer');
+            if (mc) { mc.innerHTML = ''; mc.style.display = 'none'; }
             seriesJobs = [];
             isSeriesMode = false;
             currentSeriesId = null;
           }
-          
-          // Collapse panels
-          opsPendingPanel.style.display = 'block'; // Show it again for single job mode
+
+          opsPendingPanel.style.display = 'block';
           opsPendingPanel.classList.add("panel-collapsed");
           billTablePanel.classList.add("panel-collapsed");
-          
-          // Clear tables
-          if (opsPendingBody) {
-            opsPendingBody.innerHTML = "";
-          }
-          if (billTableBody) {
-            billTableBody.innerHTML = "";
-          }
-          
-          // Hide buttons and disable Save Bill
-          if (saveBtn) {
-            saveBtn.style.display = "none";
-            saveBtn.disabled = true;
-          }
-          if (addBtn) {
-            addBtn.style.display = "none";
-          }
-          
-          // Remove "ADD ALL JOBS" button if it exists
+          if (opsPendingBody) opsPendingBody.innerHTML = "";
+          if (adhocPendingBody) adhocPendingBody.innerHTML = "";
+          if (adhocOrderSelect) adhocOrderSelect.value = "";
+          if (billTableBody) billTableBody.innerHTML = "";
+          if (addBtn) addBtn.style.display = "none";
+
           const addAllJobsBtn = document.getElementById('addAllJobsBtn');
-          if (addAllJobsBtn) {
-            addAllJobsBtn.remove();
-          }
-          
-          // Refresh bill table (will be empty now)
+          if (addAllJobsBtn) addAllJobsBtn.remove();
+
           refreshBillTable();
-          
+          updateSubmitButtonState();
+
           setTimeout(() => {
             workDoneWarning.textContent = "";
             workDoneWarning.style.color = "";
           }, 3000);
-          
+
           return true;
         } catch (error) {
-          workDoneWarning.textContent = error.message || "Failed to save bill.";
+          workDoneWarning.textContent = error.message || "Failed to submit bill.";
           return false;
         }
       }
 
-      // Save Bill button click handler
-      if (saveBtn) {
-        saveBtn.addEventListener("click", async () => {
-          // Prevent click if button is disabled
-          if (saveBtn.disabled) {
-            return;
-          }
-          
+      // Submit button click handler
+      if (submitBtn) {
+        submitBtn.addEventListener("click", async () => {
+          if (submitBtn.disabled) return;
           if (billData.length === 0) {
-            workDoneWarning.textContent = "Please add operations to the bill first using the ADD button.";
+            workDoneWarning.textContent = "No items in Bill Details to submit.";
             return;
           }
-          
-          await saveBill();
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Submitting…';
+          try {
+            await submitBill();
+          } finally {
+            if (submitBtn) {
+              submitBtn.textContent = 'SUBMIT';
+              updateSubmitButtonState();
+            }
+          }
         });
       }
 
       // Handle browser back/reload events
-      window.addEventListener('beforeunload', (e) => {
-        if (hasUnsavedBillData) {
-          e.preventDefault();
-          e.returnValue = 'You have unsaved bill data. Are you sure you want to leave?';
-          return e.returnValue;
-        }
-      });
-
-      // Handle home button click
+      // Handle home button click — single confirmation popup
       if (homeBtn) {
         homeBtn.addEventListener("click", async (e) => {
-          if (hasUnsavedBillData) {
+          if (hasUnsavedBillData && billData.length > 0) {
             e.preventDefault();
-            const proceed = await clearAllDataWithConfirmation();
-            if (proceed) {
-              window.location.href = homeBtn.href;
-            }
+            await clearAllDataWithConfirmation();
+            window.location.href = homeBtn.href;
           }
         });
       }
