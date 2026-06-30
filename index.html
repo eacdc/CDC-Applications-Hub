@@ -15,10 +15,47 @@
     </header>
 
     <main class="page-main">
-      <section class="toc-section" aria-labelledby="apps-heading">
+      <aside class="side-nav" aria-label="CDC tool categories">
+        <div class="side-nav-header">
+          <span class="side-nav-title">Tool Groups</span>
+          <button
+            class="nav-toggle"
+            type="button"
+            aria-label="Collapse navigation"
+            aria-expanded="true"
+          >
+            <span aria-hidden="true">☰</span>
+          </button>
+        </div>
+
+        <nav class="nav-options" aria-label="Tool group navigation">
+          <button
+            class="nav-option is-active"
+            type="button"
+            data-target="process-tools"
+          >
+            <span class="nav-icon" aria-hidden="true">P</span>
+            <span class="nav-label">CDC Process Tools</span>
+          </button>
+          <button
+            class="nav-option"
+            type="button"
+            data-target="accounts-tools"
+          >
+            <span class="nav-icon" aria-hidden="true">A</span>
+            <span class="nav-label">CDC Accounts Tools</span>
+          </button>
+        </nav>
+      </aside>
+
+      <section
+        class="toc-section tool-panel is-active"
+        id="process-tools"
+        aria-labelledby="apps-heading"
+      >
         <div class="toc-header">
-          <h2 id="apps-heading">Table of Contents</h2>
-          <p>Select a tool to open its landing page.</p>
+          <h2 id="apps-heading">CDC Process Tools</h2>
+          <p>Select a production or process tool to open its landing page.</p>
         </div>
 
         <div class="apps-grid">
@@ -382,6 +419,26 @@
           </article>
         </div>
       </section>
+
+      <section
+        class="toc-section tool-panel"
+        id="accounts-tools"
+        aria-labelledby="accounts-heading"
+        hidden
+      >
+        <div class="toc-header">
+          <h2 id="accounts-heading">CDC Accounts Tools</h2>
+          <p>Accounts tools will appear here when they are added.</p>
+        </div>
+
+        <div class="empty-state">
+          <span class="empty-state-icon" aria-hidden="true">A</span>
+          <h3>No accounts tools yet</h3>
+          <p>
+            This section is ready for finance and accounts-related CDC tools.
+          </p>
+        </div>
+      </section>
     </main>
 
     <footer class="page-footer">
@@ -395,6 +452,42 @@
         if (yearEl) {
           yearEl.textContent = new Date().getFullYear();
         }
+      })();
+
+      (function () {
+        var pageMain = document.querySelector('.page-main');
+        var toggleButton = document.querySelector('.nav-toggle');
+        var navOptions = document.querySelectorAll('.nav-option');
+        var panels = document.querySelectorAll('.tool-panel');
+
+        if (!pageMain || !toggleButton || !navOptions.length || !panels.length) {
+          return;
+        }
+
+        toggleButton.addEventListener('click', function () {
+          var isCollapsed = pageMain.classList.toggle('nav-collapsed');
+          toggleButton.setAttribute('aria-expanded', String(!isCollapsed));
+          toggleButton.setAttribute(
+            'aria-label',
+            isCollapsed ? 'Expand navigation' : 'Collapse navigation'
+          );
+        });
+
+        navOptions.forEach(function (option) {
+          option.addEventListener('click', function () {
+            var targetId = option.getAttribute('data-target');
+
+            navOptions.forEach(function (item) {
+              item.classList.toggle('is-active', item === option);
+            });
+
+            panels.forEach(function (panel) {
+              var isTarget = panel.id === targetId;
+              panel.hidden = !isTarget;
+              panel.classList.toggle('is-active', isTarget);
+            });
+          });
+        });
       })();
     </script>
   </body>
