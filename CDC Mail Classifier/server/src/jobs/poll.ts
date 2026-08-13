@@ -5,9 +5,14 @@ import { Email } from '../models/Email.js';
 import { getGmailClient, fetchRecentMessageIds, fetchMessage } from '../lib/gmail.js';
 import { normalizeGmailMessage } from '../lib/normalize.js';
 import {
+  applyLatestMessageToThread,
+  fetchThreadMessagesForClassification,
+} from '../lib/thread-context.js';
+import {
   classifyEmail,
   classificationToEmailFields,
 } from '../lib/classifier.js';
+import { resolveSalesPerson } from '../lib/sales-person.js';
 
 let polling = false;
 
@@ -26,21 +31,40 @@ async function processInbox(inbox: InstanceType<typeof Inbox>): Promise<void> {
 
   for (const messageId of messageIds) {
     try {
-      const raw = await fetchMessage(gmail, messageId);
-      const normalized = normalizeGmailMessage(raw, inbox.label ?? inbox.emailAddress ?? 'unknown');
-
-      const existing = await Email.findOne({ messageId }).lean();
+      const existing = await Email.findOne({ messageId }).select('classifier confidence').lean();
       const needsClassification =
         !existing ||
         !existing.classifier ||
         existing.confidence === undefined;
 
+      if (existing && !needsClassification) {
+        continue;
+      }
+
+      const raw = await fetchMessage(gmail, messageId);
+      const normalized = normalizeGmailMessage(raw, inbox.label ?? inbox.emailAddress ?? 'unknown');
+
       let classificationFields: ReturnType<typeof classificationToEmailFields> | undefined;
+      let threadMessages = await fetchThreadMessagesForClassification(
+        gmail,
+        normalized,
+        inbox.label ?? inbox.emailAddress ?? 'unknown',
+      );
+      threadMessages = applyLatestMessageToThread(normalized, threadMessages);
 
       if (needsClassification) {
-        const { result, modelUsed } = await classifyEmail(normalized);
+        const { result, modelUsed } = await classifyEmail(normalized, {
+          trigger: 'poll',
+          threadMessages,
+        });
         classificationFields = classificationToEmailFields(result, modelUsed);
       }
+
+      const mailType = classificationFields?.mailType;
+      const salesFields = await resolveSalesPerson(mailType, threadMessages, {
+        threadId: normalized.threadId,
+        messageId: normalized.messageId,
+      });
 
       const emailData = {
         messageId: normalized.messageId,
@@ -55,6 +79,8 @@ async function processInbox(inbox: InstanceType<typeof Inbox>): Promise<void> {
         gmailLink: normalized.gmailLink,
         body: normalized.body,
         attachments: normalized.attachments,
+        salesPerson: salesFields.salesPerson,
+        salesPersonSource: salesFields.salesPersonSource,
         ...(classificationFields ?? {}),
       };
 

@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { config } from './config.js';
 import { Email } from './models/Email.js';
 import { Inbox } from './models/Inbox.js';
+import { ClassificationStepLog } from './models/ClassificationStepLog.js';
 
 let connected = false;
 
@@ -14,6 +15,7 @@ export async function connectDb(): Promise<void> {
 
   await Email.syncIndexes();
   await Inbox.syncIndexes();
+  await ClassificationStepLog.syncIndexes();
 
   connected = true;
   console.log('[DB] Connected to MongoDB');

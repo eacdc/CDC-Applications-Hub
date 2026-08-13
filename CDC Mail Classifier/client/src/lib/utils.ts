@@ -23,6 +23,18 @@ export function formatDate(value?: string): string {
   });
 }
 
+export function formatDateCompact(value?: string): string {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function shortModelName(classifier?: string): string {
   if (!classifier) return '—';
   if (classifier.includes('nano')) return 'nano';

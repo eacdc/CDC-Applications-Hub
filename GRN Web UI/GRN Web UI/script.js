@@ -1034,6 +1034,7 @@
               <td>${sp.gpnQty ?? '—'}</td>
               <td>${sp.deliveredThisVoucher ?? '—'}</td>
               <td>${sp.deliveredTotal ?? '—'}</td>
+              <td>${sp.batchNo ?? '—'}</td>
             `;
             deliveryTableBody.innerHTML = '';
             deliveryTableBody.appendChild(row);
@@ -1099,6 +1100,7 @@
                 <td>${sp.gpnQty ?? '—'}</td>
                 <td>${sp.deliveredThisVoucher ?? '—'}</td>
                 <td>${sp.deliveredTotal ?? '—'}</td>
+                <td>${sp.batchNo ?? '—'}</td>
               `;
               deliveryTableBody.insertBefore(newRow, deliveryTableBody.firstChild);
             }
@@ -1132,6 +1134,7 @@
         for (let i = 0; i < 10; i++) {
           const row = document.createElement('tr');
           row.innerHTML = `
+            <td></td>
             <td></td>
             <td></td>
             <td></td>
@@ -1239,6 +1242,7 @@
             const cartonQtyTotal = responseData.CartonQtyTotal || responseData.cartonqtytotal || responseData.CartonQtyTotal || 0;
             const jobName = responseData.JobName || responseData.jobname || '—';
             const jobBookingNo = responseData.JobBookingNo || responseData.jobbookingno || responseData.JobBookingNumber || '—';
+            const batchNo = responseData.BatchNo || responseData.batchno || '—';
             
             firstRow.innerHTML = `
               <td>${barcode}</td>
@@ -1249,6 +1253,7 @@
               <td>${packedQtyTotal}</td>
               <td>${jobBookingNo}</td>
               <td>${jobName}</td>
+              <td>${batchNo}</td>
             `;
             gpnTableBody.innerHTML = '';
             gpnTableBody.appendChild(firstRow);
@@ -1349,6 +1354,7 @@
         const cartonQtyTotal = responseData.CartonQtyTotal || responseData.cartonqtytotal || responseData.CartonQtyTotal || 0;
         const jobName = responseData.JobName || responseData.jobname || '—';
         const jobBookingNo = responseData.JobBookingNo || responseData.jobbookingno || responseData.JobBookingNumber || '—';
+        const batchNo = responseData.BatchNo || responseData.batchno || '—';
   
         // Add new row to table (always at the top, newest first)
         if (gpnTableBody) {
@@ -1362,6 +1368,7 @@
             <td>${packedQtyTotal}</td>
             <td>${jobBookingNo}</td>
             <td>${jobName}</td>
+            <td>${batchNo}</td>
           `;
           // Insert at the top (prepend) - newest entries always at top
           gpnTableBody.insertBefore(newRow, gpnTableBody.firstChild);

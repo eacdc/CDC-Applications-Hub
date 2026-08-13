@@ -105,7 +105,11 @@ function extractAttachments(part: gmail_v1.Schema$MessagePart | undefined, names
   }
 }
 
-function resolveBody(payload: gmail_v1.Schema$MessagePart | undefined): string {
+function resolveBody(
+  payload: gmail_v1.Schema$MessagePart | undefined,
+  trimQuotes: boolean,
+  bodyMaxLength: number,
+): string {
   if (!payload) return '';
 
   const { plain, html } = extractBodyFromPart(payload);
@@ -119,11 +123,13 @@ function resolveBody(payload: gmail_v1.Schema$MessagePart | undefined): string {
     }
   }
 
-  body = trimQuotedReply(body);
+  if (trimQuotes) {
+    body = trimQuotedReply(body);
+  }
   body = body.replace(/\r\n/g, '\n').trim();
 
-  if (body.length > config.bodyMaxLength) {
-    body = body.slice(0, config.bodyMaxLength);
+  if (body.length > bodyMaxLength) {
+    body = body.slice(0, bodyMaxLength);
   }
 
   return body;
@@ -132,6 +138,7 @@ function resolveBody(payload: gmail_v1.Schema$MessagePart | undefined): string {
 export function normalizeGmailMessage(
   message: gmail_v1.Schema$Message,
   inboxLabel: string,
+  options?: { trimQuotes?: boolean; bodyMaxLength?: number },
 ): NormalizedEmail {
   const headers: HeaderMap = {
     from: getHeader(message.payload?.headers, 'From'),
@@ -147,6 +154,8 @@ export function normalizeGmailMessage(
 
   const messageId = message.id ?? '';
   const sentDate = headers.date ? new Date(headers.date) : new Date();
+  const trimQuotes = options?.trimQuotes ?? true;
+  const bodyMaxLength = options?.bodyMaxLength ?? config.bodyMaxLength;
 
   return {
     messageId,
@@ -158,7 +167,7 @@ export function normalizeGmailMessage(
     ccField: headers.cc,
     subject: headers.subject,
     sentDate: Number.isNaN(sentDate.getTime()) ? new Date() : sentDate,
-    body: resolveBody(message.payload),
+    body: resolveBody(message.payload, trimQuotes, bodyMaxLength),
     attachments,
     gmailLink: buildGmailLink(messageId),
   };

@@ -47,7 +47,7 @@ export default function ReviewQueuePage() {
   }, []);
 
   return (
-    <div className="page-shell space-y-4">
+    <div className="page-shell-wide space-y-4">
       <div>
         <h1 className="text-xl font-semibold">Review queue</h1>
         <p className="mt-1 text-sm text-slate-500">

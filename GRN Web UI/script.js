@@ -182,6 +182,61 @@
     const gpnConfirmation = document.getElementById('gpn-confirmation');
     const barcodeStatusSection = document.getElementById('barcode-status-section');
     const deliveryAmountSection = document.getElementById('delivery-amount-section');
+    // --- Pending GPNs for Delivery Note ---
+    const pendingGpnsSection = document.getElementById('pending-gpns-section');
+    const infoUsernamePendingGpns = document.getElementById('info-username-pending-gpns');
+    const infoDatabasePendingGpns = document.getElementById('info-database-pending-gpns');
+    const portalPendingGpns = document.getElementById('portal-pending-gpns');
+    const pendingGpnsError = document.getElementById('pending-gpns-error');
+    const pendingGpnsTableBody = document.getElementById('pending-gpns-table-body');
+    const backToLandingPendingGpnsBtn = document.getElementById('btn-back-to-landing-pending-gpns');
+    const pendingGpnsFromDateInput = document.getElementById('pending-gpns-from-date');
+    const pendingGpnsToDateInput = document.getElementById('pending-gpns-to-date');
+    const pendingGpnsSearchBtn = document.getElementById('btn-pending-gpns-search');
+    const filterPendingGpnsBarcode = document.getElementById('filter-pending-gpns-barcode');
+    const filterPendingGpnsJobNumber = document.getElementById('filter-pending-gpns-job-number');
+    const filterPendingGpnsJobName = document.getElementById('filter-pending-gpns-job-name');
+    const filterPendingGpnsClient = document.getElementById('filter-pending-gpns-client');
+    const filterPendingGpnsGpnNo = document.getElementById('filter-pending-gpns-gpn-no');
+    const filterPendingGpnsGpnDate = document.getElementById('filter-pending-gpns-gpn-date');
+    const filterPendingGpnsDays = document.getElementById('filter-pending-gpns-days');
+    // --- Challan Detail ---
+    const challanDetailSection = document.getElementById('challan-detail-section');
+    const infoUsernameChallanDetail = document.getElementById('info-username-challan-detail');
+    const infoDatabaseChallanDetail = document.getElementById('info-database-challan-detail');
+    const portalChallanDetail = document.getElementById('portal-challan-detail');
+    const challanDetailError = document.getElementById('challan-detail-error');
+    const challanDetailTableBody = document.getElementById('challan-detail-table-body');
+    const backToLandingChallanDetailBtn = document.getElementById('btn-back-to-landing-challan-detail');
+    const challanFromDateInput = document.getElementById('challan-from-date');
+    const challanToDateInput = document.getElementById('challan-to-date');
+    const challanRefreshBtn = document.getElementById('btn-challan-refresh');
+    const challanDownloadPdfBtn = document.getElementById('btn-challan-download-pdf');
+    const filterChallanDnNo = document.getElementById('filter-challan-dn-no');
+    const filterChallanDnDate = document.getElementById('filter-challan-dn-date');
+    const filterChallanClient = document.getElementById('filter-challan-client');
+    const filterChallanJobBooking = document.getElementById('filter-challan-job-booking');
+    const filterChallanPoDate = document.getElementById('filter-challan-po-date');
+    const filterChallanCartons = document.getElementById('filter-challan-cartons');
+    const filterChallanQty = document.getElementById('filter-challan-qty');
+    const challanPageSummary = document.getElementById('challan-page-summary');
+    const challanPageNav = document.getElementById('challan-page-nav');
+    const challanPageSizeBtns = document.querySelectorAll('.challan-page-size-btn');
+    // --- Challan Update ---
+    const challanUpdateSection = document.getElementById('challan-update-section');
+    const challanUpdateSubtitle = document.getElementById('challan-update-subtitle');
+    const challanUpdateError = document.getElementById('challan-update-error');
+    const challanUpdateClientName = document.getElementById('challan-update-client-name');
+    const challanUpdateConsignee = document.getElementById('challan-update-consignee');
+    const challanUpdateMode = document.getElementById('challan-update-mode');
+    const challanUpdateTransporter = document.getElementById('challan-update-transporter');
+    const challanUpdateVehicle = document.getElementById('challan-update-vehicle');
+    const challanUpdatePod = document.getElementById('challan-update-pod');
+    const challanUpdateContainer = document.getElementById('challan-update-container');
+    const challanUpdateSeal = document.getElementById('challan-update-seal');
+    const challanUpdateRemark = document.getElementById('challan-update-remark');
+    const challanUpdateCloseBtn = document.getElementById('btn-challan-update-close');
+    const challanUpdateSaveBtn = document.getElementById('btn-challan-update-save');
     const statusResults = document.getElementById('status-results');
     const statusResultsSummary = document.getElementById('status-results-summary');
     const statusResultsTitle = document.getElementById('status-results-title');
@@ -264,7 +319,10 @@
       gpn: [gpnSection],
       'gpn-confirmation': [gpnConfirmation],
       'barcode-status': [barcodeStatusSection],
-      'delivery-amount': [deliveryAmountSection]
+      'delivery-amount': [deliveryAmountSection],
+      'pending-gpns': [pendingGpnsSection],
+      'challan-detail': [challanDetailSection],
+      'challan-update': [challanUpdateSection]
     };
   
     const ALL_SECTIONS = Array.from(
@@ -332,6 +390,15 @@
       },
       'delivery-amount': {
         sections: SECTION_MAP['delivery-amount']
+      },
+      'pending-gpns': {
+        sections: SECTION_MAP['pending-gpns']
+      },
+      'challan-detail': {
+        sections: SECTION_MAP['challan-detail']
+      },
+      'challan-update': {
+        sections: SECTION_MAP['challan-update']
       }
     };
   
@@ -449,6 +516,30 @@
       deliveryAmount: ''
     };
     let deliveryAmountMode = 'pending';
+    let pendingGpnsRows = [];
+    let pendingGpnsFilters = {
+      barcodeNo: '',
+      jobNumber: '',
+      jobName: '',
+      clientName: '',
+      gpnNo: '',
+      gpnDate: '',
+      daysPending: ''
+    };
+    let challanDetailRows = [];
+    let challanDetailSelectedFgId = null;
+    let challanDetailPageSize = 100;
+    let challanDetailCurrentPage = 1;
+    let challanDetailFilters = {
+      deliveryNoteNo: '',
+      deliveryNoteDate: '',
+      clientName: '',
+      jobBookingNo: '',
+      poDate: '',
+      totalDeliveredCartons: '',
+      totalQty: ''
+    };
+    let challanUpdateContext = null;
     const STATUS_CATEGORY_CLASS_MAP = {
       'packing slip': 'status-badge-packingslip',
       'packing-slip': 'status-badge-packingslip',
@@ -833,6 +924,826 @@
       }
     }
   
+    function setChallanDetailSessionInfo(username, database) {
+      if (infoUsernameChallanDetail) infoUsernameChallanDetail.textContent = username || '';
+      if (infoDatabaseChallanDetail) infoDatabaseChallanDetail.textContent = database || '';
+    }
+
+    function setPendingGpnsSessionInfo(username, database) {
+      if (infoUsernamePendingGpns) infoUsernamePendingGpns.textContent = username || '';
+      if (infoDatabasePendingGpns) infoDatabasePendingGpns.textContent = database || '';
+    }
+
+    function setDefaultPendingGpnsDateRange() {
+      const to = new Date();
+      const from = new Date();
+      from.setDate(from.getDate() - 7);
+      if (pendingGpnsFromDateInput) pendingGpnsFromDateInput.value = formatDateForInput(from);
+      if (pendingGpnsToDateInput) pendingGpnsToDateInput.value = formatDateForInput(to);
+    }
+
+    function getPendingGpnsDateRangeParams() {
+      const fromDate = String(pendingGpnsFromDateInput?.value || '').trim();
+      const toDate = String(pendingGpnsToDateInput?.value || '').trim();
+      if (!fromDate || !toDate) {
+        throw new Error('Please select From Date and To Date.');
+      }
+      return { fromDate, toDate };
+    }
+
+    function resetPendingGpnsView() {
+      pendingGpnsRows = [];
+      pendingGpnsFilters = {
+        barcodeNo: '',
+        jobNumber: '',
+        jobName: '',
+        clientName: '',
+        gpnNo: '',
+        gpnDate: '',
+        daysPending: ''
+      };
+      if (filterPendingGpnsBarcode) filterPendingGpnsBarcode.value = '';
+      if (filterPendingGpnsJobNumber) filterPendingGpnsJobNumber.value = '';
+      if (filterPendingGpnsJobName) filterPendingGpnsJobName.value = '';
+      if (filterPendingGpnsClient) filterPendingGpnsClient.value = '';
+      if (filterPendingGpnsGpnNo) filterPendingGpnsGpnNo.value = '';
+      if (filterPendingGpnsGpnDate) filterPendingGpnsGpnDate.value = '';
+      if (filterPendingGpnsDays) filterPendingGpnsDays.value = '';
+      if (pendingGpnsError) pendingGpnsError.textContent = '';
+      setDefaultPendingGpnsDateRange();
+      if (pendingGpnsTableBody) {
+        pendingGpnsTableBody.innerHTML = `
+          <tr class="empty-row">
+            <td colspan="7" class="empty-message">Select From Date and To Date, then click Search.</td>
+          </tr>
+        `;
+      }
+    }
+
+    function mapApiRecordToPendingGpnRow(record) {
+      return {
+        barcodeNo: pickChallanRecordField(record, 'barcodeNo', 'BarcodeNo', 'Barcode') ?? null,
+        jobNumber: pickChallanRecordField(record, 'jobNumber', 'JobNumber', 'JobBookingNo') ?? null,
+        jobName: pickChallanRecordField(record, 'jobName', 'JobName') ?? null,
+        clientName: pickChallanRecordField(record, 'clientName', 'ClientName', 'LedgerName') ?? null,
+        gpnNo: pickChallanRecordField(record, 'gpnNo', 'GPNNo', 'VoucherNo') ?? null,
+        gpnDate: pickChallanRecordField(record, 'gpnDate', 'GPNDate', 'CreatedDate') ?? null,
+        daysPending: (() => {
+          const raw = pickChallanRecordField(record, 'daysPending', 'DaysPending');
+          return raw != null && Number.isFinite(Number(raw)) ? Number(raw) : null;
+        })()
+      };
+    }
+
+    function getFilteredPendingGpnsRows(rows = []) {
+      const f = pendingGpnsFilters;
+      return rows.filter((row) => {
+        const barcodeNo = String(row.barcodeNo ?? '').toLowerCase();
+        const jobNumber = String(row.jobNumber ?? '').toLowerCase();
+        const jobName = String(row.jobName ?? '').toLowerCase();
+        const clientName = String(row.clientName ?? '').toLowerCase();
+        const gpnNo = String(row.gpnNo ?? '').toLowerCase();
+        const gpnDate = row.gpnDate ? formatVoucherDate(row.gpnDate).toLowerCase() : '';
+        const daysPending = row.daysPending == null ? '' : String(row.daysPending).toLowerCase();
+        if (f.barcodeNo && !barcodeNo.includes(f.barcodeNo)) return false;
+        if (f.jobNumber && !jobNumber.includes(f.jobNumber)) return false;
+        if (f.jobName && !jobName.includes(f.jobName)) return false;
+        if (f.clientName && !clientName.includes(f.clientName)) return false;
+        if (f.gpnNo && !gpnNo.includes(f.gpnNo)) return false;
+        if (f.gpnDate && !gpnDate.includes(f.gpnDate)) return false;
+        if (f.daysPending && !daysPending.includes(f.daysPending)) return false;
+        return true;
+      });
+    }
+
+    function renderPendingGpnsRows(rows = []) {
+      if (!pendingGpnsTableBody) return;
+      const filtered = getFilteredPendingGpnsRows(rows);
+      if (!filtered.length) {
+        pendingGpnsTableBody.innerHTML = `
+          <tr class="empty-row">
+            <td colspan="7" class="empty-message">${rows.length ? 'No rows match the current filters.' : 'No pending GPNs found for the selected dates.'}</td>
+          </tr>
+        `;
+        return;
+      }
+      pendingGpnsTableBody.innerHTML = '';
+      filtered.forEach((row) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${row.barcodeNo ?? '—'}</td>
+          <td>${row.jobNumber ?? '—'}</td>
+          <td>${row.jobName ?? '—'}</td>
+          <td>${row.clientName ?? '—'}</td>
+          <td>${row.gpnNo ?? '—'}</td>
+          <td>${row.gpnDate ? formatVoucherDate(row.gpnDate) : '—'}</td>
+          <td>${row.daysPending == null ? '—' : row.daysPending}</td>
+        `;
+        pendingGpnsTableBody.appendChild(tr);
+      });
+    }
+
+    async function loadPendingGpnsRows() {
+      try {
+        if (!session || !session.selectedDatabase) {
+          if (pendingGpnsError) pendingGpnsError.textContent = 'Please login first.';
+          return;
+        }
+        const { fromDate, toDate } = getPendingGpnsDateRangeParams();
+        if (pendingGpnsError) pendingGpnsError.textContent = '';
+        if (pendingGpnsTableBody) {
+          pendingGpnsTableBody.innerHTML = `
+            <tr class="empty-row">
+              <td colspan="7" class="empty-message">Loading pending GPNs...</td>
+            </tr>
+          `;
+        }
+        setButtonLoading(pendingGpnsSearchBtn, true, 'Searching...');
+        const base = getApiBaseUrl();
+        const url = new URL('grn/pending-gpns-for-delivery-note', base);
+        url.searchParams.set('database', session.selectedDatabase);
+        url.searchParams.set('fromDate', fromDate);
+        url.searchParams.set('toDate', toDate);
+        url.searchParams.set('companyId', '2');
+        const res = await fetch(url.toString(), {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+          credentials: 'include',
+          cache: 'no-store'
+        });
+        if (!res.ok) {
+          const t = await res.text().catch(() => '');
+          let message = t || 'Failed to fetch pending GPNs';
+          try {
+            const parsed = JSON.parse(t);
+            if (parsed?.error) message = parsed.error;
+          } catch (_) {
+            // keep raw text
+          }
+          throw new Error(message);
+        }
+        const data = await res.json();
+        if (!data || data.status !== true || !Array.isArray(data.records)) {
+          throw new Error(data?.error || 'Failed to fetch pending GPNs');
+        }
+        pendingGpnsRows = data.records.map(mapApiRecordToPendingGpnRow);
+        renderPendingGpnsRows(pendingGpnsRows);
+      } catch (e) {
+        if (pendingGpnsError) pendingGpnsError.textContent = String(e.message || e);
+        pendingGpnsRows = [];
+        renderPendingGpnsRows([]);
+      } finally {
+        setButtonLoading(pendingGpnsSearchBtn, false);
+      }
+    }
+
+    function bindPendingGpnsFilters() {
+      const updateFiltersAndRender = () => {
+        pendingGpnsFilters = {
+          barcodeNo: String(filterPendingGpnsBarcode?.value || '').trim().toLowerCase(),
+          jobNumber: String(filterPendingGpnsJobNumber?.value || '').trim().toLowerCase(),
+          jobName: String(filterPendingGpnsJobName?.value || '').trim().toLowerCase(),
+          clientName: String(filterPendingGpnsClient?.value || '').trim().toLowerCase(),
+          gpnNo: String(filterPendingGpnsGpnNo?.value || '').trim().toLowerCase(),
+          gpnDate: String(filterPendingGpnsGpnDate?.value || '').trim().toLowerCase(),
+          daysPending: String(filterPendingGpnsDays?.value || '').trim().toLowerCase()
+        };
+        renderPendingGpnsRows(pendingGpnsRows);
+      };
+      [
+        filterPendingGpnsBarcode,
+        filterPendingGpnsJobNumber,
+        filterPendingGpnsJobName,
+        filterPendingGpnsClient,
+        filterPendingGpnsGpnNo,
+        filterPendingGpnsGpnDate,
+        filterPendingGpnsDays
+      ].forEach((el) => {
+        if (!el) return;
+        el.addEventListener('input', updateFiltersAndRender);
+      });
+    }
+
+    function formatDateForInput(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function setDefaultChallanDateRange() {
+      const to = new Date();
+      const from = new Date();
+      from.setDate(from.getDate() - 7);
+      if (challanFromDateInput) challanFromDateInput.value = formatDateForInput(from);
+      if (challanToDateInput) challanToDateInput.value = formatDateForInput(to);
+    }
+
+    function pickChallanRecordField(record, ...keys) {
+      if (!record || typeof record !== 'object') return null;
+      for (const key of keys) {
+        const direct = normalizeChallanScalar(record[key]);
+        if (direct != null && direct !== '') return direct;
+        const target = String(key).toLowerCase().replace(/[\s._-]/g, '');
+        for (const [rk, rv] of Object.entries(record)) {
+          const normalized = String(rk).toLowerCase().replace(/[\s._-]/g, '');
+          if (normalized === target) {
+            const value = normalizeChallanScalar(rv);
+            if (value != null && value !== '') return value;
+          }
+        }
+      }
+      return null;
+    }
+
+    function normalizeChallanScalar(value) {
+      if (Array.isArray(value)) return value.length ? value[0] : null;
+      return value;
+    }
+
+    function parseChallanPositiveInt(value) {
+      const num = Number(normalizeChallanScalar(value));
+      return Number.isInteger(num) && num > 0 ? num : null;
+    }
+
+    function mapApiRecordToChallanRow(record) {
+      const fgTransactionId = parseChallanPositiveInt(
+        pickChallanRecordField(record, 'fgTransactionId', 'FGTransactionID', 'FGTransactionId')
+      );
+      return {
+        fgTransactionId,
+        deliveryNoteNo: pickChallanRecordField(record, 'deliveryNoteNo', 'Delivery Note No.', 'DeliveryNoteNo') ?? null,
+        deliveryNoteDate: pickChallanRecordField(record, 'deliveryNoteDate', 'Delivery Note Date', 'DeliveryNoteDate') ?? null,
+        clientName: pickChallanRecordField(record, 'clientName', 'Client Name', 'ClientName') ?? null,
+        poDate: pickChallanRecordField(record, 'poDate', 'PO Date', 'PODate') ?? null,
+        totalDeliveredCartons: (() => {
+          const raw = pickChallanRecordField(
+            record,
+            'totalDeliveredCartons',
+            'Total Delivered Carton',
+            'Total Delivered Cartons'
+          );
+          return raw != null ? Number(raw) : null;
+        })(),
+        totalQty: (() => {
+          const raw = pickChallanRecordField(record, 'totalQty', 'Total Qty', 'TotalQty');
+          return raw != null ? Number(raw) : null;
+        })(),
+        canUpdate: Boolean(fgTransactionId),
+        jobBookingId: pickChallanRecordField(record, 'jobBookingId', 'JobBookingID', 'JobBookingId') ?? null,
+        jobBookingNo: pickChallanRecordField(record, 'jobBookingNo', 'JobBookingNo') ?? null
+      };
+    }
+
+    function getChallanDateRangeParams() {
+      const fromDate = String(challanFromDateInput?.value || '').trim();
+      const toDate = String(challanToDateInput?.value || '').trim();
+      if (!fromDate || !toDate) {
+        throw new Error('Please select From Date and To Date.');
+      }
+      return { fromDate, toDate };
+    }
+
+    function getFilteredChallanDetailRows(rows = []) {
+      const f = challanDetailFilters;
+      return rows.filter((row) => {
+        const dnNo = String(row.deliveryNoteNo ?? '').toLowerCase();
+        const dnDate = formatVoucherDate(row.deliveryNoteDate).toLowerCase();
+        const clientName = String(row.clientName ?? '').toLowerCase();
+        const jobBookingNo = String(row.jobBookingNo ?? '').toLowerCase();
+        const poDate = row.poDate ? formatVoucherDate(row.poDate).toLowerCase() : '';
+        const cartons = row.totalDeliveredCartons == null ? '' : String(row.totalDeliveredCartons).toLowerCase();
+        const qty = row.totalQty == null ? '' : String(row.totalQty).toLowerCase();
+        if (f.deliveryNoteNo && !dnNo.includes(f.deliveryNoteNo)) return false;
+        if (f.deliveryNoteDate && !dnDate.includes(f.deliveryNoteDate)) return false;
+        if (f.clientName && !clientName.includes(f.clientName)) return false;
+        if (f.jobBookingNo && !jobBookingNo.includes(f.jobBookingNo)) return false;
+        if (f.poDate && !poDate.includes(f.poDate)) return false;
+        if (f.totalDeliveredCartons && !cartons.includes(f.totalDeliveredCartons)) return false;
+        if (f.totalQty && !qty.includes(f.totalQty)) return false;
+        return true;
+      });
+    }
+
+    function renderChallanPagination(totalRows) {
+      const totalPages = Math.max(1, Math.ceil(totalRows / challanDetailPageSize));
+      if (challanDetailCurrentPage > totalPages) challanDetailCurrentPage = totalPages;
+      if (challanDetailCurrentPage < 1) challanDetailCurrentPage = 1;
+      const start = totalRows === 0 ? 0 : (challanDetailCurrentPage - 1) * challanDetailPageSize + 1;
+      const end = Math.min(totalRows, challanDetailCurrentPage * challanDetailPageSize);
+      if (challanPageSummary) {
+        challanPageSummary.textContent = totalRows
+          ? `Showing ${start}-${end} of ${totalRows}`
+          : 'No records';
+      }
+      if (!challanPageNav) return;
+      challanPageNav.innerHTML = '';
+      if (totalPages <= 1) return;
+      for (let page = 1; page <= totalPages; page += 1) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'challan-page-btn' + (page === challanDetailCurrentPage ? ' active' : '');
+        btn.textContent = String(page);
+        btn.addEventListener('click', () => {
+          challanDetailCurrentPage = page;
+          renderChallanDetailRows(challanDetailRows);
+        });
+        challanPageNav.appendChild(btn);
+      }
+    }
+
+    function getChallanDetailSelectedRow() {
+      if (challanDetailSelectedFgId == null) return null;
+      return challanDetailRows.find((r) => Number(r.fgTransactionId) === Number(challanDetailSelectedFgId)) || null;
+    }
+
+    function updateChallanDetailDownloadButton() {
+      if (!challanDownloadPdfBtn) return;
+      const hasSelection = getChallanDetailSelectedRow()?.deliveryNoteNo;
+      challanDownloadPdfBtn.classList.toggle('hidden', !hasSelection);
+    }
+
+    function clearChallanDetailSelection() {
+      challanDetailSelectedFgId = null;
+      updateChallanDetailDownloadButton();
+    }
+
+    function syncChallanDetailSelection(filteredRows = []) {
+      if (challanDetailSelectedFgId == null) return;
+      const stillVisible = filteredRows.some(
+        (row) => Number(row.fgTransactionId) === Number(challanDetailSelectedFgId)
+      );
+      if (!stillVisible) clearChallanDetailSelection();
+    }
+
+    function selectChallanDetailRow(row) {
+      if (!row?.fgTransactionId) return;
+      const fgId = Number(row.fgTransactionId);
+      challanDetailSelectedFgId = Number.isFinite(fgId) ? fgId : null;
+      updateChallanDetailDownloadButton();
+      renderChallanDetailRows(challanDetailRows);
+    }
+
+    function renderChallanDetailRows(rows = []) {
+      if (!challanDetailTableBody) return;
+      const filteredRows = getFilteredChallanDetailRows(rows);
+      syncChallanDetailSelection(filteredRows);
+      renderChallanPagination(filteredRows.length);
+      if (filteredRows.length === 0) {
+        challanDetailTableBody.innerHTML = `
+          <tr class="empty-row">
+            <td colspan="8" class="empty-message">No records match current filters.</td>
+          </tr>
+        `;
+        return;
+      }
+      const startIdx = (challanDetailCurrentPage - 1) * challanDetailPageSize;
+      const pageRows = filteredRows.slice(startIdx, startIdx + challanDetailPageSize);
+      challanDetailTableBody.innerHTML = '';
+      pageRows.forEach((row) => {
+        const tr = document.createElement('tr');
+        tr.className = 'challan-detail-row';
+        if (
+          challanDetailSelectedFgId != null
+          && Number(row.fgTransactionId) === Number(challanDetailSelectedFgId)
+        ) {
+          tr.classList.add('challan-row-selected');
+        }
+        const cartonsText = row.totalDeliveredCartons == null ? '—' : String(row.totalDeliveredCartons);
+        const qtyText = row.totalQty == null ? '—' : String(row.totalQty);
+        const poDateText = row.poDate ? formatVoucherDate(row.poDate) : '—';
+        const updateCell = row.fgTransactionId
+          ? `<button type="button" class="challan-action-btn" data-fg-id="${row.fgTransactionId}">Update</button>`
+          : '—';
+        tr.innerHTML = `
+          <td>${row.deliveryNoteNo ?? '—'}</td>
+          <td>${formatVoucherDate(row.deliveryNoteDate)}</td>
+          <td>${row.clientName ?? '—'}</td>
+          <td>${row.jobBookingNo ?? '—'}</td>
+          <td>${poDateText}</td>
+          <td>${cartonsText}</td>
+          <td>${qtyText}</td>
+          <td>${updateCell}</td>
+        `;
+        tr.addEventListener('click', (event) => {
+          if (event.target.closest('.challan-action-btn')) return;
+          selectChallanDetailRow(row);
+        });
+        challanDetailTableBody.appendChild(tr);
+      });
+      challanDetailTableBody.querySelectorAll('.challan-action-btn').forEach((btn) => {
+        btn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          const fgId = Number(btn.dataset.fgId);
+          const selected = challanDetailRows.find((r) => Number(r.fgTransactionId) === fgId);
+          if (selected) openChallanDetailForUpdate(selected);
+        });
+      });
+    }
+
+    function normalizeChallanDisplayValue(value) {
+      const text = String(value ?? '').trim();
+      if (!text || text === '-') return '';
+      return text;
+    }
+
+    function formatChallanDisplayValue(value) {
+      const text = String(value ?? '').trim();
+      return text || '-';
+    }
+
+    function resetChallanUpdateForm() {
+      challanUpdateContext = null;
+      if (challanUpdateSubtitle) challanUpdateSubtitle.textContent = '';
+      if (challanUpdateError) challanUpdateError.textContent = '';
+      if (challanUpdateClientName) challanUpdateClientName.value = '';
+      if (challanUpdateConsignee) challanUpdateConsignee.innerHTML = '<option value="">Select --</option>';
+      if (challanUpdateMode) challanUpdateMode.value = '';
+      if (challanUpdateTransporter) challanUpdateTransporter.innerHTML = '<option value="">Select --</option>';
+      if (challanUpdateVehicle) challanUpdateVehicle.value = '';
+      if (challanUpdatePod) challanUpdatePod.value = '';
+      if (challanUpdateContainer) challanUpdateContainer.value = '';
+      if (challanUpdateSeal) challanUpdateSeal.value = '';
+      if (challanUpdateRemark) challanUpdateRemark.value = '';
+    }
+
+    async function loadChallanUpdateTransporters(selectedLedgerId) {
+      if (!challanUpdateTransporter || !session?.selectedDatabase) return [];
+      challanUpdateTransporter.innerHTML = '<option value="">Loading...</option>';
+      try {
+        const base = getApiBaseUrl();
+        const url = new URL('grn/transporters', base);
+        url.searchParams.set('database', session.selectedDatabase);
+        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+        const data = await res.json();
+        const transporters = data?.status === true && Array.isArray(data.transporters) ? data.transporters : [];
+        const selectedId = selectedLedgerId != null ? String(selectedLedgerId) : '';
+        challanUpdateTransporter.innerHTML = '<option value="">Select --</option>' + transporters.map((t) => {
+          const id = String(t.ledgerId ?? '');
+          const name = String(t.ledgerName ?? '').trim();
+          const selected = id && id === selectedId ? ' selected' : '';
+          return `<option value="${id}"${selected}>${name}</option>`;
+        }).join('');
+        if (selectedId && !transporters.some((t) => String(t.ledgerId) === selectedId) && challanUpdateContext?.transporterName) {
+          challanUpdateTransporter.innerHTML += `<option value="${selectedId}" selected>${challanUpdateContext.transporterName}</option>`;
+        }
+        return transporters;
+      } catch (_) {
+        challanUpdateTransporter.innerHTML = '<option value="">Select --</option>';
+        return [];
+      }
+    }
+
+    async function loadChallanUpdateConsignees(selectedLedgerId, selectedName) {
+      if (!challanUpdateConsignee || !session?.selectedDatabase) return [];
+      challanUpdateConsignee.innerHTML = '<option value="">Loading...</option>';
+      try {
+        const base = getApiBaseUrl();
+        const url = new URL('grn/consignees', base);
+        url.searchParams.set('database', session.selectedDatabase);
+        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+        const data = await res.json();
+        const consignees = data?.status === true && Array.isArray(data.consignees) ? data.consignees : [];
+        const selectedId = selectedLedgerId != null ? String(selectedLedgerId) : '';
+        challanUpdateConsignee.innerHTML = '<option value="">Select --</option>' + consignees.map((c) => {
+          const id = String(c.ledgerId ?? '');
+          const name = String(c.ledgerName ?? '').trim();
+          const selected = id && id === selectedId ? ' selected' : '';
+          return `<option value="${id}"${selected}>${name}</option>`;
+        }).join('');
+        if (selectedId && !consignees.some((c) => String(c.ledgerId) === selectedId) && selectedName) {
+          challanUpdateConsignee.innerHTML += `<option value="${selectedId}" selected>${selectedName}</option>`;
+        }
+        return consignees;
+      } catch (_) {
+        challanUpdateConsignee.innerHTML = '<option value="">Select --</option>';
+        return [];
+      }
+    }
+
+    function populateChallanUpdateForm(details) {
+      if (!details) return;
+      challanUpdateContext = {
+        fgTransactionId: details.fgTransactionId,
+        clientId: details.clientId,
+        transporterName: details.transporterName,
+        deliveryNoteNo: details.deliveryNoteNo || null
+      };
+      if (challanUpdateSubtitle) {
+        const dnNo = details.deliveryNoteNo || '—';
+        const dnDate = details.deliveryNoteDate || '';
+        challanUpdateSubtitle.textContent = dnDate ? `${dnNo} · ${dnDate}` : dnNo;
+      }
+      if (challanUpdateClientName) challanUpdateClientName.value = details.clientName || '';
+      if (challanUpdateMode) challanUpdateMode.value = String(details.modeOfTransport || '').trim().toUpperCase();
+      if (challanUpdateVehicle) challanUpdateVehicle.value = normalizeChallanDisplayValue(details.vehicleNo);
+      if (challanUpdatePod) challanUpdatePod.value = normalizeChallanDisplayValue(details.podNo);
+      if (challanUpdateContainer) challanUpdateContainer.value = formatChallanDisplayValue(details.containerNo);
+      if (challanUpdateSeal) challanUpdateSeal.value = formatChallanDisplayValue(details.sealNo);
+      if (challanUpdateRemark) challanUpdateRemark.value = normalizeChallanDisplayValue(details.remark);
+    }
+
+    async function openChallanDetailForUpdate(row) {
+      if (!row || !row.fgTransactionId) {
+        alert('Missing delivery note reference.');
+        return;
+      }
+      if (!session || !session.selectedDatabase) {
+        alert('Please login first.');
+        return;
+      }
+
+      resetChallanUpdateForm();
+      if (challanUpdateError) challanUpdateError.textContent = '';
+      challanUpdateContext = {
+        fgTransactionId: row.fgTransactionId,
+        deliveryNoteNo: row.deliveryNoteNo || null
+      };
+      navigateTo('challan-update');
+
+      try {
+        setButtonLoading(challanUpdateSaveBtn, true, 'Loading...');
+        const base = getApiBaseUrl();
+        const url = new URL('grn/delivery-note-challan-details', base);
+        url.searchParams.set('database', session.selectedDatabase);
+        url.searchParams.set('fgTransactionId', String(row.fgTransactionId));
+        const res = await fetch(url.toString(), {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+          credentials: 'include',
+          cache: 'no-store'
+        });
+        if (!res.ok) {
+          const t = await res.text().catch(() => '');
+          let message = t || 'Failed to load challan details';
+          try {
+            const parsed = JSON.parse(t);
+            if (parsed?.error) message = parsed.error;
+          } catch (_) {
+            // keep raw text
+          }
+          throw new Error(message);
+        }
+        const data = await res.json();
+        if (!data || data.status !== true || !data.details) {
+          throw new Error(data?.error || 'Failed to load challan details');
+        }
+
+        populateChallanUpdateForm(data.details);
+        await Promise.all([
+          loadChallanUpdateTransporters(data.details.transporterLedgerId),
+          loadChallanUpdateConsignees(
+            data.details.consigneeLedgerId,
+            data.details.consigneeName
+          )
+        ]);
+      } catch (e) {
+        if (challanUpdateError) challanUpdateError.textContent = String(e.message || e);
+        alertWithSiren(String(e.message || e));
+      } finally {
+        setButtonLoading(challanUpdateSaveBtn, false);
+      }
+    }
+
+    async function downloadChallanDispatchPdf(options = {}) {
+      if (!session || !session.selectedDatabase) {
+        alert('Please login first.');
+        return;
+      }
+      const triggerButton = options.triggerButton || challanDownloadPdfBtn;
+      const errorElement = options.errorElement != null ? options.errorElement : challanDetailError;
+      const voucherNo = options.voucherNo
+        || challanUpdateContext?.deliveryNoteNo
+        || getChallanDetailSelectedRow()?.deliveryNoteNo;
+      if (!voucherNo) {
+        alert('Missing delivery note number.');
+        return;
+      }
+
+      setButtonLoading(triggerButton, true, 'Downloading...');
+      if (errorElement) errorElement.textContent = '';
+      try {
+        const base = getApiBaseUrl();
+        const url = new URL('grn/delivery-note-dispatch-pdf', base);
+        url.searchParams.set('database', session.selectedDatabase);
+        url.searchParams.set('voucherNo', String(voucherNo));
+        url.searchParams.set('username', String(session.username || ''));
+        const res = await fetch(url.toString(), {
+          method: 'GET',
+          credentials: 'include',
+          cache: 'no-store'
+        });
+        if (!res.ok) {
+          const t = await res.text().catch(() => '');
+          let message = t || 'Failed to download PDF';
+          try {
+            const parsed = JSON.parse(t);
+            if (parsed?.error) message = parsed.error;
+          } catch (_) {
+            // keep raw text
+          }
+          throw new Error(message);
+        }
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = `Dispatch_${String(voucherNo).replace(/[^\w.-]+/g, '_')}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(objectUrl);
+      } catch (e) {
+        const message = String(e.message || e);
+        if (errorElement) errorElement.textContent = message;
+        alertWithSiren(message);
+      } finally {
+        setButtonLoading(triggerButton, false);
+      }
+    }
+
+    async function saveChallanUpdateDetails() {
+      if (!session || !session.selectedDatabase || !session.userId) {
+        alert('Please login first.');
+        return;
+      }
+      if (!challanUpdateContext?.fgTransactionId) {
+        alert('Missing delivery note reference.');
+        return;
+      }
+
+      const modeOfTransport = String(challanUpdateMode?.value || '').trim();
+      const transporterLedgerId = String(challanUpdateTransporter?.value || '').trim();
+      const vehicleNo = String(challanUpdateVehicle?.value || '').trim();
+      const consigneeLedgerId = String(challanUpdateConsignee?.value || '').trim();
+      const podNo = String(challanUpdatePod?.value || '').trim();
+      const containerNo = String(challanUpdateContainer?.value || '').trim();
+      const sealNo = String(challanUpdateSeal?.value || '').trim();
+      const remark = String(challanUpdateRemark?.value || '').trim();
+
+      if (!modeOfTransport || !transporterLedgerId || !vehicleNo) {
+        alert('Mode of transport, transporter, and vehicle number are required.');
+        return;
+      }
+
+      setButtonLoading(challanUpdateSaveBtn, true, 'Updating...');
+      if (challanUpdateError) challanUpdateError.textContent = '';
+      try {
+        const base = getApiBaseUrl();
+        const url = new URL('grn/update-delivery-note-challan-details', base);
+        const res = await fetch(url.toString(), {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            database: session.selectedDatabase,
+            userId: session.userId,
+            fgTransactionId: challanUpdateContext.fgTransactionId,
+            consigneeLedgerId: consigneeLedgerId ? Number(consigneeLedgerId) : 0,
+            modeOfTransport,
+            transporterLedgerId,
+            vehicleNo,
+            podNo,
+            containerNo,
+            sealNo,
+            remark
+          })
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data || data.status !== true) {
+          throw new Error(data?.error || 'Failed to update challan details');
+        }
+        alert(data.message || 'Challan details updated successfully.');
+        navigateTo('challan-detail');
+        await loadChallanDetailRows();
+      } catch (e) {
+        const message = String(e.message || e);
+        if (challanUpdateError) challanUpdateError.textContent = message;
+        alertWithSiren(message);
+      } finally {
+        setButtonLoading(challanUpdateSaveBtn, false);
+      }
+    }
+
+    function resetChallanDetailView() {
+      challanDetailRows = [];
+      clearChallanDetailSelection();
+      challanDetailPageSize = 100;
+      challanDetailCurrentPage = 1;
+      challanDetailFilters = {
+        deliveryNoteNo: '',
+        deliveryNoteDate: '',
+        clientName: '',
+        jobBookingNo: '',
+        poDate: '',
+        totalDeliveredCartons: '',
+        totalQty: ''
+      };
+      if (filterChallanDnNo) filterChallanDnNo.value = '';
+      if (filterChallanDnDate) filterChallanDnDate.value = '';
+      if (filterChallanClient) filterChallanClient.value = '';
+      if (filterChallanJobBooking) filterChallanJobBooking.value = '';
+      if (filterChallanPoDate) filterChallanPoDate.value = '';
+      if (filterChallanCartons) filterChallanCartons.value = '';
+      if (filterChallanQty) filterChallanQty.value = '';
+      if (challanDetailError) challanDetailError.textContent = '';
+      if (challanPageNav) challanPageNav.innerHTML = '';
+      if (challanPageSummary) challanPageSummary.textContent = '';
+      challanPageSizeBtns.forEach((btn) => {
+        btn.classList.toggle('active', Number(btn.dataset.pageSize) === 100);
+      });
+      setDefaultChallanDateRange();
+      if (challanDetailTableBody) {
+        challanDetailTableBody.innerHTML = `
+          <tr class="empty-row">
+            <td colspan="8" class="empty-message">Open this page to load delivery notes.</td>
+          </tr>
+        `;
+      }
+    }
+
+    async function loadChallanDetailRows() {
+      try {
+        if (!session || !session.selectedDatabase) {
+          if (challanDetailError) challanDetailError.textContent = 'Please login first.';
+          return;
+        }
+        const { fromDate, toDate } = getChallanDateRangeParams();
+        if (challanDetailError) challanDetailError.textContent = '';
+        clearChallanDetailSelection();
+        challanDetailCurrentPage = 1;
+        if (challanDetailTableBody) {
+          challanDetailTableBody.innerHTML = `
+            <tr class="empty-row">
+              <td colspan="8" class="empty-message">Loading delivery notes...</td>
+            </tr>
+          `;
+        }
+        const base = getApiBaseUrl();
+        const url = new URL('grn/processed-delivery-notes', base);
+        url.searchParams.set('database', session.selectedDatabase);
+        url.searchParams.set('fromDate', fromDate);
+        url.searchParams.set('toDate', toDate);
+        const res = await fetch(url.toString(), {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+          credentials: 'include',
+          cache: 'no-store'
+        });
+        if (!res.ok) {
+          const t = await res.text().catch(() => '');
+          let message = t || 'Failed to fetch delivery notes';
+          try {
+            const parsed = JSON.parse(t);
+            if (parsed?.error) message = parsed.error;
+          } catch (_) {
+            // keep raw text
+          }
+          throw new Error(message);
+        }
+        const data = await res.json();
+        if (!data || data.status !== true || !Array.isArray(data.records)) {
+          throw new Error(data?.error || 'Failed to fetch delivery notes');
+        }
+        challanDetailRows = data.records.map(mapApiRecordToChallanRow);
+        renderChallanDetailRows(challanDetailRows);
+      } catch (e) {
+        if (challanDetailError) challanDetailError.textContent = String(e.message || e);
+        challanDetailRows = [];
+        renderChallanDetailRows([]);
+      }
+    }
+
+    function bindChallanDetailFilters() {
+      const updateFiltersAndRender = () => {
+        challanDetailFilters = {
+          deliveryNoteNo: String(filterChallanDnNo?.value || '').trim().toLowerCase(),
+          deliveryNoteDate: String(filterChallanDnDate?.value || '').trim().toLowerCase(),
+          clientName: String(filterChallanClient?.value || '').trim().toLowerCase(),
+          jobBookingNo: String(filterChallanJobBooking?.value || '').trim().toLowerCase(),
+          poDate: String(filterChallanPoDate?.value || '').trim().toLowerCase(),
+          totalDeliveredCartons: String(filterChallanCartons?.value || '').trim().toLowerCase(),
+          totalQty: String(filterChallanQty?.value || '').trim().toLowerCase()
+        };
+        challanDetailCurrentPage = 1;
+        renderChallanDetailRows(challanDetailRows);
+      };
+      [
+        filterChallanDnNo,
+        filterChallanDnDate,
+        filterChallanClient,
+        filterChallanJobBooking,
+        filterChallanPoDate,
+        filterChallanCartons,
+        filterChallanQty
+      ].forEach((el) => {
+        if (!el) return;
+        el.addEventListener('input', updateFiltersAndRender);
+      });
+    }
     function scrollBarcodeStatusIntoView() {
       if (!statusResults) return;
       const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1207,6 +2118,10 @@
   
       resetBarcodeStatusView();
       resetDeliveryAmountView();
+      resetChallanDetailView();
+      resetPendingGpnsView();
+      setChallanDetailSessionInfo(username, data.selectedDatabase);
+      setPendingGpnsSessionInfo(username, data.selectedDatabase);
   
       navigateTo('landing', { replace: true });
       historyDepth = 0;
@@ -1434,6 +2349,7 @@
               <td>${sp.gpnQty ?? '—'}</td>
               <td>${sp.deliveredThisVoucher ?? '—'}</td>
               <td>${sp.deliveredTotal ?? '—'}</td>
+              <td>${sp.batchNo ?? '—'}</td>
             `;
             deliveryTableBody.innerHTML = '';
             deliveryTableBody.appendChild(row);
@@ -1499,6 +2415,7 @@
                 <td>${sp.gpnQty ?? '—'}</td>
                 <td>${sp.deliveredThisVoucher ?? '—'}</td>
                 <td>${sp.deliveredTotal ?? '—'}</td>
+                <td>${sp.batchNo ?? '—'}</td>
               `;
               deliveryTableBody.insertBefore(newRow, deliveryTableBody.firstChild);
             }
@@ -1532,6 +2449,7 @@
         for (let i = 0; i < 10; i++) {
           const row = document.createElement('tr');
           row.innerHTML = `
+            <td></td>
             <td></td>
             <td></td>
             <td></td>
@@ -1587,6 +2505,81 @@
       });
     }
   
+
+    if (portalChallanDetail) {
+      portalChallanDetail.addEventListener('click', async () => {
+        setDefaultChallanDateRange();
+        navigateTo('challan-detail');
+        await loadChallanDetailRows();
+      });
+    }
+
+    if (portalPendingGpns) {
+      portalPendingGpns.addEventListener('click', () => {
+        resetPendingGpnsView();
+        navigateTo('pending-gpns');
+      });
+    }
+
+    if (backToLandingPendingGpnsBtn) {
+      backToLandingPendingGpnsBtn.addEventListener('click', () => {
+        handleBackNavigation('landing');
+      });
+    }
+
+    if (pendingGpnsSearchBtn) {
+      pendingGpnsSearchBtn.addEventListener('click', async () => {
+        await loadPendingGpnsRows();
+      });
+    }
+
+    if (backToLandingChallanDetailBtn) {
+      backToLandingChallanDetailBtn.addEventListener('click', () => {
+        handleBackNavigation('landing');
+      });
+    }
+
+    if (challanRefreshBtn) {
+      challanRefreshBtn.addEventListener('click', async () => {
+        await loadChallanDetailRows();
+      });
+    }
+
+    if (challanDownloadPdfBtn) {
+      challanDownloadPdfBtn.addEventListener('click', () => {
+        const selectedRow = getChallanDetailSelectedRow();
+        downloadChallanDispatchPdf({
+          voucherNo: selectedRow?.deliveryNoteNo,
+          triggerButton: challanDownloadPdfBtn,
+          errorElement: challanDetailError
+        });
+      });
+    }
+
+    challanPageSizeBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const size = Number(btn.dataset.pageSize);
+        if (!Number.isFinite(size) || size <= 0) return;
+        challanDetailPageSize = size;
+        challanDetailCurrentPage = 1;
+        challanPageSizeBtns.forEach((b) => b.classList.toggle('active', b === btn));
+        renderChallanDetailRows(challanDetailRows);
+      });
+    });
+
+    if (challanUpdateCloseBtn) {
+      challanUpdateCloseBtn.addEventListener('click', () => {
+        resetChallanUpdateForm();
+        handleBackNavigation('challan-detail');
+      });
+    }
+
+    if (challanUpdateSaveBtn) {
+      challanUpdateSaveBtn.addEventListener('click', () => {
+        saveChallanUpdateDetails();
+      });
+    }
+
     // GPN Submit handler
     if (submitGpnBtn) {
       submitGpnBtn.addEventListener('click', async () => {
@@ -1658,6 +2651,7 @@
             const cartonQtyTotal = responseData.CartonQtyTotal || responseData.cartonqtytotal || responseData.CartonQtyTotal || 0;
             const jobName = responseData.JobName || responseData.jobname || '—';
             const jobBookingNo = responseData.JobBookingNo || responseData.jobbookingno || responseData.JobBookingNumber || '—';
+            const batchNo = responseData.BatchNo || responseData.batchno || '—';
             
             firstRow.innerHTML = `
               <td>${barcode}</td>
@@ -1668,6 +2662,7 @@
               <td>${packedQtyTotal}</td>
               <td>${jobBookingNo}</td>
               <td>${jobName}</td>
+              <td>${batchNo}</td>
             `;
             gpnTableBody.innerHTML = '';
             gpnTableBody.appendChild(firstRow);
@@ -1768,6 +2763,7 @@
         const cartonQtyTotal = responseData.CartonQtyTotal || responseData.cartonqtytotal || responseData.CartonQtyTotal || 0;
         const jobName = responseData.JobName || responseData.jobname || '—';
         const jobBookingNo = responseData.JobBookingNo || responseData.jobbookingno || responseData.JobBookingNumber || '—';
+        const batchNo = responseData.BatchNo || responseData.batchno || '—';
   
         // Add new row to table (always at the top, newest first)
         if (gpnTableBody) {
@@ -1781,6 +2777,7 @@
             <td>${packedQtyTotal}</td>
             <td>${jobBookingNo}</td>
             <td>${jobName}</td>
+            <td>${batchNo}</td>
           `;
           // Insert at the top (prepend) - newest entries always at top
           gpnTableBody.insertBefore(newRow, gpnTableBody.firstChild);
@@ -1850,7 +2847,12 @@
   
     if (backToFormBtn) {
       backToFormBtn.addEventListener('click', () => {
-        handleBackNavigation('challan-form');
+        if (window.__dnOpenedFrom === 'challan-detail') {
+          window.__dnOpenedFrom = null;
+          handleBackNavigation('challan-detail');
+        } else {
+          handleBackNavigation('challan-form');
+        }
       });
     }
 
@@ -1881,6 +2883,8 @@
     }
 
     bindDeliveryAmountFilters();
+    bindChallanDetailFilters();
+    bindPendingGpnsFilters();
   
     // Restore session on page load
     function restoreSession() {
@@ -1900,6 +2904,8 @@
         if (infoDatabaseStatus) infoDatabaseStatus.textContent = savedSession.selectedDatabase;
         if (infoUsernameDeliveryAmount) infoUsernameDeliveryAmount.textContent = savedSession.username;
         if (infoDatabaseDeliveryAmount) infoDatabaseDeliveryAmount.textContent = savedSession.selectedDatabase;
+        setChallanDetailSessionInfo(savedSession.username, savedSession.selectedDatabase);
+        setPendingGpnsSessionInfo(savedSession.username, savedSession.selectedDatabase);
         
         // Show landing page
         navigateTo('landing', { replace: true, force: true });
@@ -1908,6 +2914,7 @@
         return true;
       }
       resetBarcodeStatusView();
+      resetPendingGpnsView();
       return false;
     }
     
@@ -1949,6 +2956,7 @@
             if (infoDatabaseStatus) infoDatabaseStatus.textContent = '';
             if (infoUsernameDeliveryAmount) infoUsernameDeliveryAmount.textContent = '';
             if (infoDatabaseDeliveryAmount) infoDatabaseDeliveryAmount.textContent = '';
+            setChallanDetailSessionInfo('', '');
             
             // Reset UI to login screen
             navigateTo('login', { replace: true, force: true });
@@ -1994,6 +3002,7 @@
       if (infoDatabaseStatus) infoDatabaseStatus.textContent = '';
       if (infoUsernameDeliveryAmount) infoUsernameDeliveryAmount.textContent = '';
       if (infoDatabaseDeliveryAmount) infoDatabaseDeliveryAmount.textContent = '';
+      setChallanDetailSessionInfo('', '');
       
       if (deliveryDetailsPanel) deliveryDetailsPanel.classList.remove('collapsed');
       if (deliveryDetailsToggle) {
@@ -2008,6 +3017,8 @@
       if (usernameInput) usernameInput.focus();
       resetBarcodeStatusView();
       resetDeliveryAmountView();
+      resetChallanDetailView();
+      resetChallanUpdateForm();
     }
     
     // Logout - Clear in-memory session AND backend session

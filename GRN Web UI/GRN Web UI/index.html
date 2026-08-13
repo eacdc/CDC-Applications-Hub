@@ -180,16 +180,18 @@
       width: 100%;
       border-collapse: collapse;
       background: transparent;
-      min-width: 800px;
     }
 
     .delivery-table th,
     .delivery-table td {
-      padding: 10px;
+      padding: 10px 8px;
       text-align: left;
       border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-      font-size: 13px;
+      font-size: 12px;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 200px;
     }
 
     .delivery-table th {
@@ -275,7 +277,7 @@
       }
 
       .delivery-table {
-        min-width: 900px;
+        min-width: 0;
       }
 
       .delivery-table th,
@@ -432,6 +434,7 @@
                 <th>Item Count Total</th>
                 <th>Job Number</th>
                 <th>Job Name</th>
+                <th>Batch No</th>
               </tr>
             </thead>
             <tbody id="gpn-table-body">
@@ -583,6 +586,7 @@
                 <th>GPN Qty</th>
                 <th>Delivered This Voucher</th>
                 <th>Delivered Total</th>
+                <th>Batch No</th>
               </tr>
             </thead>
             <tbody id="delivery-table-body">

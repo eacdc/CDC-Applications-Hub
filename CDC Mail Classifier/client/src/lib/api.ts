@@ -1,4 +1,5 @@
 import type {
+  AgentLogsResponse,
   EmailFilters,
   EmailListResponse,
   EmailRecord,
@@ -44,6 +45,21 @@ export function fetchEmail(id: string): Promise<EmailRecord> {
   return request<EmailRecord>(`/api/emails/${id}`);
 }
 
+export function fetchEmailAgentLogs(id: string): Promise<AgentLogsResponse> {
+  return request<AgentLogsResponse>(`/api/emails/${id}/agent-logs`);
+}
+
+export function assignSalesPerson(id: string, salesPerson: string): Promise<EmailRecord> {
+  return request<EmailRecord>(`/api/emails/${id}/sales-person`, {
+    method: 'PATCH',
+    body: JSON.stringify({ salesPerson }),
+  });
+}
+
+export function fetchSalesExecutives(): Promise<{ names: string[] }> {
+  return request<{ names: string[] }>('/api/sales-executives');
+}
+
 export function updateEmail(id: string, payload: EmailUpdatePayload): Promise<EmailRecord> {
   return request<EmailRecord>(`/api/emails/${id}`, {
     method: 'PATCH',
@@ -53,6 +69,10 @@ export function updateEmail(id: string, payload: EmailUpdatePayload): Promise<Em
 
 export function reclassifyEmail(id: string): Promise<EmailRecord> {
   return request<EmailRecord>(`/api/reclassify/${id}`, { method: 'POST' });
+}
+
+export function deleteEmail(id: string): Promise<{ deleted: boolean; _id: string }> {
+  return request<{ deleted: boolean; _id: string }>(`/api/emails/${id}`, { method: 'DELETE' });
 }
 
 export function fetchStats(): Promise<StatsResponse> {
@@ -68,6 +88,14 @@ export function createInbox(label: string, emailAddress: string): Promise<InboxR
     method: 'POST',
     body: JSON.stringify({ label, emailAddress }),
   });
+}
+
+export function disconnectInbox(id: string): Promise<InboxRecord> {
+  return request<InboxRecord>(`/api/inboxes/${id}/disconnect`, { method: 'POST' });
+}
+
+export function deleteInbox(id: string): Promise<{ deleted: boolean; _id: string }> {
+  return request<{ deleted: boolean; _id: string }>(`/api/inboxes/${id}`, { method: 'DELETE' });
 }
 
 export function getGoogleAuthUrl(label: string, emailAddress: string): string {

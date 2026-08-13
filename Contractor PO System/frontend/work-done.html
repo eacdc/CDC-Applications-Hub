@@ -1356,6 +1356,9 @@
               isSeriesMode = false;
               if (multipleJobsContainer) {
                 multipleJobsContainer.style.display = 'none';
+                // Clear any leftover series job panels so their hidden, unsaved
+                // qty inputs can't be picked up by a later save.
+                multipleJobsContainer.innerHTML = '';
               }
               
               // Show Operations Pending panel for single job mode
@@ -1497,8 +1500,9 @@
           }
           currentContractor = selectedContractorId;
 
-          // Collect qty inputs
-          const qtyInputs = document.querySelectorAll(".work-qty-input");
+          // Collect qty inputs — scope to the current job's table only so
+          // stale/hidden inputs from a previous series can't leak into this save.
+          const qtyInputs = (opsPendingBody || document).querySelectorAll(".work-qty-input");
           const operations = [];
           const qtyToAddMap = {}; // for local UI update
 

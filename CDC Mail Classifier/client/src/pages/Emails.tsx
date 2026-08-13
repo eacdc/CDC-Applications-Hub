@@ -4,6 +4,7 @@ import { fetchEmails, fetchInboxes } from '@/lib/api';
 import type { EmailFilters, EmailRecord } from '@/types';
 import FilterBar from '@/components/FilterBar';
 import EmailTable from '@/components/EmailTable';
+import DeleteEmailDialog from '@/components/DeleteEmailDialog';
 
 export default function EmailsPage() {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ export default function EmailsPage() {
   const [inboxLabels, setInboxLabels] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<EmailRecord | null>(null);
 
   useEffect(() => {
     fetchInboxes()
@@ -47,7 +49,7 @@ export default function EmailsPage() {
   }, [emails, inboxLabels]);
 
   return (
-    <div className="page-shell space-y-4">
+    <div className="page-shell-wide space-y-4">
       <h1 className="text-xl font-semibold">Mail</h1>
 
       <FilterBar filters={filters} inboxes={inboxOptions} onChange={setFilters} />
@@ -60,6 +62,7 @@ export default function EmailsPage() {
           <EmailTable
             emails={emails}
             onRowClick={(email) => navigate(`/email/${email._id}`)}
+            onDelete={(email) => setPendingDelete(email)}
           />
 
           {totalPages > 1 && (
@@ -86,6 +89,17 @@ export default function EmailsPage() {
             </div>
           )}
         </>
+      )}
+
+      {pendingDelete && (
+        <DeleteEmailDialog
+          email={pendingDelete}
+          onClose={() => setPendingDelete(null)}
+          onDeleted={(deletedId) => {
+            setEmails((prev) => prev.filter((e) => e._id !== deletedId));
+            setPendingDelete(null);
+          }}
+        />
       )}
     </div>
   );

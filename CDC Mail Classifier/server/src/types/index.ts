@@ -41,6 +41,19 @@ export interface NormalizedEmail {
   gmailLink: string;
 }
 
+export interface ThreadMessageContext {
+  messageId: string;
+  fromName: string;
+  fromEmail: string;
+  toField: string;
+  ccField: string;
+  subject: string;
+  sentDate: Date;
+  body: string;
+  attachments: string[];
+  isLatest: boolean;
+}
+
 export interface EmailListFilters {
   department?: string;
   mailType?: string;

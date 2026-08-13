@@ -74,9 +74,10 @@ export async function fetchRecentMessageIds(
   lookbackMinutes: number,
 ): Promise<string[]> {
   const afterEpoch = Math.floor(Date.now() / 1000) - lookbackMinutes * 60;
-  const query = `after:${afterEpoch}`;
+  // Gmail INBOX only — excludes Sent, Drafts, other labels
+  const query = `in:inbox after:${afterEpoch}`;
 
-  const ids: string[] = [];
+  const ids = new Set<string>();
   let pageToken: string | undefined;
 
   do {
@@ -84,6 +85,7 @@ export async function fetchRecentMessageIds(
       () =>
         gmail.users.messages.list({
           userId: 'me',
+          labelIds: ['INBOX'],
           q: query,
           maxResults: 100,
           pageToken,
@@ -92,12 +94,12 @@ export async function fetchRecentMessageIds(
     );
 
     for (const msg of res.data.messages ?? []) {
-      if (msg.id) ids.push(msg.id);
+      if (msg.id) ids.add(msg.id);
     }
     pageToken = res.data.nextPageToken ?? undefined;
   } while (pageToken);
 
-  return ids;
+  return [...ids];
 }
 
 export async function fetchMessage(

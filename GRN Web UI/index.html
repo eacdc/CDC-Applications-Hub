@@ -180,16 +180,18 @@
       width: 100%;
       border-collapse: collapse;
       background: transparent;
-      min-width: 800px;
     }
 
     .delivery-table th,
     .delivery-table td {
-      padding: 10px;
+      padding: 10px 8px;
       text-align: left;
       border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-      font-size: 13px;
+      font-size: 12px;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 200px;
     }
 
     .delivery-table th {
@@ -271,9 +273,279 @@
       font-size: 12px;
     }
 
-    #delivery-amount-section {
+    #delivery-amount-section,
+    #challan-detail-section,
+    #challan-update-section,
+    #pending-gpns-section {
       width: min(1800px, 98vw);
       max-width: 98vw;
+    }
+
+    .challan-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 14px 20px;
+      margin: 0 0 10px;
+    }
+
+    .challan-toolbar-item {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted, #94a3b8);
+      white-space: nowrap;
+    }
+
+    .challan-toolbar-item strong {
+      color: var(--text, #e2e8f0);
+      font-weight: 600;
+    }
+
+    .challan-date-row {
+      display: contents;
+    }
+
+    .challan-date-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .challan-date-field label {
+      font-size: 12px;
+      color: var(--muted, #94a3b8);
+    }
+
+    .challan-date-field input[type="date"] {
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(15, 23, 42, 0.65);
+      color: var(--text, #e2e8f0);
+      font-size: 12px;
+    }
+
+    .challan-detail-table-container {
+      max-height: calc(100vh - 220px);
+      min-height: min(560px, calc(100vh - 280px));
+      overflow-y: auto;
+      overflow-x: auto;
+    }
+
+    .challan-detail-table {
+      min-width: 1180px;
+      table-layout: fixed;
+    }
+
+    .challan-detail-table th:last-child,
+    .challan-detail-table td:last-child {
+      width: 130px;
+      min-width: 130px;
+      text-align: center;
+    }
+
+    .challan-detail-table tbody tr.challan-detail-row {
+      cursor: pointer;
+    }
+
+    .challan-detail-table tbody tr.challan-detail-row:hover td {
+      background: rgba(148, 163, 184, 0.08);
+    }
+
+    .challan-detail-table tbody tr.challan-row-selected td {
+      background: rgba(59, 130, 246, 0.18);
+    }
+
+    .challan-detail-table tbody tr.challan-row-selected:hover td {
+      background: rgba(59, 130, 246, 0.24);
+    }
+
+    .challan-detail-table th,
+    .challan-detail-table td {
+      white-space: normal;
+      word-break: break-word;
+      padding: 6px 8px;
+      font-size: 12px;
+    }
+
+    .challan-action-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(96, 165, 250, 0.45);
+      background: rgba(59, 130, 246, 0.2);
+      color: #bfdbfe;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .challan-action-btn:hover {
+      background: rgba(59, 130, 246, 0.35);
+    }
+
+    .challan-pagination {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .challan-page-size {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .challan-page-size-label {
+      font-size: 12px;
+      color: var(--muted, #94a3b8);
+      margin-right: 4px;
+    }
+
+    .challan-page-size-btn,
+    .challan-page-btn {
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      background: rgba(15, 23, 42, 0.55);
+      color: var(--text, #e2e8f0);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .challan-page-size-btn.active,
+    .challan-page-btn.active {
+      background: rgba(59, 130, 246, 0.28);
+      border-color: rgba(96, 165, 250, 0.65);
+    }
+
+    .challan-page-nav {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .challan-page-summary {
+      font-size: 12px;
+      color: var(--muted, #94a3b8);
+    }
+
+    .challan-update-header-bar {
+      margin: -16px -16px 16px;
+      padding: 10px 16px;
+      background: linear-gradient(90deg, rgba(15, 118, 110, 0.95), rgba(13, 148, 136, 0.85));
+      border-bottom: 1px solid rgba(45, 212, 191, 0.35);
+    }
+
+    .challan-update-header-bar h2 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: #ecfeff;
+    }
+
+    .challan-update-subtitle {
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: rgba(236, 254, 255, 0.85);
+    }
+
+    .challan-update-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px 14px;
+      margin-bottom: 12px;
+    }
+
+    .challan-update-grid-row2 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      max-width: calc(60% + 28px);
+    }
+
+    .challan-update-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .challan-update-field label {
+      font-size: 12px;
+      color: var(--muted, #94a3b8);
+    }
+
+    .challan-update-field input,
+    .challan-update-field select,
+    .challan-update-field textarea {
+      width: 100%;
+      padding: 7px 9px;
+      border-radius: 6px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(15, 23, 42, 0.65);
+      color: var(--text, #e2e8f0);
+      font-size: 12px;
+    }
+
+    .challan-update-field input:read-only,
+    .challan-update-field input:disabled {
+      opacity: 0.85;
+      cursor: not-allowed;
+      background: rgba(15, 23, 42, 0.45);
+    }
+
+    .challan-update-field-full {
+      grid-column: 1 / -1;
+    }
+
+    .challan-update-actions {
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .challan-update-actions .secondary {
+      background: transparent;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      color: var(--text, #e2e8f0);
+    }
+
+    #btn-challan-update-save {
+      background: #16a34a;
+      border-color: #15803d;
+      color: #fff;
+      min-width: 90px;
+    }
+
+    #btn-challan-update-save:hover {
+      background: #15803d;
+    }
+
+    @media (max-width: 1100px) {
+      .challan-update-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .challan-update-grid-row2 {
+        max-width: none;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 640px) {
+      .challan-update-grid,
+      .challan-update-grid-row2 {
+        grid-template-columns: 1fr;
+      }
     }
 
     .delivery-amount-table-container {
@@ -368,11 +640,11 @@
       }
 
       .delivery-table {
-        min-width: 900px;
+        min-width: 0;
       }
 
       .delivery-amount-table {
-        min-width: 900px;
+        min-width: 0;
       }
 
       .delivery-table th,
@@ -473,6 +745,18 @@
               <p class="portal-description">Update transport type and delivery amount</p>
             </div>
           </div>
+          <div class="portal-card" id="portal-challan-detail">
+            <div class="portal-card-content">
+              <h3>Challan Detail</h3>
+              <p class="portal-description">View processed delivery notes</p>
+            </div>
+          </div>
+          <div class="portal-card" id="portal-pending-gpns">
+            <div class="portal-card-content">
+              <h3>GPNs Pending for Delivery Note</h3>
+              <p class="portal-description">GPNs waiting for delivery note</p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -529,6 +813,199 @@
         </div>
         <div class="form-actions">
           <button id="btn-save-delivery-amount" class="secondary hidden">Save</button>
+        </div>
+      </section>
+
+      <section id="pending-gpns-section" class="card delivery-note-card hidden">
+        <div class="page-header">
+          <button id="btn-back-to-landing-pending-gpns" class="back-btn">← Back</button>
+          <h2>GPNs Pending for Delivery Note</h2>
+        </div>
+        <div class="challan-toolbar">
+          <div class="challan-toolbar-item">
+            <strong>User:</strong>
+            <span id="info-username-pending-gpns"></span>
+          </div>
+          <div class="challan-toolbar-item">
+            <strong>Database:</strong>
+            <span id="info-database-pending-gpns"></span>
+          </div>
+          <div class="challan-date-row">
+            <div class="challan-date-field">
+              <label for="pending-gpns-from-date">From Date</label>
+              <input id="pending-gpns-from-date" type="date" />
+            </div>
+            <div class="challan-date-field">
+              <label for="pending-gpns-to-date">To Date</label>
+              <input id="pending-gpns-to-date" type="date" />
+            </div>
+            <button id="btn-pending-gpns-search" type="button">Search</button>
+          </div>
+        </div>
+        <p id="pending-gpns-error" class="error" aria-live="polite"></p>
+        <div class="table-container challan-detail-table-container">
+          <table class="delivery-table challan-detail-table">
+            <thead>
+              <tr>
+                <th>Barcode No</th>
+                <th>Job Number</th>
+                <th>Job Name</th>
+                <th>Client Name</th>
+                <th>GPN No</th>
+                <th>GPN Date</th>
+                <th>Days Pending</th>
+              </tr>
+              <tr class="delivery-filter-row">
+                <th><input id="filter-pending-gpns-barcode" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
+                <th><input id="filter-pending-gpns-job-number" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
+                <th><input id="filter-pending-gpns-job-name" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
+                <th><input id="filter-pending-gpns-client" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
+                <th><input id="filter-pending-gpns-gpn-no" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
+                <th><input id="filter-pending-gpns-gpn-date" class="delivery-filter-input" type="text" placeholder="dd/mm/yyyy" /></th>
+                <th><input id="filter-pending-gpns-days" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
+              </tr>
+            </thead>
+            <tbody id="pending-gpns-table-body">
+              <tr class="empty-row">
+                <td colspan="7" class="empty-message">Select From Date and To Date, then click Search.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="challan-detail-section" class="card delivery-note-card hidden">
+        <div class="page-header">
+          <button id="btn-back-to-landing-challan-detail" class="back-btn">← Back</button>
+          <h2>Challan Detail</h2>
+        </div>
+        <div class="challan-toolbar">
+          <div class="challan-toolbar-item">
+            <strong>User:</strong>
+            <span id="info-username-challan-detail"></span>
+          </div>
+          <div class="challan-toolbar-item">
+            <strong>Database:</strong>
+            <span id="info-database-challan-detail"></span>
+          </div>
+          <div class="challan-date-row">
+            <div class="challan-date-field">
+              <label for="challan-from-date">From Date</label>
+              <input id="challan-from-date" type="date" />
+            </div>
+            <div class="challan-date-field">
+              <label for="challan-to-date">To Date</label>
+              <input id="challan-to-date" type="date" />
+            </div>
+            <button id="btn-challan-refresh" type="button">Refresh</button>
+            <button id="btn-challan-download-pdf" type="button" class="secondary hidden">Download PDF</button>
+          </div>
+        </div>
+        <p id="challan-detail-error" class="error" aria-live="polite"></p>
+        <div class="table-container challan-detail-table-container">
+          <table class="delivery-table challan-detail-table">
+            <thead>
+              <tr>
+                <th>Delivery Note No.</th>
+                <th>Delivery Note Date</th>
+                <th>Client Name</th>
+                <th>Job Booking No.</th>
+                <th>PO Date</th>
+                <th>Total Delivrd Cartons</th>
+                <th>Total Qty</th>
+                <th>Update Challan Details</th>
+              </tr>
+              <tr class="delivery-filter-row">
+                <th><input id="filter-challan-dn-no" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
+                <th><input id="filter-challan-dn-date" class="delivery-filter-input" type="text" placeholder="dd/mm/yyyy" /></th>
+                <th><input id="filter-challan-client" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
+                <th><input id="filter-challan-job-booking" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
+                <th><input id="filter-challan-po-date" class="delivery-filter-input" type="text" placeholder="dd/mm/yyyy" /></th>
+                <th><input id="filter-challan-cartons" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
+                <th><input id="filter-challan-qty" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="challan-detail-table-body">
+              <tr class="empty-row">
+                <td colspan="8" class="empty-message">Open this page to load delivery notes.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="challan-pagination">
+          <div class="challan-page-size">
+            <span class="challan-page-size-label">Rows per page</span>
+            <button type="button" class="challan-page-size-btn active" data-page-size="100">100</button>
+            <button type="button" class="challan-page-size-btn" data-page-size="200">200</button>
+            <button type="button" class="challan-page-size-btn" data-page-size="500">500</button>
+            <button type="button" class="challan-page-size-btn" data-page-size="1000">1000</button>
+          </div>
+          <span id="challan-page-summary" class="challan-page-summary"></span>
+          <div id="challan-page-nav" class="challan-page-nav"></div>
+        </div>
+      </section>
+
+      <section id="challan-update-section" class="card delivery-note-card hidden">
+        <div class="challan-update-header-bar">
+          <h2>Update Challan Details</h2>
+          <p id="challan-update-subtitle" class="challan-update-subtitle"></p>
+        </div>
+        <p id="challan-update-error" class="error" aria-live="polite"></p>
+        <div class="challan-update-grid">
+          <div class="challan-update-field">
+            <label for="challan-update-client-name">Client Name</label>
+            <input id="challan-update-client-name" type="text" readonly disabled aria-readonly="true" tabindex="-1" />
+          </div>
+          <div class="challan-update-field">
+            <label for="challan-update-consignee">Consignee</label>
+            <select id="challan-update-consignee">
+              <option value="">Select --</option>
+            </select>
+          </div>
+          <div class="challan-update-field">
+            <label for="challan-update-mode">Mode of Transport</label>
+            <select id="challan-update-mode">
+              <option value="">Select --</option>
+              <option value="AIR">Air</option>
+              <option value="SEA">Sea</option>
+              <option value="ROAD">Road</option>
+            </select>
+          </div>
+          <div class="challan-update-field">
+            <label for="challan-update-transporter">Transporter</label>
+            <select id="challan-update-transporter">
+              <option value="">Select --</option>
+            </select>
+          </div>
+          <div class="challan-update-field">
+            <label for="challan-update-vehicle">Vehicle No</label>
+            <input id="challan-update-vehicle" type="text" />
+          </div>
+        </div>
+        <div class="challan-update-grid challan-update-grid-row2">
+          <div class="challan-update-field">
+            <label for="challan-update-pod">POD NO.</label>
+            <input id="challan-update-pod" type="text" />
+          </div>
+          <div class="challan-update-field">
+            <label for="challan-update-container">Container No</label>
+            <input id="challan-update-container" type="text" />
+          </div>
+          <div class="challan-update-field">
+            <label for="challan-update-seal">Seal No</label>
+            <input id="challan-update-seal" type="text" />
+          </div>
+        </div>
+        <div class="challan-update-grid">
+          <div class="challan-update-field challan-update-field-full">
+            <label for="challan-update-remark">Remark</label>
+            <input id="challan-update-remark" type="text" />
+          </div>
+        </div>
+        <div class="form-actions challan-update-actions">
+          <button id="btn-challan-update-close" type="button" class="secondary">Close</button>
+          <button id="btn-challan-update-save" type="button">Update</button>
         </div>
       </section>
 
@@ -591,6 +1068,7 @@
                 <th>Item Count Total</th>
                 <th>Job Number</th>
                 <th>Job Name</th>
+                <th>Batch No</th>
               </tr>
             </thead>
             <tbody id="gpn-table-body">
@@ -742,6 +1220,7 @@
                 <th>GPN Qty</th>
                 <th>Delivered This Voucher</th>
                 <th>Delivered Total</th>
+                <th>Batch No</th>
               </tr>
             </thead>
             <tbody id="delivery-table-body">

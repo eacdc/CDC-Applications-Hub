@@ -130,13 +130,27 @@ export const operationsAPI = {
   },
   getCategories: () => apiCall('/operations/categories'),
   getById: (id) => apiCall(`/operations/${id}`),
-  create: (opsName, type, ratePerUnit, categories, isAdhocOp = false) => apiCall('/operations', {
+  create: (opsName, type, ratePerUnit, categories, isAdhocOp = false, link = '') => apiCall('/operations', {
     method: 'POST',
-    body: { opsName, type, ratePerUnit, isAdhocOp: !!isAdhocOp, categories: Array.isArray(categories) ? categories : (categories != null && categories !== '' ? [String(categories)] : []) }
+    body: {
+      opsName,
+      type,
+      ratePerUnit,
+      isAdhocOp: !!isAdhocOp,
+      link: link != null ? String(link).trim() : '',
+      categories: Array.isArray(categories) ? categories : (categories != null && categories !== '' ? [String(categories)] : [])
+    }
   }),
-  update: (id, opsName, type, ratePerUnit, categories, isAdhocOp = false) => apiCall(`/operations/${id}`, {
+  update: (id, opsName, type, ratePerUnit, categories, isAdhocOp = false, link = '') => apiCall(`/operations/${id}`, {
     method: 'PUT',
-    body: { opsName, type, ratePerUnit, isAdhocOp: !!isAdhocOp, categories: Array.isArray(categories) ? categories : (categories != null && categories !== '' ? [String(categories)] : []) }
+    body: {
+      opsName,
+      type,
+      ratePerUnit,
+      isAdhocOp: !!isAdhocOp,
+      link: link != null ? String(link).trim() : '',
+      categories: Array.isArray(categories) ? categories : (categories != null && categories !== '' ? [String(categories)] : [])
+    }
   }),
   delete: (id) => apiCall(`/operations/${id}`, {
     method: 'DELETE'
@@ -216,10 +230,18 @@ export const billsAPI = {
     body: { contractorName, jobs }
   }),
   checkRoomRent: (contractorName) => apiCall(`/bills/check-roomrent/${encodeURIComponent(contractorName)}`),
-  markAsPaid: (billNumber, roomRent) => apiCall(`/bills/${billNumber}/pay`, {
+  markAsPaid: (billNumber, roomRent, contractorBillNumber) => apiCall(`/bills/${billNumber}/pay`, {
     method: 'PATCH',
-    body: roomRent !== undefined ? { roomRent } : {}
+    body: {
+      ...(roomRent !== undefined ? { roomRent } : {}),
+      contractorBillNumber,
+    }
   }),
+  updateContractorBillNo: (billNumber, contractorBillNumber, updateShared = true) =>
+    apiCall(`/bills/${encodeURIComponent(billNumber)}/contractor-bill-no`, {
+      method: 'PATCH',
+      body: { contractorBillNumber, updateShared },
+    }),
   delete: (billNumber) => apiCall(`/bills/${billNumber}`, {
     method: 'DELETE'
   })
@@ -244,7 +266,27 @@ export const summaryAPI = {
     if (month != null) params.set('month', String(month));
     if (quarter != null) params.set('quarter', String(quarter));
     return apiCall(`/summary/chart?${params.toString()}`);
-  }
+  },
+  exportJobSummary: async (startDate, endDate) => {
+    const params = new URLSearchParams();
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
+    const qs = params.toString();
+    const url = `${API_BASE_URL}/summary/export.xlsx${qs ? `?${qs}` : ''}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      const text = await response.text();
+      let body;
+      try {
+        body = text ? JSON.parse(text) : null;
+      } catch {
+        body = text;
+      }
+      const message = body?.error || `HTTP ${response.status}`;
+      throw new Error(message);
+    }
+    return response.blob();
+  },
 };
 
 // Series API

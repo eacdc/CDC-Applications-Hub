@@ -7,6 +7,7 @@ import emailsRouter, { reclassifyEmailById } from './routes/emails.js';
 import statsRouter from './routes/stats.js';
 import inboxesRouter from './routes/inboxes.js';
 import authRouter from './routes/auth.js';
+import salesExecutivesRouter from './routes/sales-executives.js';
 import { startPollJob } from './jobs/poll.js';
 
 const app = express();
@@ -19,6 +20,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/emails', emailsRouter);
+app.use('/api/sales-executives', salesExecutivesRouter);
 app.post('/api/reclassify/:id', async (req, res) => {
   try {
     const id = String(req.params.id);

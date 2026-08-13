@@ -29,6 +29,8 @@ const EmailSchema = new mongoose.Schema(
     actionRequired: String,
     typeSpecific: mongoose.Schema.Types.Mixed,
     reviewed: { type: Boolean, default: false },
+    salesPerson: String,
+    salesPersonSource: String,
   },
   { timestamps: true },
 );
@@ -37,6 +39,7 @@ EmailSchema.index({ messageId: 1 }, { unique: true });
 EmailSchema.index({ needsReview: 1, sentDate: 1 });
 EmailSchema.index({ department: 1, mailType: 1 });
 EmailSchema.index({ inbox: 1, sentDate: -1 });
+EmailSchema.index({ threadId: 1, salesPersonSource: 1 });
 
 export type EmailDocument = mongoose.InferSchemaType<typeof EmailSchema> & {
   _id: mongoose.Types.ObjectId;

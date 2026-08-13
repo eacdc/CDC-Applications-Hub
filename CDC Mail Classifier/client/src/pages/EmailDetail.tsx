@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { ExternalLink, Loader2, RefreshCw, Save } from 'lucide-react';
-import { fetchEmail, reclassifyEmail, updateEmail } from '@/lib/api';
-import type { EmailRecord, EmailUpdatePayload } from '@/types';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ExternalLink, Loader2, RefreshCw, Save, Trash2 } from 'lucide-react';
+import { fetchEmail, fetchEmailAgentLogs, reclassifyEmail, updateEmail } from '@/lib/api';
+import type { AgentStepLogRecord, EmailRecord, EmailUpdatePayload } from '@/types';
 import { DEPARTMENTS, MAIL_TYPES } from '@/types';
 import StatusBadge from '@/components/StatusBadge';
+import AgentLogPanel from '@/components/AgentLogPanel';
+import DeleteEmailDialog from '@/components/DeleteEmailDialog';
+import SalesPersonPicker from '@/components/SalesPersonPicker';
 import { formatConfidence, formatDate } from '@/lib/utils';
 
 interface EmailDetailPageProps {
@@ -19,12 +22,17 @@ export default function EmailDetailPage({ id: propId }: EmailDetailPageProps) {
 }
 
 function EmailDetailInner({ id }: { id: string }) {
+  const navigate = useNavigate();
   const [email, setEmail] = useState<EmailRecord | null>(null);
   const [form, setForm] = useState<EmailUpdatePayload>({});
   const [typeSpecificJson, setTypeSpecificJson] = useState('{}');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [reclassifying, setReclassifying] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [agentLogs, setAgentLogs] = useState<AgentStepLogRecord[]>([]);
+  const [agentLogsLoading, setAgentLogsLoading] = useState(true);
+  const [agentLogsError, setAgentLogsError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -55,9 +63,24 @@ function EmailDetailInner({ id }: { id: string }) {
     }
   }, [id]);
 
+  const loadAgentLogs = useCallback(async () => {
+    if (!id) return;
+    try {
+      setAgentLogsLoading(true);
+      const data = await fetchEmailAgentLogs(id);
+      setAgentLogs(data.logs);
+      setAgentLogsError(null);
+    } catch (err) {
+      setAgentLogsError(err instanceof Error ? err.message : 'Failed to load agent logs');
+    } finally {
+      setAgentLogsLoading(false);
+    }
+  }, [id]);
+
   useEffect(() => {
     load();
-  }, [load]);
+    loadAgentLogs();
+  }, [load, loadAgentLogs]);
 
   async function handleSave() {
     if (!id) return;
@@ -104,6 +127,7 @@ function EmailDetailInner({ id }: { id: string }) {
       setTypeSpecificJson(JSON.stringify(updated.typeSpecific ?? {}, null, 2));
       setMessage('Reclassified');
       setError(null);
+      await loadAgentLogs();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Reclassify failed');
     } finally {
@@ -144,11 +168,43 @@ function EmailDetailInner({ id }: { id: string }) {
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Save correction
           </button>
+          <button
+            type="button"
+            className="btn-secondary text-red-300 hover:bg-red-950/40 hover:text-red-200"
+            onClick={() => setShowDelete(true)}
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </button>
         </div>
       </div>
 
       {error && <div className="text-sm text-red-400">{error}</div>}
       {message && <div className="text-sm text-emerald-400">{message}</div>}
+
+      <div className="card space-y-3">
+        <h2 className="text-sm font-medium text-slate-400">Email headers</h2>
+        <dl className="grid gap-3 text-sm sm:grid-cols-2">
+          <HeaderField label="From">
+            {email.fromName ? `${email.fromName} <${email.fromEmail}>` : (email.fromEmail || '—')}
+          </HeaderField>
+          <HeaderField label="To">{email.toField || '—'}</HeaderField>
+          <HeaderField label="CC">{email.ccField || '—'}</HeaderField>
+          <HeaderField label="Inbox">{email.inbox || '—'}</HeaderField>
+          <HeaderField label="Gmail message ID">
+            <code className="break-all text-xs text-slate-300">{email.messageId || '—'}</code>
+          </HeaderField>
+          <HeaderField label="Gmail thread ID">
+            <code className="break-all text-xs text-slate-300">{email.threadId || '—'}</code>
+          </HeaderField>
+          <HeaderField label="App record ID">
+            <code className="break-all text-xs text-slate-300">{email._id}</code>
+          </HeaderField>
+          <HeaderField label="Sales person">
+            <SalesPersonPicker email={email} onAssigned={setEmail} />
+          </HeaderField>
+        </dl>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="card space-y-3">
@@ -235,6 +291,25 @@ function EmailDetailInner({ id }: { id: string }) {
           </Field>
         </div>
       </div>
+
+      <div className="card space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium text-slate-400">Agent logs</h2>
+          <span className="text-xs text-slate-500">Inputs & outputs · auto-deleted after 30 days</span>
+        </div>
+        <AgentLogPanel logs={agentLogs} loading={agentLogsLoading} error={agentLogsError} />
+      </div>
+
+      {showDelete && email && (
+        <DeleteEmailDialog
+          email={email}
+          onClose={() => setShowDelete(false)}
+          onDeleted={() => {
+            setShowDelete(false);
+            navigate('/emails');
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -245,5 +320,14 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       {label}
       {children}
     </label>
+  );
+}
+
+function HeaderField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <dt className="text-xs text-slate-500">{label}</dt>
+      <dd className="mt-0.5 text-slate-200">{children}</dd>
+    </div>
   );
 }

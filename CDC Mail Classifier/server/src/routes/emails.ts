@@ -1,8 +1,16 @@
 import { Router, type Request, type Response } from 'express';
 import mongoose from 'mongoose';
 import { Email } from '../models/Email.js';
+import { ClassificationStepLog } from '../models/ClassificationStepLog.js';
 import type { EmailUpdatePayload } from '../types/index.js';
 import { classifyEmail, classificationToEmailFields } from '../lib/classifier.js';
+import { resolveGmailClientForInboxLabel } from '../lib/inbox-gmail.js';
+import {
+  enrichLatestMessageBody,
+  fetchThreadMessagesForClassification,
+} from '../lib/thread-context.js';
+import { resolveSalesPerson, SALES_TAG_MAIL_TYPES } from '../lib/sales-person.js';
+import { fetchSalesExecutiveNames, isSqlConfigured } from '../db-sql.js';
 
 const router = Router();
 
@@ -82,6 +90,34 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+router.get('/:id/agent-logs', async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ error: 'Invalid email id' });
+      return;
+    }
+
+    const email = await Email.findById(id).select('messageId').lean();
+    if (!email) {
+      res.status(404).json({ error: 'Email not found' });
+      return;
+    }
+
+    const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit ?? '100'), 10) || 100));
+
+    const logs = await ClassificationStepLog.find({ messageId: email.messageId })
+      .sort({ createdAt: -1, step: 1 })
+      .limit(limit)
+      .lean();
+
+    res.json({ messageId: email.messageId, logs });
+  } catch (err) {
+    console.error('[API] GET /emails/:id/agent-logs error', err);
+    res.status(500).json({ error: 'Failed to fetch agent logs' });
+  }
+});
+
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
@@ -100,6 +136,74 @@ router.get('/:id', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('[API] GET /emails/:id error', err);
     res.status(500).json({ error: 'Failed to fetch email' });
+  }
+});
+
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ error: 'Invalid email id' });
+      return;
+    }
+
+    const deleted = await Email.findByIdAndDelete(id).lean();
+    if (!deleted) {
+      res.status(404).json({ error: 'Email not found' });
+      return;
+    }
+
+    res.json({ deleted: true, _id: id });
+  } catch (err) {
+    console.error('[API] DELETE /emails/:id error', err);
+    res.status(500).json({ error: 'Failed to delete email' });
+  }
+});
+
+router.patch('/:id/sales-person', async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ error: 'Invalid email id' });
+      return;
+    }
+
+    const salesPerson = String(req.body?.salesPerson ?? '').trim();
+    if (!salesPerson) {
+      res.status(400).json({ error: 'salesPerson is required' });
+      return;
+    }
+
+    if (!isSqlConfigured()) {
+      res.status(503).json({ error: 'Sales executive lookup is not configured' });
+      return;
+    }
+
+    const email = await Email.findById(id);
+    if (!email) {
+      res.status(404).json({ error: 'Email not found' });
+      return;
+    }
+
+    if (!email.mailType || !SALES_TAG_MAIL_TYPES.has(email.mailType)) {
+      res.status(400).json({ error: 'Sales person can only be assigned for eligible mail types' });
+      return;
+    }
+
+    const executives = await fetchSalesExecutiveNames();
+    if (!executives.includes(salesPerson)) {
+      res.status(400).json({ error: 'Invalid sales person selection' });
+      return;
+    }
+
+    email.salesPerson = salesPerson;
+    email.salesPersonSource = 'manual';
+    await email.save();
+
+    res.json(email.toObject());
+  } catch (err) {
+    console.error('[API] PATCH /emails/:id/sales-person error', err);
+    res.status(500).json({ error: 'Failed to assign sales person' });
   }
 });
 
@@ -171,10 +275,52 @@ export async function reclassifyEmailById(id: string): Promise<Record<string, un
     gmailLink: email.gmailLink ?? '',
   };
 
-  const { result, modelUsed } = await classifyEmail(normalized);
-  const fields = classificationToEmailFields(result, modelUsed);
+  let threadMessages = [
+    {
+      messageId: normalized.messageId,
+      fromName: normalized.fromName,
+      fromEmail: normalized.fromEmail,
+      toField: normalized.toField,
+      ccField: normalized.ccField,
+      subject: normalized.subject,
+      sentDate: normalized.sentDate,
+      body: normalized.body,
+      attachments: normalized.attachments,
+      isLatest: true,
+    },
+  ];
 
+  const gmailClient = await resolveGmailClientForInboxLabel(normalized.inbox);
+  if (gmailClient) {
+    threadMessages = await fetchThreadMessagesForClassification(
+      gmailClient.gmail,
+      normalized,
+      gmailClient.label,
+    );
+    threadMessages = await enrichLatestMessageBody(
+      gmailClient.gmail,
+      normalized,
+      gmailClient.label,
+      threadMessages,
+    );
+  }
+
+  const { result, modelUsed } = await classifyEmail(normalized, {
+    trigger: 'reclassify',
+    threadMessages,
+  });
+  const fields = classificationToEmailFields(result, modelUsed);
   Object.assign(email, fields);
+  const preserveManual =
+    email.salesPersonSource === 'manual' && Boolean(email.salesPerson?.trim());
+  if (!preserveManual) {
+    const salesFields = await resolveSalesPerson(fields.mailType, threadMessages, {
+      threadId: email.threadId ?? undefined,
+      messageId: email.messageId,
+    });
+    email.salesPerson = salesFields.salesPerson;
+    email.salesPersonSource = salesFields.salesPersonSource;
+  }
   email.reviewed = false;
   await email.save();
 

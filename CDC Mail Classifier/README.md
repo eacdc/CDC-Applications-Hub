@@ -123,6 +123,7 @@ http://localhost:3002/api/auth/google?label=prepress&emailAddress=prepress@yourd
 |--------|------|-------------|
 | GET | `/api/emails` | List with filters + pagination |
 | GET | `/api/emails/:id` | Single email |
+| GET | `/api/emails/:id/agent-logs` | AI agent input/output steps for an email |
 | PATCH | `/api/emails/:id` | Staff correction (`reviewed=true`) |
 | POST | `/api/reclassify/:id` | Re-run classifier |
 | GET | `/api/stats` | Dashboard aggregates |
@@ -132,11 +133,12 @@ http://localhost:3002/api/auth/google?label=prepress&emailAddress=prepress@yourd
 
 ## Classification flow
 
-1. **Poll** — every minute, fetch Gmail messages from the last 5 minutes per inbox.
-2. **Dedupe** — upsert on `messageId` (unique index).
+1. **Poll** — every minute, fetch **Gmail INBOX only** (`in:inbox`) from the last 5 minutes per connected account.
+2. **Dedupe** — upsert on `messageId` (unique index). Overlapping poll windows may list the same Gmail ID again, but already-classified mail is skipped (no re-fetch, no re-classify).
 3. **Normalize** — decode body, strip HTML/quotes, cap at 8000 chars.
 4. **Classify** — `gpt-5-nano` first; escalate to `gpt-5.4-mini` if confidence &lt; 0.6 or parse failure.
 5. **Store** — persist metadata + classification; flag `needsReview` when confidence &lt; 0.7.
+6. **Agent logs** — each model call saves full prompt input + raw/parsed output in `ClassificationStepLog`; MongoDB TTL auto-deletes after 30 days (`AGENT_LOG_RETENTION_DAYS`).
 
 Prompt text lives in `server/src/prompts/classifier.ts`.
 
