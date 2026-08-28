@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CDC Apps Home</title>
-    <link rel="stylesheet" href="home-styles.css?v=3" />
+    <link rel="stylesheet" href="home-styles.css?v=4" />
   </head>
   <body>
     <header class="page-header">
@@ -42,19 +42,32 @@
         </div>
 
         <nav class="nav-options" aria-label="Tool group navigation">
-          <button
-            class="nav-option is-active"
-            type="button"
-            data-target="process-tools"
-          >
-            <span class="nav-icon" aria-hidden="true">P</span>
-            <span class="nav-label">CDC Process Tools</span>
+          <button class="nav-option is-active" type="button" data-target="qc">
+            <span class="nav-icon" aria-hidden="true">Q</span>
+            <span class="nav-label">QC</span>
           </button>
-          <button
-            class="nav-option"
-            type="button"
-            data-target="accounts-tools"
-          >
+          <button class="nav-option" type="button" data-target="inventory">
+            <span class="nav-icon" aria-hidden="true">I</span>
+            <span class="nav-label">Inventory</span>
+          </button>
+          <button class="nav-option" type="button" data-target="job-management">
+            <span class="nav-icon" aria-hidden="true">J</span>
+            <span class="nav-label">Job Management</span>
+          </button>
+          <button class="nav-option" type="button" data-target="production">
+            <span class="nav-icon" aria-hidden="true">P</span>
+            <span class="nav-label">Production</span>
+          </button>
+          <button class="nav-option" type="button" data-target="dispatch">
+            <span class="nav-icon" aria-hidden="true">D</span>
+            <span class="nav-label">Dispatch</span>
+          </button>
+          <button class="nav-option" type="button" data-target="misc">
+            <span class="nav-icon" aria-hidden="true">M</span>
+            <span class="nav-label">Misc</span>
+          </button>
+          <div class="nav-divider" aria-hidden="true"></div>
+          <button class="nav-option" type="button" data-target="accounts-tools">
             <span class="nav-icon" aria-hidden="true">A</span>
             <span class="nav-label">CDC Accounts Tools</span>
           </button>
@@ -63,17 +76,15 @@
 
       <section
         class="toc-section tool-panel is-active"
-        id="process-tools"
-        aria-labelledby="apps-heading"
+        id="qc"
+        aria-labelledby="qc-heading"
       >
         <div class="toc-header">
-          <h2 id="apps-heading">CDC Process Tools</h2>
-          <p>Select a production or process tool to open its landing page.</p>
+          <h2 id="qc-heading">QC</h2>
+          <p>Quality control checks for jobs, raw materials, and finished goods.</p>
         </div>
 
-        <div class="tool-group" data-group="qc">
-          <h3 class="tool-group-title">QC</h3>
-          <div class="apps-grid">
+        <div class="apps-grid">
             <article class="app-card">
               <div class="app-meta">
                 <span class="app-index">01</span>
@@ -123,11 +134,20 @@
               </a>
             </article>
           </div>
+      </section>
+
+      <section
+        class="toc-section tool-panel"
+        id="inventory"
+        aria-labelledby="inventory-heading"
+        hidden
+      >
+        <div class="toc-header">
+          <h2 id="inventory-heading">Inventory</h2>
+          <p>Inventory summaries, client consumption, and pending purchase orders.</p>
         </div>
 
-        <div class="tool-group" data-group="inventory">
-          <h3 class="tool-group-title">Inventory</h3>
-          <div class="apps-grid">
+        <div class="apps-grid">
             <article class="app-card">
               <div class="app-meta">
                 <span class="app-index">01</span>
@@ -182,11 +202,20 @@
               </a>
             </article>
           </div>
+      </section>
+
+      <section
+        class="toc-section tool-panel"
+        id="job-management"
+        aria-labelledby="job-management-heading"
+        hidden
+      >
+        <div class="toc-header">
+          <h2 id="job-management-heading">Job Management</h2>
+          <p>Create, compare, update, and complete job cards.</p>
         </div>
 
-        <div class="tool-group" data-group="job-management">
-          <h3 class="tool-group-title">Job Management</h3>
-          <div class="apps-grid">
+        <div class="apps-grid">
             <article class="app-card">
               <div class="app-meta">
                 <span class="app-index">01</span>
@@ -277,11 +306,20 @@
               </a>
             </article>
           </div>
+      </section>
+
+      <section
+        class="toc-section tool-panel"
+        id="production"
+        aria-labelledby="production-heading"
+        hidden
+      >
+        <div class="toc-header">
+          <h2 id="production-heading">Production</h2>
+          <p>Production planning, machine floor, prepress, and scheduling.</p>
         </div>
 
-        <div class="tool-group" data-group="production">
-          <h3 class="tool-group-title">Production</h3>
-          <div class="apps-grid">
+        <div class="apps-grid">
             <article class="app-card">
               <div class="app-meta">
                 <span class="app-index">01</span>
@@ -354,11 +392,20 @@
               </a>
             </article>
           </div>
+      </section>
+
+      <section
+        class="toc-section tool-panel"
+        id="dispatch"
+        aria-labelledby="dispatch-heading"
+        hidden
+      >
+        <div class="toc-header">
+          <h2 id="dispatch-heading">Dispatch</h2>
+          <p>Goods receipt and shipment ETA tracking.</p>
         </div>
 
-        <div class="tool-group" data-group="dispatch">
-          <h3 class="tool-group-title">Dispatch</h3>
-          <div class="apps-grid">
+        <div class="apps-grid">
             <article class="app-card">
               <div class="app-meta">
                 <span class="app-index">01</span>
@@ -395,11 +442,20 @@
               </a>
             </article>
           </div>
+      </section>
+
+      <section
+        class="toc-section tool-panel"
+        id="misc"
+        aria-labelledby="misc-heading"
+        hidden
+      >
+        <div class="toc-header">
+          <h2 id="misc-heading">Misc</h2>
+          <p>Other CDC process tools.</p>
         </div>
 
-        <div class="tool-group" data-group="misc">
-          <h3 class="tool-group-title">Misc</h3>
-          <div class="apps-grid">
+        <div class="apps-grid">
             <article class="app-card">
               <div class="app-meta">
                 <span class="app-index">01</span>
@@ -503,7 +559,6 @@
               </a>
             </article>
           </div>
-        </div>
       </section>
 
       <section
@@ -517,9 +572,7 @@
           <p>Finance and accounts-related CDC tools.</p>
         </div>
 
-        <div class="tool-group" data-group="accounts">
-          <h3 class="tool-group-title">Accounts</h3>
-          <div class="apps-grid">
+        <div class="apps-grid">
             <article class="app-card">
               <div class="app-meta">
                 <span class="app-index">01</span>
@@ -555,7 +608,6 @@
               </a>
             </article>
           </div>
-        </div>
       </section>
 
       <div class="empty-state search-empty" id="search-empty" hidden>
@@ -587,20 +639,24 @@
         var searchInput = document.getElementById('tool-search');
         var searchEmpty = document.getElementById('search-empty');
         var cards = document.querySelectorAll('.app-card');
-        var groups = document.querySelectorAll('.tool-group');
-        var activePanelId = 'process-tools';
+        var activePanelId = 'qc';
 
         if (!pageMain || !toggleButton || !navOptions.length || !panels.length) {
           return;
         }
 
+        function setActiveNav(targetId, matchingIds) {
+          navOptions.forEach(function (item) {
+            var itemTarget = item.getAttribute('data-target');
+            var isSelected = itemTarget === targetId;
+            var isMatch = matchingIds && matchingIds.indexOf(itemTarget) !== -1;
+            item.classList.toggle('is-active', isSelected || isMatch);
+            item.classList.toggle('is-match', !!isMatch);
+          });
+        }
+
         function showPanel(targetId) {
           activePanelId = targetId;
-
-          navOptions.forEach(function (item) {
-            item.classList.toggle('is-active', item.getAttribute('data-target') === targetId);
-          });
-
           applySearch();
         }
 
@@ -610,6 +666,7 @@
             .toLowerCase();
           var isSearching = query.length > 0;
           var matchCount = 0;
+          var matchingIds = [];
 
           cards.forEach(function (card) {
             var titleEl = card.querySelector('.app-title');
@@ -621,11 +678,6 @@
             }
           });
 
-          groups.forEach(function (group) {
-            var visibleCard = group.querySelector('.app-card:not([hidden])');
-            group.hidden = !visibleCard;
-          });
-
           panels.forEach(function (panel) {
             var hasVisibleCard = !!panel.querySelector('.app-card:not([hidden])');
             var shouldShow = isSearching
@@ -633,7 +685,12 @@
               : panel.id === activePanelId;
             panel.hidden = !shouldShow;
             panel.classList.toggle('is-active', shouldShow);
+            if (isSearching && hasVisibleCard) {
+              matchingIds.push(panel.id);
+            }
           });
+
+          setActiveNav(isSearching ? '' : activePanelId, matchingIds);
 
           if (searchEmpty) {
             searchEmpty.hidden = matchCount > 0;

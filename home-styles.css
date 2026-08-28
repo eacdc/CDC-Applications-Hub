@@ -49,11 +49,21 @@ body {
   margin: 0 auto;
   padding: 1.4rem 1.5rem 1rem;
   display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.85rem 1.25rem;
+}
+
+.header-text {
+  display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  min-width: 0;
 }
 
 .header-content h1 {
+  margin: 0;
   font-size: clamp(1.8rem, 3vw, 2.2rem);
   font-weight: 650;
   letter-spacing: 0.02em;
@@ -63,6 +73,86 @@ body {
   margin: 0;
   font-size: 0.95rem;
   color: var(--text-muted);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.header-search {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 1 1 280px;
+  max-width: 420px;
+}
+
+.header-search input[type='search'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 2.45rem;
+  padding: 0 0.95rem;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: var(--radius-full);
+  background: rgba(15, 23, 42, 0.82);
+  color: var(--text-main);
+  font: inherit;
+  font-size: 0.92rem;
+  outline: none;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.header-search input[type='search']::placeholder {
+  color: var(--text-muted);
+}
+
+.header-search input[type='search']:focus {
+  border-color: rgba(34, 197, 94, 0.75);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+}
+
+.header-search input[type='search']::-webkit-search-cancel-button {
+  filter: invert(1);
+  cursor: pointer;
+}
+
+.search-button {
+  height: 2.45rem;
+  padding: 0 1rem;
+  border: 1px solid rgba(34, 197, 94, 0.9);
+  border-radius: var(--radius-full);
+  background: radial-gradient(circle at 0 0, #22c55e, #166534);
+  color: #ecfdf5;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 8px 18px rgba(21, 128, 61, 0.4);
+  transition:
+    background var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.search-button:hover {
+  background: radial-gradient(circle at 20% 0, #4ade80, #15803d);
+  box-shadow: 0 12px 28px rgba(22, 163, 74, 0.5);
+  transform: translateY(-1px);
+}
+
+.search-button:active {
+  transform: translateY(0);
 }
 
 .page-main {
@@ -84,7 +174,9 @@ body {
   position: sticky;
   top: 6.25rem;
   z-index: 5;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: calc(100vh - 7rem);
   border: 1px solid rgba(148, 163, 184, 0.24);
   border-radius: 22px;
   background: linear-gradient(
@@ -146,13 +238,13 @@ body {
 
 .nav-option {
   width: 100%;
-  min-height: 2.8rem;
+  min-height: 2.55rem;
   display: flex;
   align-items: center;
   gap: 0.75rem;
   border: 1px solid transparent;
   border-radius: 14px;
-  padding: 0.6rem 0.7rem;
+  padding: 0.5rem 0.7rem;
   background: transparent;
   color: var(--text-muted);
   font: inherit;
@@ -165,10 +257,17 @@ body {
 }
 
 .nav-option:hover,
-.nav-option.is-active {
+.nav-option.is-active,
+.nav-option.is-match {
   border-color: rgba(34, 197, 94, 0.42);
   background: var(--accent-soft);
   color: var(--text-main);
+}
+
+.nav-divider {
+  height: 1px;
+  margin: 0.15rem 0.35rem;
+  background: rgba(148, 163, 184, 0.22);
 }
 
 .nav-icon {
@@ -207,6 +306,10 @@ body {
 .page-main.nav-collapsed .nav-option {
   justify-content: center;
   padding-inline: 0.55rem;
+}
+
+.page-main.nav-collapsed .nav-divider {
+  margin-inline: 0.2rem;
 }
 
 .toc-section {
@@ -260,8 +363,22 @@ body {
 
 .apps-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 0.9rem;
+}
+
+.search-empty {
+  grid-column: 2 / -1;
+}
+
+.tool-panel {
+  grid-column: 2;
+}
+
+.app-card[hidden],
+.tool-panel[hidden],
+.search-empty[hidden] {
+  display: none !important;
 }
 
 .empty-state {
@@ -450,6 +567,11 @@ body {
     width: auto;
     opacity: 1;
   }
+
+  .search-empty,
+  .tool-panel {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 640px) {
@@ -464,6 +586,16 @@ body {
 
   .header-content {
     padding-inline: 1rem;
+  }
+
+  .header-search {
+    max-width: none;
+    flex-basis: 100%;
+  }
+
+  .search-empty,
+  .tool-panel {
+    grid-column: 1 / -1;
   }
 }
 
