@@ -4,13 +4,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CDC Apps Home</title>
-    <link rel="stylesheet" href="home-styles.css" />
+    <link rel="stylesheet" href="home-styles.css?v=3" />
   </head>
   <body>
     <header class="page-header">
       <div class="header-content">
-        <h1>CDC Applications Hub</h1>
-        <p>Your central landing page for all CDC tools.</p>
+        <div class="header-text">
+          <h1>CDC Applications Hub</h1>
+          <p>Your central landing page for all CDC tools.</p>
+        </div>
+        <form class="header-search" role="search" aria-label="Search tools">
+          <label for="tool-search" class="visually-hidden">Search tools by name</label>
+          <input
+            type="search"
+            id="tool-search"
+            name="q"
+            placeholder="Search any tool..."
+            autocomplete="off"
+          />
+          <button type="submit" class="search-button">Search</button>
+        </form>
       </div>
     </header>
 
@@ -58,397 +71,438 @@
           <p>Select a production or process tool to open its landing page.</p>
         </div>
 
-        <div class="apps-grid">
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">01</span>
-              <h3 class="app-title">Production Tool (CDC Web App)</h3>
-              <p class="app-desc">
-                Core production planning and tracking web application.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://cdc-site-web.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
+        <div class="tool-group" data-group="qc">
+          <h3 class="tool-group-title">QC</h3>
+          <div class="apps-grid">
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">01</span>
+                <h3 class="app-title">QC Tool</h3>
+                <p class="app-desc">
+                  Quality control checks, logging and reporting for jobs.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://cdc-qc-tool.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
 
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">02</span>
-              <h3 class="app-title">Contractor PO System</h3>
-              <p class="app-desc">
-                Create and manage purchase orders for contractors.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://contractor-po-v1.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">02</span>
+                <h3 class="app-title">Raw Material QC Tool</h3>
+                <p class="app-desc">
+                  QC for raw materials: pending GRNs, item parameters and standard values.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://rm-qc-tool.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
 
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">03</span>
-              <h3 class="app-title">GRN Web UI</h3>
-              <p class="app-desc">
-                Goods Receipt Note management and tracking interface.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://cdc-grn-portal.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">03</span>
+                <h3 class="app-title">FG Transaction QC</h3>
+                <p class="app-desc">
+                  Finished goods QC against Carter AQL: inspect pending GPN lots, record defect counts, and review pass/fail.
+                </p>
+              </div>
+              <a class="app-button" href="FG Transaction QC/index.html">
+                Open App
+              </a>
+            </article>
+          </div>
+        </div>
 
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">04</span>
-              <h3 class="app-title">Inventory Summary</h3>
-              <p class="app-desc">
-                Inventory summary by item group and item.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://inventory-summary.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
+        <div class="tool-group" data-group="inventory">
+          <h3 class="tool-group-title">Inventory</h3>
+          <div class="apps-grid">
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">01</span>
+                <h3 class="app-title">Inventory Summary</h3>
+                <p class="app-desc">
+                  Inventory summary by item group and item.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://inventory-summary.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
 
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">05</span>
-              <h3 class="app-title">Compare Jobcard</h3>
-              <p class="app-desc">
-                Compare jobcard with client details.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://compare-jobcard.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">02</span>
+                <h3 class="app-title">Previous Items By Client</h3>
+                <p class="app-desc">
+                  Packaging client consumption (order vs delivery). SKU-wise and category-wise views.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://client-wise-paper-consumption.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
 
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">06</span>
-              <h3 class="app-title">Concerned Person Tool</h3>
-              <p class="app-desc">
-                Add and manage concerned person records linked to client ledgers.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://concerned-person-tool.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">03</span>
+                <h3 class="app-title">Pending PO Tool</h3>
+                <p class="app-desc">
+                  Open PO lines with pending receipt quantity (GRN not fully delivered).
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://pendingpov1.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
+          </div>
+        </div>
 
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">07</span>
-              <h3 class="app-title">Job Completion System</h3>
-              <p class="app-desc">
-                Capture and monitor job completion status from production.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://closejob.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
+        <div class="tool-group" data-group="job-management">
+          <h3 class="tool-group-title">Job Management</h3>
+          <div class="apps-grid">
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">01</span>
+                <h3 class="app-title">Compare Jobcard</h3>
+                <p class="app-desc">
+                  Compare jobcard with client details.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://compare-jobcard.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
 
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">08</span>
-              <h3 class="app-title">Machine Floor Dashboard</h3>
-              <p class="app-desc">
-                Live machine floor overview, performance and running jobs.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://machine-dashboard-v1.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">02</span>
+                <h3 class="app-title">Job Completion System</h3>
+                <p class="app-desc">
+                  Capture and monitor job completion status from production.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://closejob.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
 
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">09</span>
-              <h3 class="app-title">Prepress FMS Tool</h3>
-              <p class="app-desc">
-                Prepress File Management System for artwork and approvals.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://prepress-fms-tool.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">03</span>
+                <h3 class="app-title">Update Job Card</h3>
+                <p class="app-desc">
+                  Update and maintain job card details throughout the lifecycle.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://updatejobcolor.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
 
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">10</span>
-              <h3 class="app-title">QC Tool</h3>
-              <p class="app-desc">
-                Quality control checks, logging and reporting for jobs.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://cdc-qc-tool.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">04</span>
+                <h3 class="app-title">Job Card Generator</h3>
+                <p class="app-desc">
+                  Generate and manage job cards for production.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://printjobcard.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
 
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">11</span>
-              <h3 class="app-title">Update Job Card</h3>
-              <p class="app-desc">
-                Update and maintain job card details throughout the lifecycle.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://updatejobcolor.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">05</span>
+                <h3 class="app-title">Upload Job Cover Image</h3>
+                <p class="app-desc">
+                  Upload job cover image.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://upload-cover-image-jobcard.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
+          </div>
+        </div>
 
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">12</span>
-              <h3 class="app-title">Voice Note Tool</h3>
-              <p class="app-desc">
-                Record, manage and review production-related voice notes.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://voicenotetool.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
+        <div class="tool-group" data-group="production">
+          <h3 class="tool-group-title">Production</h3>
+          <div class="apps-grid">
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">01</span>
+                <h3 class="app-title">Production Tool (CDC Web App)</h3>
+                <p class="app-desc">
+                  Core production planning and tracking web application.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://cdc-site-web.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
 
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">13</span>
-              <h3 class="app-title">Whats App Intimation Tool</h3>
-              <p class="app-desc">
-                WhatsApp-based job and status intimation interface.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://send-whatsapp-cdc.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">02</span>
+                <h3 class="app-title">Machine Floor Dashboard</h3>
+                <p class="app-desc">
+                  Live machine floor overview, performance and running jobs.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://machine-dashboard-v1.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
 
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">14</span>
-              <h3 class="app-title">Schedule Reorder</h3>
-              <p class="app-desc">
-                Reorder and manage production schedules.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://machine-scheduler.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">03</span>
+                <h3 class="app-title">Prepress FMS Tool</h3>
+                <p class="app-desc">
+                  Prepress File Management System for artwork and approvals.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://prepress-fms-tool.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
 
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">15</span>
-              <h3 class="app-title">Job Card Generator</h3>
-              <p class="app-desc">
-                Generate and manage job cards for production.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://printjobcard.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">04</span>
+                <h3 class="app-title">Schedule Reorder</h3>
+                <p class="app-desc">
+                  Reorder and manage production schedules.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://machine-scheduler.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
+          </div>
+        </div>
 
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">16</span>
-              <h3 class="app-title">Raw Material QC Tool</h3>
-              <p class="app-desc">
-                QC for raw materials: pending GRNs, item parameters and standard values.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://rm-qc-tool.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
+        <div class="tool-group" data-group="dispatch">
+          <h3 class="tool-group-title">Dispatch</h3>
+          <div class="apps-grid">
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">01</span>
+                <h3 class="app-title">GRN Web UI</h3>
+                <p class="app-desc">
+                  Goods Receipt Note management and tracking interface.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://cdc-grn-portal.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
 
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">17</span>
-              <h3 class="app-title">Shipment ETA Tool</h3>
-              <p class="app-desc">
-                Upload Excel to import Container Number, Destination Port, ETA dates, actual dates and Link into the database.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://shipmenteta.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">02</span>
+                <h3 class="app-title">Shipment ETA Tool</h3>
+                <p class="app-desc">
+                  Upload Excel to import Container Number, Destination Port, ETA dates, actual dates and Link into the database.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://shipmenteta.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
+          </div>
+        </div>
 
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">18</span>
-              <h3 class="app-title">Previous Items By Client</h3>
-              <p class="app-desc">
-                Packaging client consumption (order vs delivery). SKU-wise and category-wise views.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://client-wise-paper-consumption.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
+        <div class="tool-group" data-group="misc">
+          <h3 class="tool-group-title">Misc</h3>
+          <div class="apps-grid">
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">01</span>
+                <h3 class="app-title">Contractor PO System</h3>
+                <p class="app-desc">
+                  Create and manage purchase orders for contractors.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://contractor-po-v1.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
 
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">19</span>
-              <h3 class="app-title">Pending PO Tool</h3>
-              <p class="app-desc">
-                Open PO lines with pending receipt quantity (GRN not fully delivered).
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://pendingpov1.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">20</span>
-              <h3 class="app-title">Upload Job Cover Image</h3>
-              <p class="app-desc">
-                Upload job cover image.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://upload-cover-image-jobcard.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">21</span>
-              <h3 class="app-title">FG Transaction QC</h3>
-              <p class="app-desc">
-                Finished goods QC against Carter AQL: inspect pending GPN lots, record defect counts, and review pass/fail.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="FG Transaction QC/index.html"
-            >
-              Open App
-            </a>
-          </article>
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">22</span>
-              <h3 class="app-title">Cost Estimation Tool</h3>
-              <p class="app-desc">
-                Cost estimation tool for production.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://costcalcutor.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">02</span>
+                <h3 class="app-title">Concerned Person Tool</h3>
+                <p class="app-desc">
+                  Add and manage concerned person records linked to client ledgers.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://concerned-person-tool.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
+
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">03</span>
+                <h3 class="app-title">Voice Note Tool</h3>
+                <p class="app-desc">
+                  Record, manage and review production-related voice notes.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://voicenotetool.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
+
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">04</span>
+                <h3 class="app-title">Whats App Intimation Tool</h3>
+                <p class="app-desc">
+                  WhatsApp-based job and status intimation interface.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://send-whatsapp-cdc.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
+
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">05</span>
+                <h3 class="app-title">Pending Dashboard</h3>
+                <p class="app-desc">
+                  Pending PO lines and pending jobs with value — delivery, post printing, and partial.
+                </p>
+              </div>
+              <a class="app-button" href="Pending Dashboard/index.html">
+                Open App
+              </a>
+            </article>
+
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">06</span>
+                <h3 class="app-title">Cost Estimation Tool</h3>
+                <p class="app-desc">
+                  Cost estimation tool for production.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://costcalcutor.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
+          </div>
         </div>
       </section>
 
@@ -463,45 +517,52 @@
           <p>Finance and accounts-related CDC tools.</p>
         </div>
 
-        <div class="apps-grid">
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">01</span>
-              <h3 class="app-title">CDC Invoice Wise Inventory</h3>
-              <p class="app-desc">
-                Purchase invoice register with GRN, PO, weight, rate and value by vendor invoice date.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://cdc-purchase-grn.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
-          <article class="app-card">
-            <div class="app-meta">
-              <span class="app-index">02</span>
-              <h3 class="app-title">CDC Job Wise Profitability</h3>
-              <p class="app-desc">
-                Purchase invoice register with GRN, PO, weight, rate and value by vendor invoice date.
-              </p>
-            </div>
-            <a
-              class="app-button"
-              href="https://cdc-job-wise-profitability.onrender.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open App
-            </a>
-          </article>
-
-
+        <div class="tool-group" data-group="accounts">
+          <h3 class="tool-group-title">Accounts</h3>
+          <div class="apps-grid">
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">01</span>
+                <h3 class="app-title">CDC Invoice Wise Inventory</h3>
+                <p class="app-desc">
+                  Purchase invoice register with GRN, PO, weight, rate and value by vendor invoice date.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://cdc-purchase-grn.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
+            <article class="app-card">
+              <div class="app-meta">
+                <span class="app-index">02</span>
+                <h3 class="app-title">CDC Job Wise Profitability</h3>
+                <p class="app-desc">
+                  Purchase invoice register with GRN, PO, weight, rate and value by vendor invoice date.
+                </p>
+              </div>
+              <a
+                class="app-button"
+                href="https://cdc-job-wise-profitability.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open App
+              </a>
+            </article>
+          </div>
         </div>
       </section>
+
+      <div class="empty-state search-empty" id="search-empty" hidden>
+        <span class="empty-state-icon" aria-hidden="true">?</span>
+        <h3>No tools found</h3>
+        <p>No tool name matches your search. Try a different keyword.</p>
+      </div>
     </main>
 
     <footer class="page-footer">
@@ -522,9 +583,61 @@
         var toggleButton = document.querySelector('.nav-toggle');
         var navOptions = document.querySelectorAll('.nav-option');
         var panels = document.querySelectorAll('.tool-panel');
+        var searchForm = document.querySelector('.header-search');
+        var searchInput = document.getElementById('tool-search');
+        var searchEmpty = document.getElementById('search-empty');
+        var cards = document.querySelectorAll('.app-card');
+        var groups = document.querySelectorAll('.tool-group');
+        var activePanelId = 'process-tools';
 
         if (!pageMain || !toggleButton || !navOptions.length || !panels.length) {
           return;
+        }
+
+        function showPanel(targetId) {
+          activePanelId = targetId;
+
+          navOptions.forEach(function (item) {
+            item.classList.toggle('is-active', item.getAttribute('data-target') === targetId);
+          });
+
+          applySearch();
+        }
+
+        function applySearch() {
+          var query = (searchInput && searchInput.value ? searchInput.value : '')
+            .trim()
+            .toLowerCase();
+          var isSearching = query.length > 0;
+          var matchCount = 0;
+
+          cards.forEach(function (card) {
+            var titleEl = card.querySelector('.app-title');
+            var title = titleEl ? titleEl.textContent.toLowerCase() : '';
+            var matches = !isSearching || title.indexOf(query) !== -1;
+            card.hidden = !matches;
+            if (matches) {
+              matchCount += 1;
+            }
+          });
+
+          groups.forEach(function (group) {
+            var visibleCard = group.querySelector('.app-card:not([hidden])');
+            group.hidden = !visibleCard;
+          });
+
+          panels.forEach(function (panel) {
+            var hasVisibleCard = !!panel.querySelector('.app-card:not([hidden])');
+            var shouldShow = isSearching
+              ? hasVisibleCard
+              : panel.id === activePanelId;
+            panel.hidden = !shouldShow;
+            panel.classList.toggle('is-active', shouldShow);
+          });
+
+          if (searchEmpty) {
+            searchEmpty.hidden = matchCount > 0;
+          }
         }
 
         toggleButton.addEventListener('click', function () {
@@ -538,21 +651,22 @@
 
         navOptions.forEach(function (option) {
           option.addEventListener('click', function () {
-            var targetId = option.getAttribute('data-target');
-
-            navOptions.forEach(function (item) {
-              item.classList.toggle('is-active', item === option);
-            });
-
-            panels.forEach(function (panel) {
-              var isTarget = panel.id === targetId;
-              panel.hidden = !isTarget;
-              panel.classList.toggle('is-active', isTarget);
-            });
+            if (searchInput && searchInput.value) {
+              searchInput.value = '';
+            }
+            showPanel(option.getAttribute('data-target'));
           });
         });
+
+        if (searchForm && searchInput) {
+          searchForm.addEventListener('submit', function (event) {
+            event.preventDefault();
+            applySearch();
+          });
+
+          searchInput.addEventListener('input', applySearch);
+        }
       })();
     </script>
   </body>
 </html>
-
