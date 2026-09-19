@@ -62,6 +62,7 @@
         machineId: null,
         machineIdFromUrl: false,
         machineCatalog: [],
+        viewAllFromUrl: false,
         database: allowedDatabases.includes((config.defaultDatabase || '').toUpperCase())
             ? (config.defaultDatabase || '').toUpperCase()
             : 'KOL',
@@ -103,6 +104,18 @@
             if (allowedDatabases.includes(candidate)) {
                 state.database = candidate;
             }
+        }
+
+        const viewParam = (params.get('view') || '').trim().toLowerCase();
+        const pathTail = pathSegments.length > 0 ? String(pathSegments[pathSegments.length - 1]).toLowerCase() : '';
+        if (
+            viewParam === 'all' ||
+            viewParam === 'multiple' ||
+            params.get('multiple') === '1' ||
+            pathTail === 'multiple' ||
+            pathTail === 'all'
+        ) {
+            state.viewAllFromUrl = true;
         }
     }
 
@@ -481,7 +494,22 @@
 
         try {
             const list = await fetchMachineList(state.database);
-            const sorted = [...list].sort((a, b) =>
+            const byId = new Map();
+            for (const m of list) {
+                const id = Number(m.machineId);
+                if (Number.isInteger(id) && id > 0) {
+                    byId.set(id, m);
+                }
+            }
+            for (const id of (VIEW_ALL_MACHINE_IDS[state.database] || [])) {
+                if (!byId.has(id)) {
+                    byId.set(id, {
+                        machineId: id,
+                        machineName: fallbackMachineName(id) || `Machine ${id}`,
+                    });
+                }
+            }
+            const sorted = [...byId.values()].sort((a, b) =>
                 String(a.machineName || '').localeCompare(String(b.machineName || ''), undefined, { sensitivity: 'base' })
             );
             state.machineCatalog = sorted;
@@ -502,9 +530,25 @@
             }
         } catch (error) {
             console.error('Failed to load machine list', error);
-            state.machineCatalog = [];
+            const fallback = (VIEW_ALL_MACHINE_IDS[state.database] || []).map((id) => ({
+                machineId: id,
+                machineName: fallbackMachineName(id) || `Machine ${id}`,
+            }));
+            state.machineCatalog = fallback;
+            for (const m of fallback) {
+                const opt = document.createElement('option');
+                opt.value = String(m.machineId);
+                opt.textContent = m.machineName;
+                selectors.machineSelect.appendChild(opt);
+            }
             setStatusMessage(error.message || 'Failed to load machine list.', 'error');
-            selectors.machineSelect.value = '';
+            const pick = preferred && [...selectors.machineSelect.options].some((o) => o.value === preferred)
+                ? preferred
+                : '';
+            selectors.machineSelect.value = pick;
+            if (pick) {
+                state.machineId = Number(pick);
+            }
         }
     }
 
@@ -817,6 +861,7 @@
         cards.forEach(card => {
             selectors.machinesGrid.appendChild(card);
         });
+        selectors.machinesGrid.dataset.count = String(cards.length);
 
         setStatusMessage('');
         
@@ -971,7 +1016,15 @@
 
         setupEventListeners();
 
-        if (state.machineIdFromUrl && Number.isInteger(state.machineId) && state.machineId > 0) {
+        if (state.viewAllFromUrl) {
+            if (selectors.appShell) {
+                selectors.appShell.classList.add('view-all-mode');
+            }
+            if (selectors.viewAllButton) {
+                selectors.viewAllButton.textContent = 'View Single';
+            }
+            loadAllMachines();
+        } else if (state.machineIdFromUrl && Number.isInteger(state.machineId) && state.machineId > 0) {
             loadData();
         } else {
             updateVisibility({ showPlaceholder: true });

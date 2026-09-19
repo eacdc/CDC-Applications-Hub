@@ -847,6 +847,11 @@ body:has(.card.maximized) {
     box-sizing: border-box;
 }
 
+.machines-grid[data-count="7"] {
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+}
+
 .machine-card-grid {
     position: relative;
     transition: transform 0.3s ease, z-index 0.3s ease;
@@ -1106,6 +1111,11 @@ body:has(.machine-card-grid.card-maximized) {
 @media (max-width: 1920px) {
     .machines-grid {
         grid-template-columns: repeat(5, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+    }
+
+    .machines-grid[data-count="7"] {
+        grid-template-columns: repeat(4, 1fr);
         grid-template-rows: repeat(2, 1fr);
     }
 }
