@@ -49,7 +49,13 @@
     /** Fixed IDs for View All only (single view uses the API machine dropdown). */
     const VIEW_ALL_MACHINE_IDS = {
         KOL: [14, 47, 58, 61, 62, 63, 64, 65, 66, 33],
-        AHM: [1, 2, 3, 11, 12, 17],
+        AHM: [1, 2, 3, 11, 12, 17, 19],
+    };
+
+    const VIEW_ALL_MACHINE_NAMES = {
+        AHM: {
+            19: '630 Manugraph 2T',
+        },
     };
 
     const state = {
@@ -219,11 +225,16 @@
         return false;
     }
 
+    function fallbackMachineName(machineId) {
+        const names = VIEW_ALL_MACHINE_NAMES[state.database] || {};
+        return names[machineId] || names[String(machineId)] || null;
+    }
+
     function floorDisplayName(machineId, machineName) {
         if (machineName != null && String(machineName).trim() !== '') {
             return String(machineName).trim();
         }
-        return `Machine ${machineId}`;
+        return fallbackMachineName(machineId) || `Machine ${machineId}`;
     }
 
     function hideSingleMachineNoDataLayout() {
@@ -362,7 +373,7 @@
 
     function renderDashboard(data) {
         hideSingleMachineNoDataLayout();
-        selectors.machineName.textContent = data.MachineName ?? 'Unknown Machine';
+        selectors.machineName.textContent = floorDisplayName(data.MachineID ?? data.machineid, data.MachineName);
         state.machineId = data.MachineID ?? state.machineId;
         state.machineIdFromUrl = false;
         if (selectors.machineSelect && state.machineId) {
@@ -636,7 +647,7 @@
         
         const machineNameEl = cardElement.querySelector('.machine-name-centered');
         if (machineNameEl) {
-            machineNameEl.textContent = data.MachineName ?? `Machine ${machineId}`;
+            machineNameEl.textContent = floorDisplayName(machineId, data.MachineName);
         }
 
         const isRunning = flagIsTrue(data.IsRunning);
@@ -791,7 +802,7 @@
                 card.dataset.machineId = String(machineId);
                 const machineNameEl = card.querySelector('.machine-name-centered');
                 if (machineNameEl) {
-                    machineNameEl.textContent = `Machine ${machineId} - Error`;
+                    machineNameEl.textContent = `${floorDisplayName(machineId, null)} - Error`;
                 }
                 card.dataset.statusColor = 'red';
             }
