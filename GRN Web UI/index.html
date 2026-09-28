@@ -180,18 +180,16 @@
       width: 100%;
       border-collapse: collapse;
       background: transparent;
+      min-width: 800px;
     }
 
     .delivery-table th,
     .delivery-table td {
-      padding: 10px 8px;
+      padding: 10px;
       text-align: left;
       border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-      font-size: 12px;
+      font-size: 13px;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 200px;
     }
 
     .delivery-table th {
@@ -279,6 +277,19 @@
     #pending-gpns-section {
       width: min(1800px, 98vw);
       max-width: 98vw;
+    }
+
+    #pending-gpns-section .delivery-table th,
+    #pending-gpns-section .delivery-table td {
+      font-size: 14.3px;
+    }
+
+    #pending-gpns-section .delivery-table th {
+      font-size: 13.2px;
+    }
+
+    #pending-gpns-section .delivery-filter-input {
+      font-size: 13.2px;
     }
 
     .challan-toolbar {
@@ -640,11 +651,11 @@
       }
 
       .delivery-table {
-        min-width: 0;
+        min-width: 900px;
       }
 
       .delivery-amount-table {
-        min-width: 0;
+        min-width: 900px;
       }
 
       .delivery-table th,
@@ -795,10 +806,8 @@
                 <th>
                   <select id="filter-transport-type" class="delivery-filter-select">
                     <option value="">All</option>
-                    <!-- <option value="select">Select</option> -->
                     <option value="local">Local</option>
                     <option value="non local">Non Local</option>
-                    
                   </select>
                 </th>
                 <th><input id="filter-delivery-amount" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
@@ -913,6 +922,8 @@
                 <th>PO Date</th>
                 <th>Total Delivrd Cartons</th>
                 <th>Total Qty</th>
+                <th>Job Delivered Carton</th>
+                <th>Job Qty</th>
                 <th>Update Challan Details</th>
               </tr>
               <tr class="delivery-filter-row">
@@ -923,12 +934,14 @@
                 <th><input id="filter-challan-po-date" class="delivery-filter-input" type="text" placeholder="dd/mm/yyyy" /></th>
                 <th><input id="filter-challan-cartons" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
                 <th><input id="filter-challan-qty" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
+                <th><input id="filter-challan-job-cartons" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
+                <th><input id="filter-challan-job-qty" class="delivery-filter-input" type="text" placeholder="Filter" /></th>
                 <th></th>
               </tr>
             </thead>
             <tbody id="challan-detail-table-body">
               <tr class="empty-row">
-                <td colspan="8" class="empty-message">Open this page to load delivery notes.</td>
+                <td colspan="10" class="empty-message">Open this page to load delivery notes.</td>
               </tr>
             </tbody>
           </table>
@@ -1068,7 +1081,6 @@
                 <th>Item Count Total</th>
                 <th>Job Number</th>
                 <th>Job Name</th>
-                <th>Batch No</th>
               </tr>
             </thead>
             <tbody id="gpn-table-body">
@@ -1220,7 +1232,6 @@
                 <th>GPN Qty</th>
                 <th>Delivered This Voucher</th>
                 <th>Delivered Total</th>
-                <th>Batch No</th>
               </tr>
             </thead>
             <tbody id="delivery-table-body">

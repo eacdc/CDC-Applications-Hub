@@ -15,18 +15,24 @@
       try { new URL(v); return true; } catch (_) { return false; }
     }
   
+    function isLocalFrontend() {
+      try {
+        const protocol = String(window.location.protocol || '').toLowerCase();
+        const host = String(window.location.hostname || '').toLowerCase();
+        return protocol === 'file:' || !host || host === 'localhost' || host === '127.0.0.1' || host === '::1';
+      } catch (_) {
+        return false;
+      }
+    }
+
     function getApiBaseUrl() {
       try {
         const stored = localStorage.getItem('grn_api_base');
-        const host = String(window.location.hostname || '').toLowerCase();
-        const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
-        const defaultBase = isLocalHost ? LOCAL_API_BASE : DEFAULT_API_BASE;
+        const defaultBase = isLocalFrontend() ? LOCAL_API_BASE : DEFAULT_API_BASE;
         const chosen = isValidAbsoluteUrl(stored) ? stored : defaultBase;
         return chosen.endsWith('/') ? chosen : chosen + '/';
       } catch (_) {
-        const host = String(window.location.hostname || '').toLowerCase();
-        const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
-        return isLocalHost ? LOCAL_API_BASE : DEFAULT_API_BASE;
+        return isLocalFrontend() ? LOCAL_API_BASE : DEFAULT_API_BASE;
       }
     }
   
@@ -219,6 +225,8 @@
     const filterChallanPoDate = document.getElementById('filter-challan-po-date');
     const filterChallanCartons = document.getElementById('filter-challan-cartons');
     const filterChallanQty = document.getElementById('filter-challan-qty');
+    const filterChallanJobCartons = document.getElementById('filter-challan-job-cartons');
+    const filterChallanJobQty = document.getElementById('filter-challan-job-qty');
     const challanPageSummary = document.getElementById('challan-page-summary');
     const challanPageNav = document.getElementById('challan-page-nav');
     const challanPageSizeBtns = document.querySelectorAll('.challan-page-size-btn');
@@ -537,7 +545,9 @@
       jobBookingNo: '',
       poDate: '',
       totalDeliveredCartons: '',
-      totalQty: ''
+      totalQty: '',
+      jobDeliveredCarton: '',
+      jobQty: ''
     };
     let challanUpdateContext = null;
     const STATUS_CATEGORY_CLASS_MAP = {
@@ -695,10 +705,6 @@
     }
 
     function updateDeliveryRowDirtyState(rowObj) {
-      if (!rowObj.transportType) {
-        rowObj.isModified = false;
-        return false;
-      }
       const currentAmount = normalizeDeliveryAmount(rowObj.deliveryAmount);
       const originalAmount = normalizeDeliveryAmount(rowObj.originalDeliveryAmount);
       rowObj.isModified = rowObj.transportType !== rowObj.originalTransportType || currentAmount !== originalAmount;
@@ -766,7 +772,6 @@
           <td>
             ${isPending
               ? `<select class="transport-type-select" data-row-index="${sourceIndex}">
-                  <option value="" ${!row.transportType ? 'selected' : ''}>Select</option>
                   <option value="local" ${row.transportType === 'local' ? 'selected' : ''}>Local</option>
                   <option value="non local" ${row.transportType === 'non local' ? 'selected' : ''}>Non Local</option>
                 </select>`
@@ -822,13 +827,8 @@
           const idx = Number(event.target.dataset.rowIndex);
           if (!Number.isInteger(idx) || !deliveryAmountRows[idx]) return;
           if (deliveryAmountRows[idx].transportType !== 'non local') return;
-          const rawVal = String(event.target.value ?? '').trim();
-          if (!rawVal) {
-            deliveryAmountRows[idx].deliveryAmount = null;
-          } else {
-            const numericVal = Number(rawVal);
-            deliveryAmountRows[idx].deliveryAmount = Number.isFinite(numericVal) ? numericVal : null;
-          }
+          const numericVal = Number(event.target.value);
+          deliveryAmountRows[idx].deliveryAmount = Number.isFinite(numericVal) ? numericVal : null;
           const isModified = updateDeliveryRowDirtyState(deliveryAmountRows[idx]);
           const rowEl = event.target.closest('tr');
           if (rowEl) rowEl.classList.toggle('delivery-row-modified', isModified);
@@ -908,9 +908,9 @@
           transporterName: record.transporterName,
           clientName: record.clientName,
           transportTypeRaw: String(record.transportType || '').trim(),
-          transportType: '',
+          transportType: record.transportType === 'non local' ? 'non local' : 'local',
           deliveryAmount: record.deliveryAmount != null && Number.isFinite(Number(record.deliveryAmount)) ? Number(record.deliveryAmount) : null,
-          originalTransportType: '',
+          originalTransportType: record.transportType === 'non local' ? 'non local' : 'local',
           originalDeliveryAmount: record.deliveryAmount != null && Number.isFinite(Number(record.deliveryAmount)) ? Number(record.deliveryAmount) : null,
           isModified: false
         }));
@@ -1189,6 +1189,21 @@
           const raw = pickChallanRecordField(record, 'totalQty', 'Total Qty', 'TotalQty');
           return raw != null ? Number(raw) : null;
         })(),
+        jobDeliveredCarton: (() => {
+          const raw = pickChallanRecordField(
+            record,
+            'jobDeliveredCarton',
+            'Job Delivered Carton',
+            'JobDeliveredCarton',
+            'Job Delivered Cartons',
+            'JobDeliveredCartons'
+          );
+          return raw != null ? Number(raw) : null;
+        })(),
+        jobQty: (() => {
+          const raw = pickChallanRecordField(record, 'jobQty', 'Job Qty', 'JobQty');
+          return raw != null ? Number(raw) : null;
+        })(),
         canUpdate: Boolean(fgTransactionId),
         jobBookingId: pickChallanRecordField(record, 'jobBookingId', 'JobBookingID', 'JobBookingId') ?? null,
         jobBookingNo: pickChallanRecordField(record, 'jobBookingNo', 'JobBookingNo') ?? null
@@ -1214,6 +1229,8 @@
         const poDate = row.poDate ? formatVoucherDate(row.poDate).toLowerCase() : '';
         const cartons = row.totalDeliveredCartons == null ? '' : String(row.totalDeliveredCartons).toLowerCase();
         const qty = row.totalQty == null ? '' : String(row.totalQty).toLowerCase();
+        const jobCartons = row.jobDeliveredCarton == null ? '' : String(row.jobDeliveredCarton).toLowerCase();
+        const jobQty = row.jobQty == null ? '' : String(row.jobQty).toLowerCase();
         if (f.deliveryNoteNo && !dnNo.includes(f.deliveryNoteNo)) return false;
         if (f.deliveryNoteDate && !dnDate.includes(f.deliveryNoteDate)) return false;
         if (f.clientName && !clientName.includes(f.clientName)) return false;
@@ -1221,6 +1238,8 @@
         if (f.poDate && !poDate.includes(f.poDate)) return false;
         if (f.totalDeliveredCartons && !cartons.includes(f.totalDeliveredCartons)) return false;
         if (f.totalQty && !qty.includes(f.totalQty)) return false;
+        if (f.jobDeliveredCarton && !jobCartons.includes(f.jobDeliveredCarton)) return false;
+        if (f.jobQty && !jobQty.includes(f.jobQty)) return false;
         return true;
       });
     }
@@ -1292,7 +1311,7 @@
       if (filteredRows.length === 0) {
         challanDetailTableBody.innerHTML = `
           <tr class="empty-row">
-            <td colspan="8" class="empty-message">No records match current filters.</td>
+            <td colspan="10" class="empty-message">No records match current filters.</td>
           </tr>
         `;
         return;
@@ -1311,6 +1330,8 @@
         }
         const cartonsText = row.totalDeliveredCartons == null ? '—' : String(row.totalDeliveredCartons);
         const qtyText = row.totalQty == null ? '—' : String(row.totalQty);
+        const jobCartonsText = row.jobDeliveredCarton == null ? '—' : String(row.jobDeliveredCarton);
+        const jobQtyText = row.jobQty == null ? '—' : String(row.jobQty);
         const poDateText = row.poDate ? formatVoucherDate(row.poDate) : '—';
         const updateCell = row.fgTransactionId
           ? `<button type="button" class="challan-action-btn" data-fg-id="${row.fgTransactionId}">Update</button>`
@@ -1323,6 +1344,8 @@
           <td>${poDateText}</td>
           <td>${cartonsText}</td>
           <td>${qtyText}</td>
+          <td>${jobCartonsText}</td>
+          <td>${jobQtyText}</td>
           <td>${updateCell}</td>
         `;
         tr.addEventListener('click', (event) => {
@@ -1357,7 +1380,10 @@
       if (challanUpdateSubtitle) challanUpdateSubtitle.textContent = '';
       if (challanUpdateError) challanUpdateError.textContent = '';
       if (challanUpdateClientName) challanUpdateClientName.value = '';
-      if (challanUpdateConsignee) challanUpdateConsignee.innerHTML = '<option value="">Select --</option>';
+      if (challanUpdateConsignee) {
+        challanUpdateConsignee.innerHTML = '<option value="">Select --</option>';
+        challanUpdateConsignee.title = '';
+      }
       if (challanUpdateMode) challanUpdateMode.value = '';
       if (challanUpdateTransporter) challanUpdateTransporter.innerHTML = '<option value="">Select --</option>';
       if (challanUpdateVehicle) challanUpdateVehicle.value = '';
@@ -1394,6 +1420,21 @@
       }
     }
 
+    function escapeHtmlAttr(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function syncChallanConsigneeTooltip() {
+      if (!challanUpdateConsignee) return;
+      const selected = challanUpdateConsignee.options[challanUpdateConsignee.selectedIndex];
+      const fullText = String(selected?.textContent || '').trim();
+      challanUpdateConsignee.title = fullText && fullText !== 'Select --' ? fullText : '';
+    }
+
     async function loadChallanUpdateConsignees(selectedLedgerId, selectedName) {
       if (!challanUpdateConsignee || !session?.selectedDatabase) return [];
       challanUpdateConsignee.innerHTML = '<option value="">Loading...</option>';
@@ -1407,16 +1448,21 @@
         const selectedId = selectedLedgerId != null ? String(selectedLedgerId) : '';
         challanUpdateConsignee.innerHTML = '<option value="">Select --</option>' + consignees.map((c) => {
           const id = String(c.ledgerId ?? '');
-          const name = String(c.ledgerName ?? '').trim();
+          const name = String(c.displayName || c.ledgerName || '').trim();
           const selected = id && id === selectedId ? ' selected' : '';
-          return `<option value="${id}"${selected}>${name}</option>`;
+          const safeName = escapeHtmlAttr(name);
+          return `<option value="${id}" title="${safeName}"${selected}>${safeName}</option>`;
         }).join('');
         if (selectedId && !consignees.some((c) => String(c.ledgerId) === selectedId) && selectedName) {
-          challanUpdateConsignee.innerHTML += `<option value="${selectedId}" selected>${selectedName}</option>`;
+          const fallback = String(selectedName).trim();
+          const safeFallback = escapeHtmlAttr(fallback);
+          challanUpdateConsignee.innerHTML += `<option value="${selectedId}" title="${safeFallback}" selected>${safeFallback}</option>`;
         }
+        syncChallanConsigneeTooltip();
         return consignees;
       } catch (_) {
         challanUpdateConsignee.innerHTML = '<option value="">Select --</option>';
+        challanUpdateConsignee.title = '';
         return [];
       }
     }
@@ -1640,7 +1686,9 @@
         jobBookingNo: '',
         poDate: '',
         totalDeliveredCartons: '',
-        totalQty: ''
+        totalQty: '',
+        jobDeliveredCarton: '',
+        jobQty: ''
       };
       if (filterChallanDnNo) filterChallanDnNo.value = '';
       if (filterChallanDnDate) filterChallanDnDate.value = '';
@@ -1649,6 +1697,8 @@
       if (filterChallanPoDate) filterChallanPoDate.value = '';
       if (filterChallanCartons) filterChallanCartons.value = '';
       if (filterChallanQty) filterChallanQty.value = '';
+      if (filterChallanJobCartons) filterChallanJobCartons.value = '';
+      if (filterChallanJobQty) filterChallanJobQty.value = '';
       if (challanDetailError) challanDetailError.textContent = '';
       if (challanPageNav) challanPageNav.innerHTML = '';
       if (challanPageSummary) challanPageSummary.textContent = '';
@@ -1659,7 +1709,7 @@
       if (challanDetailTableBody) {
         challanDetailTableBody.innerHTML = `
           <tr class="empty-row">
-            <td colspan="8" class="empty-message">Open this page to load delivery notes.</td>
+            <td colspan="10" class="empty-message">Open this page to load delivery notes.</td>
           </tr>
         `;
       }
@@ -1678,7 +1728,7 @@
         if (challanDetailTableBody) {
           challanDetailTableBody.innerHTML = `
             <tr class="empty-row">
-              <td colspan="8" class="empty-message">Loading delivery notes...</td>
+              <td colspan="10" class="empty-message">Loading delivery notes...</td>
             </tr>
           `;
         }
@@ -1726,7 +1776,9 @@
           jobBookingNo: String(filterChallanJobBooking?.value || '').trim().toLowerCase(),
           poDate: String(filterChallanPoDate?.value || '').trim().toLowerCase(),
           totalDeliveredCartons: String(filterChallanCartons?.value || '').trim().toLowerCase(),
-          totalQty: String(filterChallanQty?.value || '').trim().toLowerCase()
+          totalQty: String(filterChallanQty?.value || '').trim().toLowerCase(),
+          jobDeliveredCarton: String(filterChallanJobCartons?.value || '').trim().toLowerCase(),
+          jobQty: String(filterChallanJobQty?.value || '').trim().toLowerCase()
         };
         challanDetailCurrentPage = 1;
         renderChallanDetailRows(challanDetailRows);
@@ -1738,7 +1790,9 @@
         filterChallanJobBooking,
         filterChallanPoDate,
         filterChallanCartons,
-        filterChallanQty
+        filterChallanQty,
+        filterChallanJobCartons,
+        filterChallanJobQty
       ].forEach((el) => {
         if (!el) return;
         el.addEventListener('input', updateFiltersAndRender);
@@ -2349,7 +2403,6 @@
               <td>${sp.gpnQty ?? '—'}</td>
               <td>${sp.deliveredThisVoucher ?? '—'}</td>
               <td>${sp.deliveredTotal ?? '—'}</td>
-              <td>${sp.batchNo ?? '—'}</td>
             `;
             deliveryTableBody.innerHTML = '';
             deliveryTableBody.appendChild(row);
@@ -2415,7 +2468,6 @@
                 <td>${sp.gpnQty ?? '—'}</td>
                 <td>${sp.deliveredThisVoucher ?? '—'}</td>
                 <td>${sp.deliveredTotal ?? '—'}</td>
-                <td>${sp.batchNo ?? '—'}</td>
               `;
               deliveryTableBody.insertBefore(newRow, deliveryTableBody.firstChild);
             }
@@ -2449,7 +2501,6 @@
         for (let i = 0; i < 10; i++) {
           const row = document.createElement('tr');
           row.innerHTML = `
-            <td></td>
             <td></td>
             <td></td>
             <td></td>
@@ -2567,6 +2618,10 @@
       });
     });
 
+    if (challanUpdateConsignee) {
+      challanUpdateConsignee.addEventListener('change', syncChallanConsigneeTooltip);
+    }
+
     if (challanUpdateCloseBtn) {
       challanUpdateCloseBtn.addEventListener('click', () => {
         resetChallanUpdateForm();
@@ -2651,7 +2706,6 @@
             const cartonQtyTotal = responseData.CartonQtyTotal || responseData.cartonqtytotal || responseData.CartonQtyTotal || 0;
             const jobName = responseData.JobName || responseData.jobname || '—';
             const jobBookingNo = responseData.JobBookingNo || responseData.jobbookingno || responseData.JobBookingNumber || '—';
-            const batchNo = responseData.BatchNo || responseData.batchno || '—';
             
             firstRow.innerHTML = `
               <td>${barcode}</td>
@@ -2662,7 +2716,6 @@
               <td>${packedQtyTotal}</td>
               <td>${jobBookingNo}</td>
               <td>${jobName}</td>
-              <td>${batchNo}</td>
             `;
             gpnTableBody.innerHTML = '';
             gpnTableBody.appendChild(firstRow);
@@ -2763,7 +2816,6 @@
         const cartonQtyTotal = responseData.CartonQtyTotal || responseData.cartonqtytotal || responseData.CartonQtyTotal || 0;
         const jobName = responseData.JobName || responseData.jobname || '—';
         const jobBookingNo = responseData.JobBookingNo || responseData.jobbookingno || responseData.JobBookingNumber || '—';
-        const batchNo = responseData.BatchNo || responseData.batchno || '—';
   
         // Add new row to table (always at the top, newest first)
         if (gpnTableBody) {
@@ -2777,7 +2829,6 @@
             <td>${packedQtyTotal}</td>
             <td>${jobBookingNo}</td>
             <td>${jobName}</td>
-            <td>${batchNo}</td>
           `;
           // Insert at the top (prepend) - newest entries always at top
           gpnTableBody.insertBefore(newRow, gpnTableBody.firstChild);

@@ -23,10 +23,34 @@ window.AppConfig = window.AppConfig || {};
   }
 })();
 
-/** Go-live cutoff: without this, every historical GPN appears in the queue. */
-window.AppConfig.fromGPNDate = window.AppConfig.fromGPNDate || '2026-08-01';
-/** Sampling plans and QC settings in Indus are stored against CompanyID = 1. */
-window.AppConfig.companyId = window.AppConfig.companyId || 1;
+/**
+ * Go-live cutoff: without this, every historical GPN appears in the queue.
+ *
+ * 1 September 2026 — go-live for the awaiting queue. The API keeps the same
+ * date in FGQC_FROM_GPN_DATE; the two have to move together or the count on the
+ * dashboard will not match the list behind it.
+ */
+window.AppConfig.fromGPNDate = window.AppConfig.fromGPNDate || '2026-09-01';
+/**
+ * Product categories hidden from the awaiting-inspection list (case-insensitive;
+ * singular/plural and "Name - …" variants are matched in script.js).
+ */
+window.AppConfig.excludedPendingCategories = window.AppConfig.excludedPendingCategories || [
+  'Books',
+  'Leaflets',
+  'Tag',
+  'Rigid Box',
+  'Unprinted card'
+];
+/**
+ * The company the FG QC data lives under in Indus. This one value is sent to
+ * all three procedures — the pending queue, the template, and the save — so it
+ * has to be the company that owns the GPNs, the sampling plans and the
+ * parameter master alike. Get it wrong and the queue comes back empty with no
+ * error: the spec marks FinishGoodsTransactionMain.CompanyID [VERIFY] for
+ * exactly this reason. Keep it in step with FGQC_COMPANY_ID on the API.
+ */
+window.AppConfig.companyId = window.AppConfig.companyId || 2;
 window.AppConfig.defaultDatabase = window.AppConfig.defaultDatabase || 'KOL';
 window.AppConfig.pageSize = window.AppConfig.pageSize || 25;
 /** A shift is treated as 8 hours for "waiting too long" highlighting. */

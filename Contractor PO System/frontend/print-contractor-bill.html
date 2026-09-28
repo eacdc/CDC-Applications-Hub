@@ -569,7 +569,10 @@
             const tr = document.createElement('tr');
             tr.dataset.jobNumber = job.jobNumber || '';
             tr.dataset.isAdhoc = isAdhoc ? '1' : '0';
+            tr.dataset.adhocOrderId = job.adhocOrderId || '';
+            tr.dataset.adhocLabel = job.adhocLabel || '';
             tr.dataset.opsName = opsName;
+            tr.dataset.opId = op.opId || '';
             tr.dataset.rate = String(rate);
             tr.dataset.oldQty = String(oldQty);
 
@@ -783,15 +786,19 @@
 
           rows.forEach(tr => {
             const isAdhoc = tr.dataset.isAdhoc === '1';
-            if (isAdhoc) return;
-            const jobNumber = tr.dataset.jobNumber;
+            const jobNumber = tr.dataset.jobNumber || '';
+            const adhocOrderId = tr.dataset.adhocOrderId || '';
             const opsName = tr.dataset.opsName;
+            const opId = tr.dataset.opId || '';
             const rateStr = tr.dataset.rate;
             const oldQtyStr = tr.dataset.oldQty;
 
-            if (!jobNumber || !opsName || rateStr === undefined || oldQtyStr === undefined) {
+            // Skip empty placeholder rows
+            if (!opsName || rateStr === undefined || oldQtyStr === undefined) {
               return;
             }
+            if (!isAdhoc && !jobNumber) return;
+            if (isAdhoc && !adhocOrderId) return;
 
             const input = tr.querySelector('.bill-edit-qty-input');
             if (!(input instanceof HTMLInputElement)) return;
@@ -807,6 +814,9 @@
             if (newQty !== oldQty) {
               changes.push({
                 jobNumber,
+                isAdhoc,
+                adhocOrderId,
+                opId,
                 opsName,
                 rate,
                 newQtyCompleted: newQty

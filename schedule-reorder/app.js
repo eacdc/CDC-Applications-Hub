@@ -4,7 +4,13 @@
  */
 const IST = 'Asia/Kolkata';
 
-const DEFAULT_API_BASE = '';
+function isLocalFrontend() {
+  const protocol = (typeof window !== 'undefined' && window.location.protocol) || '';
+  const host = String((typeof window !== 'undefined' && window.location.hostname) || '').toLowerCase();
+  return protocol === 'file:' || !host || host === 'localhost' || host === '127.0.0.1' || host === '::1';
+}
+
+const DEFAULT_API_BASE = isLocalFrontend() ? 'http://localhost:3001' : '';
 
 function getApiBase() {
   const params = new URLSearchParams(window.location.search);

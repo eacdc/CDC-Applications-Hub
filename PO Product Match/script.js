@@ -1,7 +1,12 @@
 (function () {
   'use strict';
 
-  const isLocalHost = typeof window !== 'undefined' && /localhost|127\.0\.0\.1/i.test(window.location.hostname);
+  // file:// (double-click / start index.html) has an empty hostname — treat as local.
+  const isLocalHost =
+    typeof window !== 'undefined' &&
+    (window.location.protocol === 'file:' ||
+      !window.location.hostname ||
+      /localhost|127\.0\.0\.1|^::1$/i.test(window.location.hostname));
   const API_BASE = isLocalHost ? 'http://localhost:3001/api' : 'https://cdcapi.onrender.com/api';
 
   const els = {

@@ -1,0 +1,6 @@
+MONGODB_URI_WA=mongodb+srv://portal_app:ESU1EOvOBDOCWlAK@portal.wetssq.mongodb.net/whatsapp_summarizer?retryWrites=true&w=majority&appName=whatsapp_summarizer
+MAYTAPI_PRODUCT_ID=303c7e43-1f60-43f5-9169-d18f6949accf
+MAYTAPI_PHONE_ID=152557
+MAYTAPI_TOKEN=4044eee8-c890-4b8d-93a7-57231689235d
+ADMIN_PHONE=916290177265
+retryWrites=true&w=majority&appName=whatsapp_summarizer
