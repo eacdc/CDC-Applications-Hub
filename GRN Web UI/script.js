@@ -217,6 +217,7 @@
     const challanFromDateInput = document.getElementById('challan-from-date');
     const challanToDateInput = document.getElementById('challan-to-date');
     const challanRefreshBtn = document.getElementById('btn-challan-refresh');
+    const challanDownloadExcelBtn = document.getElementById('btn-challan-download-excel');
     const challanDownloadPdfBtn = document.getElementById('btn-challan-download-pdf');
     const filterChallanDnNo = document.getElementById('filter-challan-dn-no');
     const filterChallanDnDate = document.getElementById('filter-challan-dn-date');
@@ -1277,9 +1278,9 @@
     }
 
     function updateChallanDetailDownloadButton() {
-      if (!challanDownloadPdfBtn) return;
-      const hasSelection = getChallanDetailSelectedRow()?.deliveryNoteNo;
-      challanDownloadPdfBtn.classList.toggle('hidden', !hasSelection);
+      const hasSelection = Boolean(getChallanDetailSelectedRow()?.deliveryNoteNo);
+      if (challanDownloadPdfBtn) challanDownloadPdfBtn.classList.toggle('hidden', !hasSelection);
+      if (challanDownloadExcelBtn) challanDownloadExcelBtn.classList.toggle('hidden', !hasSelection);
     }
 
     function clearChallanDetailSelection() {
@@ -1551,18 +1552,20 @@
       }
     }
 
-    async function downloadChallanDispatchPdf(options = {}) {
+    async function downloadChallanDispatchFile(format, options = {}) {
+      const isExcel = format === 'excel';
       if (!session || !session.selectedDatabase) {
         alert('Please login first.');
         return;
       }
-      const triggerButton = options.triggerButton || challanDownloadPdfBtn;
+      const triggerButton = options.triggerButton
+        || (isExcel ? challanDownloadExcelBtn : challanDownloadPdfBtn);
       const errorElement = options.errorElement != null ? options.errorElement : challanDetailError;
       const voucherNo = options.voucherNo
         || challanUpdateContext?.deliveryNoteNo
         || getChallanDetailSelectedRow()?.deliveryNoteNo;
       if (!voucherNo) {
-        alert('Missing delivery note number.');
+        alert('Select a delivery note row first.');
         return;
       }
 
@@ -1570,7 +1573,7 @@
       if (errorElement) errorElement.textContent = '';
       try {
         const base = getApiBaseUrl();
-        const url = new URL('grn/delivery-note-dispatch-pdf', base);
+        const url = new URL(isExcel ? 'grn/delivery-note-dispatch-excel' : 'grn/delivery-note-dispatch-pdf', base);
         url.searchParams.set('database', session.selectedDatabase);
         url.searchParams.set('voucherNo', String(voucherNo));
         url.searchParams.set('username', String(session.username || ''));
@@ -1581,7 +1584,7 @@
         });
         if (!res.ok) {
           const t = await res.text().catch(() => '');
-          let message = t || 'Failed to download PDF';
+          let message = t || (isExcel ? 'Failed to download Excel' : 'Failed to download PDF');
           try {
             const parsed = JSON.parse(t);
             if (parsed?.error) message = parsed.error;
@@ -1594,7 +1597,8 @@
         const objectUrl = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = objectUrl;
-        link.download = `Dispatch_${String(voucherNo).replace(/[^\w.-]+/g, '_')}.pdf`;
+        const safeName = String(voucherNo).replace(/[^\w.-]+/g, '_');
+        link.download = `Dispatch_${safeName}.${isExcel ? 'xls' : 'pdf'}`;
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -1606,6 +1610,10 @@
       } finally {
         setButtonLoading(triggerButton, false);
       }
+    }
+
+    async function downloadChallanDispatchPdf(options = {}) {
+      return downloadChallanDispatchFile('pdf', options);
     }
 
     async function saveChallanUpdateDetails() {
@@ -2593,6 +2601,17 @@
     if (challanRefreshBtn) {
       challanRefreshBtn.addEventListener('click', async () => {
         await loadChallanDetailRows();
+      });
+    }
+
+    if (challanDownloadExcelBtn) {
+      challanDownloadExcelBtn.addEventListener('click', () => {
+        const selectedRow = getChallanDetailSelectedRow();
+        downloadChallanDispatchFile('excel', {
+          voucherNo: selectedRow?.deliveryNoteNo,
+          triggerButton: challanDownloadExcelBtn,
+          errorElement: challanDetailError
+        });
       });
     }
 
