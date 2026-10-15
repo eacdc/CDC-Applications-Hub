@@ -88,6 +88,65 @@ function el(tag, className, content) {
   return node;
 }
 
+// -- theme ------------------------------------------------------------------
+
+/**
+ * Light or dark, with the system preference as the starting point.
+ *
+ * `data-theme` on <html> is only set once someone has chosen; without it the
+ * stylesheet follows `prefers-color-scheme`. The choice is remembered in
+ * localStorage and re-applied by a tiny inline script in the <head>, before
+ * the stylesheet paints, so a dark-mode user never sees a white flash.
+ */
+var THEME_KEY = 'grnCreator.theme';
+
+function systemPrefersDark() {
+  return Boolean(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
+
+/** What is actually on screen right now, chosen or inherited. */
+function resolvedTheme() {
+  var chosen = document.documentElement.getAttribute('data-theme');
+  if (chosen === 'dark' || chosen === 'light') return chosen;
+  return systemPrefersDark() ? 'dark' : 'light';
+}
+
+/** The button shows where a click will take you: moon while light, sun while dark. */
+function paintThemeIcon() {
+  var dark = resolvedTheme() === 'dark';
+  var moon = document.querySelector('.icon-moon');
+  var sun = document.querySelector('.icon-sun');
+  if (moon) moon.hidden = dark;
+  if (sun) sun.hidden = !dark;
+  var button = $('themeToggle');
+  if (button) {
+    var next = dark ? 'light' : 'dark';
+    button.title = 'Switch to ' + next + ' mode';
+    button.setAttribute('aria-label', 'Switch to ' + next + ' mode');
+  }
+}
+
+function toggleTheme() {
+  var next = resolvedTheme() === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  try { window.localStorage.setItem(THEME_KEY, next); } catch (e) { /* not important */ }
+  paintThemeIcon();
+}
+
+/**
+ * Follow the system while the person has not chosen. Without this the page
+ * keeps the theme it loaded with when the OS flips at sunset.
+ */
+function watchSystemTheme() {
+  if (!window.matchMedia) return;
+  var media = window.matchMedia('(prefers-color-scheme: dark)');
+  var onChange = function () {
+    if (!document.documentElement.getAttribute('data-theme')) paintThemeIcon();
+  };
+  if (media.addEventListener) media.addEventListener('change', onChange);
+  else if (media.addListener) media.addListener(onChange);
+}
+
 // -- session ----------------------------------------------------------------
 
 function saveSession() {
@@ -271,6 +330,9 @@ function checkContext() {
     $('contextWarn').textContent = 'Still needed before posting: ' + missing.join(', ') + '.';
     show('contextWarn');
   } else {
+    // Cleared as well as hidden: stale text in a hidden node reads as current
+    // to anything inspecting the page, and misled me once already.
+    $('contextWarn').textContent = '';
     hide('contextWarn');
   }
   return missing.length === 0;
@@ -667,6 +729,7 @@ async function loadHistory() {
 
 // -- wiring -----------------------------------------------------------------
 
+$('themeToggle').addEventListener('click', toggleTheme);
 $('signInForm').addEventListener('submit', signIn);
 $('signOutBtn').addEventListener('click', signOut);
 $('extractBtn').addEventListener('click', extract);
@@ -682,6 +745,8 @@ Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (tab) {
   tab.addEventListener('click', function () { selectSource(tab.dataset.source); });
 });
 
+paintThemeIcon();
+watchSystemTheme();
 prefillLogin();
 
 if (restoreSession()) {

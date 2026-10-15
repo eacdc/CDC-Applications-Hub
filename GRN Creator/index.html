@@ -3,7 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>GRN Creator</title>
+<script>
+  /**
+   * Applied before the stylesheet paints, so a dark-mode user never sees a
+   * white flash. It only sets the attribute; script.js owns the rest.
+   */
+  try {
+    var saved = localStorage.getItem('grnCreator.theme');
+    if (saved === 'dark' || saved === 'light') {
+      document.documentElement.setAttribute('data-theme', saved);
+    }
+  } catch (e) { /* storage blocked; the system preference still applies */ }
+</script>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -13,7 +26,18 @@
   <div class="topbar-right">
     <span id="siteBadge" class="badge hidden"></span>
     <span id="writeBadge" class="badge badge-dry hidden">dry run only</span>
-    <span id="whoami" class="muted"></span>
+    <span id="whoami"></span>
+    <button id="themeToggle" class="icon-btn" type="button" title="Switch theme" aria-label="Switch theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden>
+        <circle cx="12" cy="12" r="4"/>
+        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+      </svg>
+    </button>
     <button id="signOutBtn" class="link hidden">Sign out</button>
   </div>
 </header>
@@ -39,9 +63,10 @@
 
 <!-- 2 ─ receiving context -------------------------------------------------->
 <section id="contextPanel" class="panel hidden">
-  <h2>1 · Receiving context</h2>
+  <h2><span class="step">1</span> Receiving context</h2>
   <p class="hint">Three different ID spaces. <b>Received by</b> is an employee ledger,
-     <b>created by</b> is an ERP <code>UserMaster</code> id — the post refuses if either is missing.</p>
+     <b>ERP user id</b> is a <code>UserMaster</code> id and fills itself from your sign-in —
+     the post refuses if either is missing.</p>
   <div class="grid grid-3">
     <label>Received by (employee)<select id="employeeLedgerId"></select></label>
     <label>Warehouse / bin<select id="warehouseId"></select></label>
@@ -54,7 +79,7 @@
 
 <!-- 3 ─ supplier + invoice ------------------------------------------------->
 <section id="capturePanel" class="panel hidden">
-  <h2>2 · Supplier and invoice</h2>
+  <h2><span class="step">2</span> Supplier and invoice</h2>
   <div class="grid grid-2">
     <label>Supplier ledger
       <input id="supplierSearch" list="supplierList" placeholder="Type a name, e.g. RNG Papers" autocomplete="off">
@@ -64,8 +89,8 @@
   </div>
 
   <div class="tabs">
-    <button class="tab active" data-source="file">Upload a file</button>
-    <button class="tab" data-source="url">Paste a URL</button>
+    <button class="tab active" data-source="file" type="button">Upload a file</button>
+    <button class="tab" data-source="url" type="button">Paste a URL</button>
   </div>
 
   <div id="sourceFile" class="source">
@@ -83,7 +108,7 @@
 
 <!-- 4 ─ review ------------------------------------------------------------->
 <section id="reviewPanel" class="panel hidden">
-  <h2>3 · What the AI read <span class="muted" id="providerNote"></span></h2>
+  <h2><span class="step">3</span> What the AI read <span class="muted" id="providerNote"></span></h2>
   <p class="hint">Everything here is editable. Corrections are saved before matching, so the
      checks run on what you confirmed rather than on what was extracted.</p>
   <div class="grid grid-4" id="headerFields"></div>
@@ -94,7 +119,7 @@
 
 <!-- 5 ─ match + checks ----------------------------------------------------->
 <section id="matchPanel" class="panel hidden">
-  <h2>4 · PO matching and checks</h2>
+  <h2><span class="step">4</span> PO matching and checks</h2>
   <table class="lines" id="matchTable"></table>
   <h3>Checks</h3>
   <div id="checksList"></div>
@@ -104,7 +129,7 @@
 
 <!-- 6 ─ preview ------------------------------------------------------------>
 <section id="previewPanel" class="panel hidden">
-  <h2>5 · Exactly what would be written</h2>
+  <h2><span class="step">5</span> Exactly what would be written</h2>
   <div id="voucherNos" class="voucher-nos"></div>
   <div class="grid grid-2">
     <div><h3>GRN — <code>ItemTransactionMain</code></h3><pre id="grnPreview"></pre></div>
