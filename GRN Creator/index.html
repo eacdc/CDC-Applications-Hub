@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GRN Creator</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">GRN Creator <span class="muted">CDC Printers</span></div>
+  <div class="topbar-right">
+    <span id="siteBadge" class="badge hidden"></span>
+    <span id="writeBadge" class="badge badge-dry hidden">dry run only</span>
+    <span id="whoami" class="muted"></span>
+    <button id="signOutBtn" class="link hidden">Sign out</button>
+  </div>
+</header>
+
+<main>
+
+<!-- 1 ─ sign in ------------------------------------------------------------>
+<section id="signInPanel" class="panel">
+  <h2>Sign in</h2>
+  <p class="hint">Your ERP user name and database — the same sign-in as the Stock Issue Tool.
+     No password: the name is looked up in the ERP's own <code>UserMaster</code>.</p>
+  <form id="signInForm" class="grid">
+    <label>Username<input type="text" id="username" autocomplete="username"
+      autocapitalize="none" spellcheck="false" required autofocus></label>
+    <label>Database<select id="site">
+      <option value="KOL">KOL — Kolkata</option>
+      <option value="AHM">AHM — Ahmedabad</option>
+    </select></label>
+    <button type="submit" class="primary" id="signInBtn">Sign in</button>
+  </form>
+  <p id="signInError" class="error hidden"></p>
+</section>
+
+<!-- 2 ─ receiving context -------------------------------------------------->
+<section id="contextPanel" class="panel hidden">
+  <h2>1 · Receiving context</h2>
+  <p class="hint">Three different ID spaces. <b>Received by</b> is an employee ledger,
+     <b>created by</b> is an ERP <code>UserMaster</code> id — the post refuses if either is missing.</p>
+  <div class="grid grid-3">
+    <label>Received by (employee)<select id="employeeLedgerId"></select></label>
+    <label>Warehouse / bin<select id="warehouseId"></select></label>
+    <label>Purchase ledger<select id="purchaseLedgerId"></select></label>
+    <label>Freight ledger <span class="muted">(only if freight)</span><select id="freightLedgerId"></select></label>
+    <label>ERP user id <span class="muted">(CreatedBy)</span><input id="erpUserId" type="number" readonly></label>
+  </div>
+  <p id="contextWarn" class="warn hidden"></p>
+</section>
+
+<!-- 3 ─ supplier + invoice ------------------------------------------------->
+<section id="capturePanel" class="panel hidden">
+  <h2>2 · Supplier and invoice</h2>
+  <div class="grid grid-2">
+    <label>Supplier ledger
+      <input id="supplierSearch" list="supplierList" placeholder="Type a name, e.g. RNG Papers" autocomplete="off">
+      <datalist id="supplierList"></datalist>
+    </label>
+    <label>Selected<input id="supplierLedgerId" readonly></label>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-source="file">Upload a file</button>
+    <button class="tab" data-source="url">Paste a URL</button>
+  </div>
+
+  <div id="sourceFile" class="source">
+    <input type="file" id="invoiceFile" accept="application/pdf,image/png,image/jpeg">
+    <p class="hint">Uploaded to R2 with a presigned PUT, exactly as the tablet would.</p>
+  </div>
+  <div id="sourceUrl" class="source hidden">
+    <input type="url" id="invoiceUrl" placeholder="https://…/invoice.pdf">
+    <p class="hint">Skips storage. Fastest way to re-run a known invoice.</p>
+  </div>
+
+  <button id="extractBtn" class="primary">Read the invoice</button>
+  <p id="captureStatus" class="status"></p>
+</section>
+
+<!-- 4 ─ review ------------------------------------------------------------->
+<section id="reviewPanel" class="panel hidden">
+  <h2>3 · What the AI read <span class="muted" id="providerNote"></span></h2>
+  <p class="hint">Everything here is editable. Corrections are saved before matching, so the
+     checks run on what you confirmed rather than on what was extracted.</p>
+  <div class="grid grid-4" id="headerFields"></div>
+  <table class="lines" id="linesTable"></table>
+  <button id="matchBtn" class="primary">Match to pending POs</button>
+  <p id="reviewStatus" class="status"></p>
+</section>
+
+<!-- 5 ─ match + checks ----------------------------------------------------->
+<section id="matchPanel" class="panel hidden">
+  <h2>4 · PO matching and checks</h2>
+  <table class="lines" id="matchTable"></table>
+  <h3>Checks</h3>
+  <div id="checksList"></div>
+  <button id="previewBtn" class="primary">Preview the vouchers</button>
+  <p id="matchStatus" class="status"></p>
+</section>
+
+<!-- 6 ─ preview ------------------------------------------------------------>
+<section id="previewPanel" class="panel hidden">
+  <h2>5 · Exactly what would be written</h2>
+  <div id="voucherNos" class="voucher-nos"></div>
+  <div class="grid grid-2">
+    <div><h3>GRN — <code>ItemTransactionMain</code></h3><pre id="grnPreview"></pre></div>
+    <div><h3>Purchase invoice — <code>ItemPurchaseInvoiceMain</code></h3><pre id="piPreview"></pre></div>
+  </div>
+  <h3>PO lines that would close</h3>
+  <pre id="closePreview"></pre>
+  <div class="post-row">
+    <button id="postBtn" class="danger" disabled>Post for real</button>
+    <span id="postNote" class="muted"></span>
+  </div>
+  <p id="previewStatus" class="status"></p>
+</section>
+
+<!-- 7 ─ history ------------------------------------------------------------>
+<section id="historyPanel" class="panel hidden">
+  <h2>History</h2>
+  <button id="refreshHistory" class="link">Refresh</button>
+  <table class="lines" id="historyTable"></table>
+</section>
+
+</main>
+
+<script src="config.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
