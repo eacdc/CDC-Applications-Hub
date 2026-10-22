@@ -62,13 +62,19 @@
 </section>
 
 <!-- 1 · supplier and invoice ------------------------------------------------>
+<nav class="tabs app-tabs hidden" id="appTabs" role="tablist" aria-label="GRN Creator">
+  <button class="tab active" data-app="new" type="button">New GRN</button>
+  <button class="tab" data-app="history" type="button">History</button>
+</nav>
+
+<div id="newView">
 <section id="capturePanel" class="panel hidden">
   <h2><span class="step">1</span> Supplier and invoice</h2>
   <div class="tabs mode-tabs" id="entryMode" role="tablist" aria-label="How to make this GRN">
     <button class="tab active" data-mode="ai" type="button">Read an invoice</button>
     <button class="tab" data-mode="manual" type="button">Enter manually</button>
   </div>
-  <div class="grid grid-2 supplier-row">
+  <div class="grid grid-2">
     <label>Supplier ledger
       <input id="supplierSearch" list="supplierList" placeholder="Filled in from the invoice - or type a name" autocomplete="off">
       <datalist id="supplierList"></datalist>
@@ -156,7 +162,7 @@
     <div class="table-wrap"><table class="lines" id="receiptTable"></table></div>
   </div>
 
-  <details id="checksBox" class="checks-box" open>
+  <details id="checksBox" class="checks-box">
     <summary><span class="checks-title">Checks</span> <span id="checksSummary" class="checks-count"></span></summary>
     <div id="checksList"></div>
   </details>
@@ -214,8 +220,52 @@
 </section>
 
 <!-- history ------------------------------------------------------------------->
+</div>
+
+<!-- History: every GRN on the site, and editing or deleting one ------------->
+<div id="historyView" class="hidden">
+<section id="registerPanel" class="panel">
+  <h2>GRNs and purchase invoices</h2>
+  <div class="grid grid-4">
+    <label>From<input id="regFrom" type="date"></label>
+    <label>To<input id="regTo" type="date"></label>
+    <label>Supplier<input id="regSupplier" list="supplierList" placeholder="All suppliers" autocomplete="off"></label>
+    <label>GRN / D.N. no.<input id="regSearch" placeholder="e.g. REC04597 or 0710"></label>
+  </div>
+  <div class="grid-head">
+    <button id="regLoad" class="primary" type="button">Show</button>
+    <span class="hint" id="regSummary"></span>
+  </div>
+  <div class="table-wrap scroll-box" id="regWrap"><table class="lines" id="registerTable"></table></div>
+  <p id="registerStatus" class="status"></p>
+</section>
+
+<section id="grnEditPanel" class="panel hidden">
+  <h2 id="grnEditTitle">GRN</h2>
+  <p class="hint" id="grnEditNote"></p>
+  <div class="grid grid-4">
+    <label>D.N. No. / Invoice No.<input id="geDnNo"></label>
+    <label>D.N. / Invoice date<input id="geDnDate" type="date"></label>
+    <label>Gate entry no.<input id="geGateNo"></label>
+    <label>Gate entry date<input id="geGateDate" type="date"></label>
+    <label>Vehicle no.<input id="geVehicle"></label>
+    <label>E-way bill<input id="geEway"></label>
+    <label>Received by<select id="geReceivedBy"></select></label>
+  </div>
+  <h3>Lines</h3>
+  <div class="table-wrap"><table class="lines" id="grnEditLines"></table></div>
+  <div id="grnEditPlan" class="edit-plan hidden"></div>
+  <div class="post-row">
+    <button id="geCheckBtn" class="primary" type="button">Check changes</button>
+    <button id="geSaveBtn" type="button" disabled>Save to ERP</button>
+    <button id="geDeleteBtn" class="danger" type="button">Delete GRN</button>
+    <button id="geCloseBtn" class="link" type="button">Close</button>
+  </div>
+  <p id="grnEditStatus" class="status"></p>
+</section>
+
 <section id="historyPanel" class="panel hidden">
-  <h2>History</h2>
+  <h2>Drafts in GRN Creator</h2>
   <div class="history-actions">
     <button id="refreshHistory" class="link" type="button">Refresh</button>
     <!-- Testing only. Hidden unless the server sets SP_ALLOW_DRAFT_DELETE=true. -->
@@ -224,6 +274,7 @@
   <p id="historyStatus" class="status"></p>
   <table class="lines" id="historyTable"></table>
 </section>
+</div>
 
 </main>
 

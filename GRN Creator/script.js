@@ -277,6 +277,7 @@ function signOut() {
 
 async function onSignedIn() {
   hide('signInPanel');
+  show('appTabs');
   show('capturePanel'); show('historyPanel');
   $('siteBadge').textContent = state.context.site;
   show('siteBadge');
@@ -1276,6 +1277,14 @@ function renderChecks(result) {
       : 'all ' + state.checks.length + ' passed';
   summary.className = 'checks-count ' + (blocking.length ? 'bad' : failed.length ? 'warn' : state.checks.length ? 'ok' : '');
 
+  // Folded while everything passes, open as soon as something fails. Only a
+  // change of outcome moves it, so a box someone opened or closed stays so.
+  var outcome = !state.checks.length ? 'none' : failed.length ? 'failed' : 'passed';
+  if (outcome !== state.checksOutcome) {
+    state.checksOutcome = outcome;
+    $('checksBox').open = outcome === 'failed';
+  }
+
   // Failures first - a passing check is evidence, not news.
   state.checks.slice().sort(function (a, b) {
     return (a.passed ? 1 : 0) - (b.passed ? 1 : 0);
@@ -1602,6 +1611,393 @@ async function loadHistory() {
   await refreshDraftButton();
 }
 
+// -- History: the GRN register ---------------------------------------------
+
+/** New GRN or History, the two tabs at the top. */
+function setApp(view) {
+  Array.prototype.forEach.call(document.querySelectorAll('#appTabs .tab'), function (tab) {
+    tab.classList.toggle('active', tab.dataset.app === view);
+  });
+  $('newView').classList.toggle('hidden', view !== 'new');
+  $('historyView').classList.toggle('hidden', view !== 'history');
+  if (view === 'history' && !state.register) {
+    var to = new Date();
+    var from = new Date(to.getTime() - 7 * 86400000);
+    $('regTo').value = localDateInput(to);
+    $('regFrom').value = localDateInput(from);
+    loadRegister();
+  }
+}
+
+function supplierIdFrom(value) {
+  var m = /\[(\d+)\]\s*$/.exec(value || '');
+  return m ? m[1] : '';
+}
+
+var REGISTER_COLUMNS = [
+  ['GRN No.', 'c-grn'], ['Date', 'c-date'], ['Supplier', 'c-sup'], ['D.N. No.', 'c-dn'], ['D.N. Date', 'c-date'],
+  ['Lines', 'c-n num'], ['Qty (S.U.)', 'c-q num'], ['Issued', 'c-iss'], ['Purchase invoice', 'c-pi'],
+  ['Made in', 'c-made'], ['Created by', 'c-by'], ['', 'c-act'],
+];
+
+async function loadRegister() {
+  var params = ['from=' + encodeURIComponent($('regFrom').value), 'to=' + encodeURIComponent($('regTo').value)];
+  var supplier = supplierIdFrom($('regSupplier').value);
+  if ($('regSupplier').value.trim() && !supplier) {
+    setStatus('registerStatus', 'Choose a supplier from the list, or clear the box for all.', 'error');
+    return;
+  }
+  if (supplier) params.push('supplierLedgerId=' + supplier);
+  if ($('regSearch').value.trim()) params.push('q=' + encodeURIComponent($('regSearch').value.trim()));
+  setStatus('registerStatus', 'Loading...');
+  $('regLoad').disabled = true;
+  try {
+    state.register = await api('/receiving/grns?' + params.join('&'));
+    renderRegister();
+    setStatus('registerStatus', '', null);
+  } catch (err) {
+    setStatus('registerStatus', err.message, 'error');
+  } finally {
+    $('regLoad').disabled = false;
+  }
+}
+
+function renderRegister() {
+  var reg = state.register || { grns: [] };
+  var table = $('registerTable');
+  table.innerHTML = '';
+  var thead = table.createTHead();
+  var head = thead.insertRow();
+  REGISTER_COLUMNS.forEach(function (c) { head.appendChild(el('th', c[1], c[0])); });
+  var body = table.createTBody();
+
+  var grns = reg.grns || [];
+  var issued = grns.filter(function (g) { return g.issued !== 'none'; }).length;
+  var noPi = grns.filter(function (g) { return !g.piVoucherNo; }).length;
+  $('regSummary').textContent = grns.length
+    ? grns.length + ' GRN' + (grns.length === 1 ? '' : 's') + (reg.truncated ? ' (the newest 500 - narrow the dates for the rest)' : '')
+      + ' - ' + issued + ' issued from, ' + noPi + ' without a purchase invoice.'
+      + (reg.canEdit ? '' : ' You can view them; editing is for the people named in SP_GRN_EDITORS.')
+    : '';
+
+  if (!grns.length) {
+    var c = body.insertRow().insertCell();
+    c.colSpan = REGISTER_COLUMNS.length;
+    c.className = 'empty';
+    c.textContent = 'No GRNs in this range.';
+    sizeRegisterBox();
+    return;
+  }
+
+  grns.forEach(function (g) {
+    var row = body.insertRow();
+    row.insertCell().textContent = g.voucherNo;
+    row.insertCell().textContent = displayDate(g.voucherDate);
+    var sup = row.insertCell(); sup.textContent = text(g.supplierName); sup.title = text(g.supplierName);
+    var dn = row.insertCell(); dn.textContent = text(g.deliveryNoteNo); dn.title = text(g.deliveryNoteNo);
+    row.insertCell().textContent = displayDate(g.deliveryNoteDate);
+    var n = row.insertCell(); n.className = 'num'; n.textContent = text(g.lines);
+    var q = row.insertCell(); q.className = 'num'; q.textContent = qtyText(g.stockQty) + (g.stockUnit ? ' ' + g.stockUnit : '');
+
+    var iss = row.insertCell();
+    var label = g.issued === 'none' ? 'None' : g.issued === 'full' ? 'Full' : 'Part';
+    var tag = el('span', 'badge state-' + g.issued, label);
+    if (g.issued !== 'none') tag.title = qtyText(g.issuedQty) + ' issued from ' + g.linesIssued + ' line(s), on ' + g.issues + ' issue(s)';
+    iss.appendChild(tag);
+
+    var pi = row.insertCell();
+    if (g.piVoucherNo) pi.textContent = g.piVoucherNo + (g.purchaseInvoices > 1 ? ' +' + (g.purchaseInvoices - 1) : '');
+    else pi.appendChild(el('span', 'badge state-nopi', 'Not made'));
+
+    row.insertCell().textContent = g.madeIn;
+    var by = row.insertCell(); by.textContent = text(g.createdByName); by.title = text(g.createdByName);
+
+    var act = row.insertCell();
+    act.className = 'row-actions';
+    var open = el('button', 'link', reg.canEdit ? 'Edit' : 'View');
+    open.type = 'button';
+    open.addEventListener('click', function () { openGrn(g.transactionId); });
+    act.appendChild(open);
+    if (reg.canEdit) {
+      var del = el('button', 'link danger-link', 'Delete');
+      del.type = 'button';
+      var why = g.piVoucherNo ? 'Purchase invoice ' + g.piVoucherNo + ' is made from it. Delete that in the ERP first.'
+        : g.issued !== 'none' ? 'Stock has been issued from it. Delete those issue lines first.' : '';
+      if (why) { del.disabled = true; del.title = why; }
+      del.addEventListener('click', function () { removeGrn(g.transactionId, g.voucherNo); });
+      act.appendChild(del);
+    }
+  });
+  sizeRegisterBox();
+}
+
+/** Fifteen rows, then the register scrolls inside its box. */
+function sizeRegisterBox() {
+  var wrap = $('regWrap');
+  var table = $('registerTable');
+  if (!wrap || wrap.offsetParent === null) return;
+  var height = table.tHead ? table.tHead.offsetHeight : 0;
+  var rows = table.tBodies[0] ? table.tBodies[0].rows : [];
+  for (var i = 0; i < Math.min(15, rows.length); i++) height += rows[i].offsetHeight;
+  wrap.style.maxHeight = (height + 2) + 'px';
+}
+
+// -- History: one GRN, edited or deleted ------------------------------------
+
+/** kg per sheet for paper bought by the kilo; null otherwise. Mirrors the server. */
+function kgPerSheet(line) {
+  var pu = String(line.purchaseUnit || '').trim().toUpperCase();
+  var su = String(line.stockUnit || '').trim().toUpperCase();
+  if (pu !== 'KG' || (su !== 'SHEET' && su !== 'SHEETS')) return null;
+  var wt = num(line.wtPerPacking); var per = num(line.unitPerPacking);
+  return wt > 0 && per > 0 ? wt / per : null;
+}
+
+async function openGrn(transactionId) {
+  setStatus('grnEditStatus', 'Opening...');
+  show('grnEditPanel');
+  hide('grnEditPlan');
+  $('geSaveBtn').disabled = true;
+  try {
+    state.grn = await api('/receiving/grns/' + transactionId);
+    renderGrnEdit();
+    setStatus('grnEditStatus', '', null);
+    $('grnEditPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (err) {
+    setStatus('grnEditStatus', err.message, 'error');
+  }
+}
+
+function renderGrnEdit() {
+  var g = state.grn;
+  var editable = g.canEdit;
+  $('grnEditTitle').textContent = g.voucherNo + ' - ' + text(g.supplierName);
+
+  var notes = [];
+  notes.push('Made in ' + g.madeIn + ', ' + displayDate(g.voucherDate) + '.');
+  if (g.purchaseInvoices.length) {
+    notes.push('Purchase invoice ' + g.purchaseInvoices.map(function (p) { return p.voucherNo; }).join(', ')
+      + ' is made from it, so its quantities stay as they are until that is deleted in the ERP. The header can still change.');
+  }
+  if (!editable) notes.push('You can view this GRN; editing is for the people named in SP_GRN_EDITORS.');
+  else if (!g.writesEnabled) notes.push('ERP writes are off: Check changes shows exactly what would change, and nothing is saved.');
+  $('grnEditNote').textContent = notes.join(' ');
+
+  var h = g.header;
+  $('geDnNo').value = text(h.deliveryNoteNo);
+  $('geDnDate').value = localDateInput(h.deliveryNoteDate);
+  $('geGateNo').value = text(h.gateEntryNo);
+  $('geGateDate').value = localDateInput(h.gateEntryDate);
+  $('geVehicle').value = text(h.vehicleNo);
+  $('geEway').value = text(h.eWayBillNo);
+  fillSelect('geReceivedBy', state.reference.employees, 'LedgerID',
+    function (r) { return r.LedgerName + (r.Designation ? ' - ' + r.Designation : ''); }, h.receivedBy, 'Choose...');
+  // Whoever received it may have left since: keep them on the list for this GRN.
+  if (h.receivedBy && String($('geReceivedBy').value) !== String(h.receivedBy)) {
+    var gone = el('option', null, (h.receivedByName || 'Ledger ' + h.receivedBy) + ' (not on the employee list)');
+    gone.value = h.receivedBy;
+    gone.selected = true;
+    $('geReceivedBy').appendChild(gone);
+  }
+  ['geDnNo', 'geDnDate', 'geGateNo', 'geGateDate', 'geVehicle', 'geEway', 'geReceivedBy'].forEach(function (id) {
+    $(id).disabled = !editable;
+  });
+
+  var table = $('grnEditLines');
+  table.innerHTML = '';
+  var head = table.insertRow();
+  ['#', 'P.O. No.', 'Item Code', 'Item Name', 'Receipt Qty (S.U.)', 'Receipt Qty (P.U.)', 'Stock Unit', 'Issued', 'Warehouse', 'Remove']
+    .forEach(function (label, i) { head.appendChild(el('th', i === 4 || i === 5 || i === 7 ? 'num' : null, label)); });
+
+  g.lines.forEach(function (l) {
+    var row = table.insertRow();
+    row.dataset.id = l.transactionDetailId;
+    row.insertCell().textContent = text(l.lineNo);
+    row.insertCell().textContent = text(l.poVoucherNo);
+    row.insertCell().textContent = text(l.itemCode);
+    var name = row.insertCell(); name.className = 'wrap'; name.textContent = text(l.itemName);
+
+    var su = row.insertCell(); su.className = 'num';
+    var input = el('input', 'cell-input');
+    input.type = 'number'; input.min = String(l.minStockQty || 0); input.step = 'any';
+    input.value = text(l.stockQty);
+    input.dataset.field = 'stockQty';
+    input.disabled = !editable || Boolean(l.qtyLocked);
+    input.title = l.qtyLocked || (l.minStockQty > 0 ? 'At least ' + qtyText(l.minStockQty) + ' - that much has been issued.' : 'Receipt qty in ' + text(l.stockUnit));
+    su.appendChild(input);
+
+    var pu = row.insertCell(); pu.className = 'num'; pu.textContent = qtyText(l.qty) + (l.purchaseUnit ? ' ' + l.purchaseUnit : '');
+    input.addEventListener('input', function () {
+      var per = kgPerSheet(l);
+      var s = num(input.value);
+      pu.textContent = s === null ? '' : qtyText(per ? Math.round(s * per * 1000) / 1000 : s) + (l.purchaseUnit ? ' ' + l.purchaseUnit : '');
+      hide('grnEditPlan'); $('geSaveBtn').disabled = true;
+    });
+
+    row.insertCell().textContent = text(l.stockUnit);
+    var iss = row.insertCell(); iss.className = 'num';
+    iss.textContent = l.issuedQty ? qtyText(l.issuedQty) : '-';
+    if (l.issues.length) iss.title = l.issues.map(function (i) { return i.issueNo + ' (' + qtyText(i.qty) + ')'; }).join(', ');
+
+    var wh = row.insertCell();
+    var select = el('select', 'cell-select');
+    select.dataset.field = 'warehouseId';
+    (state.reference.warehouses || []).forEach(function (w) {
+      var o = el('option', null, warehouseLabel(w));
+      o.value = w.WarehouseID;
+      if (String(w.WarehouseID) === String(l.warehouseId)) o.selected = true;
+      select.appendChild(o);
+    });
+    select.disabled = !editable || Boolean(l.warehouseLocked);
+    if (l.warehouseLocked) select.title = l.warehouseLocked;
+    wh.appendChild(select);
+
+    var rm = row.insertCell();
+    var box = el('input');
+    box.type = 'checkbox';
+    box.dataset.field = 'remove';
+    box.disabled = !editable || Boolean(l.removeLocked);
+    box.title = l.removeLocked || 'Take this line off the GRN';
+    box.setAttribute('aria-label', 'Remove line ' + l.lineNo);
+    rm.appendChild(box);
+    [select, box].forEach(function (c) { c.addEventListener('change', function () { hide('grnEditPlan'); $('geSaveBtn').disabled = true; }); });
+  });
+
+  $('geCheckBtn').classList.toggle('hidden', !editable);
+  $('geSaveBtn').classList.toggle('hidden', !editable);
+  $('geDeleteBtn').classList.toggle('hidden', !editable);
+  $('geDeleteBtn').disabled = Boolean(g.deleteLocked);
+  $('geDeleteBtn').title = g.deleteLocked || '';
+}
+
+/** What the person changed, against the GRN as it was opened. */
+function collectGrnEdit() {
+  var g = state.grn;
+  var header = {
+    deliveryNoteNo: $('geDnNo').value, deliveryNoteDate: $('geDnDate').value || null,
+    gateEntryNo: $('geGateNo').value, gateEntryDate: $('geGateDate').value || null,
+    vehicleNo: $('geVehicle').value, eWayBillNo: $('geEway').value,
+  };
+  // Only a change of who received it is sent: an unchanged one may be a
+  // person no longer on the active list.
+  var receivedBy = num($('geReceivedBy').value);
+  if (receivedBy && receivedBy !== num(g.header.receivedBy)) header.receivedBy = receivedBy;
+  var lines = [];
+  Array.prototype.forEach.call($('grnEditLines').rows, function (row) {
+    if (!row.dataset.id) return;
+    var l = g.lines.filter(function (x) { return String(x.transactionDetailId) === row.dataset.id; })[0];
+    var change = { transactionDetailId: l.transactionDetailId };
+    var remove = row.querySelector('[data-field="remove"]');
+    if (remove.checked) { change.remove = true; lines.push(change); return; }
+    var q = num(row.querySelector('[data-field="stockQty"]').value);
+    if (q !== null && Math.abs(q - (num(l.stockQty) || 0)) > 1e-9) change.stockQty = q;
+    var w = num(row.querySelector('[data-field="warehouseId"]').value);
+    if (w !== null && w !== num(l.warehouseId)) change.warehouseId = w;
+    if (Object.keys(change).length > 1) lines.push(change);
+  });
+  return { header: header, lines: lines, expectedModifiedDate: g.modifiedDate };
+}
+
+var FIELD_LABEL = {
+  deliveryNoteNo: 'D.N. no.', deliveryNoteDate: 'D.N. date', gateEntryNo: 'Gate entry no.', gateEntryDate: 'Gate entry date',
+  eWayBillNo: 'E-way bill', eWayBillDate: 'E-way bill date', vehicleNo: 'Vehicle no.', receivedBy: 'Received by',
+  stockQty: 'Receipt qty (S.U.)', qty: 'Receipt qty (P.U.)', warehouseId: 'Warehouse',
+};
+
+function shownValue(field, v) {
+  if (v === null || v === undefined || v === '') return '(blank)';
+  if (field === 'warehouseId') return warehouseName(v) || String(v);
+  if (field === 'receivedBy') {
+    var e = (state.reference.employees || []).filter(function (r) { return String(r.LedgerID) === String(v); })[0];
+    return e ? e.LedgerName : String(v);
+  }
+  if (/Date$/.test(field)) return displayDate(v);
+  if (field === 'stockQty' || field === 'qty') return qtyText(v);
+  return String(v);
+}
+
+function renderPlan(result) {
+  var host = $('grnEditPlan');
+  host.innerHTML = '';
+  var plan = result.plan;
+  var list = el('ul');
+  plan.header.forEach(function (h) {
+    list.appendChild(el('li', null, FIELD_LABEL[h.field] + ': ' + shownValue(h.field, h.before) + ' -> ' + shownValue(h.field, h.after)));
+  });
+  plan.lines.forEach(function (l) {
+    l.changes.forEach(function (c) {
+      list.appendChild(el('li', null, 'Line ' + l.lineNo + ', ' + FIELD_LABEL[c.field] + ': '
+        + shownValue(c.field, c.before) + ' -> ' + shownValue(c.field, c.after)));
+    });
+  });
+  plan.removals.forEach(function (r) { list.appendChild(el('li', null, 'Line ' + r.lineNo + ' comes off the GRN.')); });
+  host.appendChild(el('b', null, result.dryRun ? 'This would change on ' + result.voucherNo + ':' : 'Changed on ' + result.voucherNo + ':'));
+  host.appendChild(list);
+  (result.notes || []).forEach(function (n) { host.appendChild(el('p', 'warn-note', n)); });
+  show('grnEditPlan');
+}
+
+async function checkGrnEdit() {
+  var edit = collectGrnEdit();
+  $('geSaveBtn').disabled = true;
+  setStatus('grnEditStatus', 'Checking...');
+  try {
+    var result = await api('/receiving/grns/' + state.grn.transactionId + '/edit?dryRun=true', { method: 'POST', body: edit });
+    renderPlan(result);
+    state.pendingEdit = edit;
+    $('geSaveBtn').disabled = !result.writesEnabled;
+    setStatus('grnEditStatus', result.writesEnabled
+      ? 'Check the list, then Save to ERP.'
+      : 'ERP writes are off, so this is as far as it goes: nothing has been saved.', result.writesEnabled ? 'ok' : 'warn');
+  } catch (err) {
+    hide('grnEditPlan');
+    setStatus('grnEditStatus', err.message, 'error');
+  }
+}
+
+async function saveGrnEdit() {
+  if (!state.pendingEdit) return;
+  if (!window.confirm('Save these changes to ' + state.grn.voucherNo + ' in the ERP?')) return;
+  $('geSaveBtn').disabled = true;
+  setStatus('grnEditStatus', 'Saving...');
+  try {
+    var result = await api('/receiving/grns/' + state.grn.transactionId + '/edit', { method: 'POST', body: state.pendingEdit });
+    state.pendingEdit = null;
+    await openGrn(state.grn.transactionId);
+    renderPlan(result);
+    setStatus('grnEditStatus', result.voucherNo + ' saved.', 'ok');
+    loadRegister();
+  } catch (err) {
+    setStatus('grnEditStatus', err.message, 'error');
+  }
+}
+
+/** Delete a GRN: the server checks first (dry run), then asks, then deletes. */
+async function removeGrn(transactionId, voucherNo) {
+  var status = state.grn && state.grn.transactionId === transactionId ? 'grnEditStatus' : 'registerStatus';
+  setStatus(status, 'Checking whether ' + voucherNo + ' can be deleted...');
+  try {
+    var dry = await api('/receiving/grns/' + transactionId + '/delete?dryRun=true', { method: 'POST', body: {} });
+    var warn = (dry.notes || []).length ? '\n\n' + dry.notes.join('\n') : '';
+    if (!dry.writesEnabled) {
+      setStatus(status, voucherNo + ' could be deleted (' + dry.lines + ' line' + (dry.lines === 1 ? '' : 's')
+        + '), but ERP writes are off, so nothing has been deleted.' + (warn ? ' ' + dry.notes.join(' ') : ''), 'warn');
+      return;
+    }
+    if (!window.confirm('Delete ' + voucherNo + ' and its ' + dry.lines + ' line(s) in the ERP?' + warn)) {
+      setStatus(status, '', null);
+      return;
+    }
+    var expected = state.grn && state.grn.transactionId === transactionId ? state.grn.modifiedDate : undefined;
+    await api('/receiving/grns/' + transactionId + '/delete', { method: 'POST', body: { expectedModifiedDate: expected } });
+    if (state.grn && state.grn.transactionId === transactionId) { hide('grnEditPanel'); state.grn = null; }
+    setStatus('registerStatus', voucherNo + ' deleted.', 'ok');
+    loadRegister();
+  } catch (err) {
+    setStatus(status, err.message, 'error');
+  }
+}
+
 // -- testing cleanup --------------------------------------------------------
 
 /**
@@ -1666,11 +2062,6 @@ $('previewBtn').addEventListener('click', preview);
 $('startManualBtn').addEventListener('click', startManual);
 ['freightAmount', 'roundOffAmount'].forEach(function (id) { $(id).addEventListener('input', renderPiTotals); });
 window.addEventListener('resize', sizePendingBox);
-// Folded or open, the checks stay as the person left them.
-try { if (window.localStorage.getItem('grnCreator.checksOpen') === '0') $('checksBox').open = false; } catch (e) { /* not important */ }
-$('checksBox').addEventListener('toggle', function () {
-  try { window.localStorage.setItem('grnCreator.checksOpen', $('checksBox').open ? '1' : '0'); } catch (e) { /* not important */ }
-});
 $('postBtn').addEventListener('click', post);
 $('refreshHistory').addEventListener('click', loadHistory);
 $('deleteDraftsBtn').addEventListener('click', deleteDrafts);
@@ -1695,6 +2086,18 @@ Array.prototype.forEach.call(document.querySelectorAll('#entryMode .tab'), funct
 });
 Array.prototype.forEach.call(document.querySelectorAll('#poScope .tab'), function (tab) {
   tab.addEventListener('click', function () { setScope(tab.dataset.scope); });
+});
+Array.prototype.forEach.call(document.querySelectorAll('#appTabs .tab'), function (tab) {
+  tab.addEventListener('click', function () { setApp(tab.dataset.app); });
+});
+$('regLoad').addEventListener('click', loadRegister);
+$('regSearch').addEventListener('keydown', function (e) { if (e.key === 'Enter') loadRegister(); });
+$('geCheckBtn').addEventListener('click', checkGrnEdit);
+$('geSaveBtn').addEventListener('click', saveGrnEdit);
+$('geDeleteBtn').addEventListener('click', function () { removeGrn(state.grn.transactionId, state.grn.voucherNo); });
+$('geCloseBtn').addEventListener('click', function () { hide('grnEditPanel'); state.grn = null; });
+['geDnNo', 'geDnDate', 'geGateNo', 'geGateDate', 'geVehicle', 'geEway', 'geReceivedBy'].forEach(function (id) {
+  $(id).addEventListener('input', function () { hide('grnEditPlan'); $('geSaveBtn').disabled = true; });
 });
 
 paintScope();
