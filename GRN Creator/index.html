@@ -44,7 +44,7 @@
 
 <main>
 
-<!-- 1 ─ sign in ------------------------------------------------------------>
+<!-- sign in ----------------------------------------------------------------->
 <section id="signInPanel" class="panel">
   <h2>Sign in</h2>
   <p class="hint">Your ERP user name and database — the same sign-in as the Stock Issue Tool.
@@ -61,34 +61,24 @@
   <p id="signInError" class="error hidden"></p>
 </section>
 
-<!-- 2 ─ receiving context -------------------------------------------------->
-<section id="contextPanel" class="panel hidden">
-  <h2><span class="step">1</span> Receiving context</h2>
-  <p class="hint">Three different ID spaces. <b>Received by</b> is an employee ledger,
-     <b>ERP user id</b> is a <code>UserMaster</code> id and fills itself from your sign-in —
-     the post refuses if either is missing.</p>
-  <div class="grid grid-3">
-    <label>Received by (employee)<select id="employeeLedgerId"></select></label>
-    <label>Warehouse / bin<select id="warehouseId"></select></label>
-    <label>Purchase ledger<select id="purchaseLedgerId"></select></label>
-    <label>Freight ledger <span class="muted">(only if freight)</span><select id="freightLedgerId"></select></label>
-    <label>ERP user id <span class="muted">(CreatedBy)</span><input id="erpUserId" type="number" readonly></label>
-  </div>
-  <p id="contextWarn" class="warn hidden"></p>
-</section>
-
-<!-- 3 ─ supplier + invoice ------------------------------------------------->
+<!-- 1 · supplier and invoice ------------------------------------------------>
 <section id="capturePanel" class="panel hidden">
-  <h2><span class="step">2</span> Supplier and invoice</h2>
-  <div class="grid grid-2">
+  <h2><span class="step">1</span> Supplier and invoice</h2>
+  <div class="tabs mode-tabs" id="entryMode" role="tablist" aria-label="How to make this GRN">
+    <button class="tab active" data-mode="ai" type="button">Read an invoice</button>
+    <button class="tab" data-mode="manual" type="button">Enter manually</button>
+  </div>
+  <div class="grid grid-2 supplier-row">
     <label>Supplier ledger
-      <input id="supplierSearch" list="supplierList" placeholder="Type a name, e.g. RNG Papers" autocomplete="off">
+      <input id="supplierSearch" list="supplierList" placeholder="Filled in from the invoice - or type a name" autocomplete="off">
       <datalist id="supplierList"></datalist>
+      <small class="source" id="supplierNote"></small>
     </label>
     <label>Selected<input id="supplierLedgerId" readonly></label>
   </div>
 
-  <div class="tabs">
+  <div id="aiPane">
+  <div class="tabs" id="sourceTabs">
     <button class="tab active" data-source="file" type="button">Upload a file</button>
     <button class="tab" data-source="url" type="button">Paste a URL</button>
   </div>
@@ -103,33 +93,112 @@
   </div>
 
   <button id="extractBtn" class="primary">Read the invoice</button>
+  </div>
+
+  <!-- the ERP's own way: a supplier, the delivery note, then PO lines picked one by one -->
+  <div id="manualPane" class="hidden">
+    <p class="hint">As on the ERP's GRN screen: choose the supplier, give the delivery note, then pick
+       PO lines from <b>Pending POs</b> and enter what arrived. Nothing is read by AI.</p>
+    <div class="grid grid-3">
+      <label>D.N. No. / Invoice No.<input id="manualInvoiceNo" placeholder="e.g. PU/26-27/0710"></label>
+      <label>D.N. / Invoice date<input id="manualInvoiceDate" type="date"></label>
+    </div>
+    <button id="startManualBtn" class="primary">Start GRN</button>
+  </div>
   <p id="captureStatus" class="status"></p>
 </section>
 
-<!-- 4 ─ review ------------------------------------------------------------->
+<!-- 2 · what the AI read ---------------------------------------------------->
 <section id="reviewPanel" class="panel hidden">
-  <h2><span class="step">3</span> What the AI read <span class="muted" id="providerNote"></span></h2>
-  <p class="hint">Everything here is editable. Corrections are saved before matching, so the
-     checks run on what you confirmed rather than on what was extracted.</p>
+  <h2><span class="step">2</span> What the AI read</h2>
+  <p class="hint">Everything is editable. Corrections are saved before matching, so the checks
+     run on what you confirmed. Changing a line clears its PO match - except a match you
+     chose by hand, which is kept.</p>
   <div class="grid grid-4" id="headerFields"></div>
   <table class="lines" id="linesTable"></table>
-  <button id="matchBtn" class="primary">Match to pending POs</button>
+  <button id="matchBtn" class="primary">Match to POs</button>
   <p id="reviewStatus" class="status"></p>
 </section>
 
-<!-- 5 ─ match + checks ----------------------------------------------------->
+<!-- 3 · receive against POs ------------------------------------------------->
 <section id="matchPanel" class="panel hidden">
-  <h2><span class="step">4</span> PO matching and checks</h2>
-  <table class="lines" id="matchTable"></table>
-  <h3>Checks</h3>
-  <div id="checksList"></div>
-  <button id="previewBtn" class="primary">Preview the vouchers</button>
+  <h2><span class="step">3</span> Receive against POs</h2>
+
+  <div class="scope-row">
+    <div class="tabs" id="poScope" role="tablist" aria-label="Which PO lines to match against">
+      <button class="tab active" data-scope="open" type="button">Open POs</button>
+      <button class="tab" data-scope="closed" type="button">Include closed</button>
+    </div>
+    <p class="hint" id="poScopeHint"></p>
+  </div>
+
+  <!-- as on the ERP's GRN screen: the supplier's pending PO lines on top ... -->
+  <div id="pendingView">
+    <div class="grid-head">
+      <h3>Pending POs <span id="pendingCount" class="count"></span></h3>
+      <span class="hint">Type under any heading to search.</span>
+    </div>
+    <div class="assign-bar">
+      <label>Clicking a PO line
+        <select id="assignLine"></select>
+      </label>
+    </div>
+    <div class="table-wrap scroll-box" id="pendingWrap"><table class="lines grid-table" id="pendingTable"></table></div>
+  </div>
+
+  <!-- ... and the GRN's own lines right under them -->
+  <div id="linesView">
+    <div class="grid-head">
+      <h3>GRN lines <span id="linesCount" class="count"></span></h3>
+      <span class="hint">Warehouse defaults to <b id="defaultWarehouseName">-</b>.</span>
+      <button id="rematchBtn" class="link" type="button">Match again</button>
+    </div>
+    <div class="table-wrap"><table class="lines" id="receiptTable"></table></div>
+  </div>
+
+  <details id="checksBox" class="checks-box" open>
+    <summary><span class="checks-title">Checks</span> <span id="checksSummary" class="checks-count"></span></summary>
+    <div id="checksList"></div>
+  </details>
   <p id="matchStatus" class="status"></p>
 </section>
 
-<!-- 6 ─ preview ------------------------------------------------------------>
+<!-- 4 · GRN details ---------------------------------------------------------->
+<section id="grnPanel" class="panel hidden">
+  <h2><span class="step">4</span> GRN details</h2>
+  <div class="grid grid-3">
+    <label>D.N. No. / Invoice No.<input id="dnNo" readonly></label>
+    <label>D.N. / Invoice date<input id="dnDate" type="date" readonly></label>
+    <label>E-way bill<input id="eWayBillNo"></label>
+    <label>Gate entry no.<input id="gateEntryNo"></label>
+    <label>Gate entry date<input id="gateEntryDate" type="date"></label>
+    <label>Vehicle no.<input id="vehicleNo"></label>
+    <label>Received by<select id="receivedBy"></select><small class="source" id="receivedByHint"></small></label>
+    <label>Default warehouse<select id="defaultWarehouse"></select><small class="source" id="warehouseHint"></small></label>
+  </div>
+</section>
+
+<!-- 5 · purchase invoice ----------------------------------------------------->
+<section id="piPanel" class="panel hidden">
+  <h2><span class="step">5</span> Purchase invoice</h2>
+  <div class="grid grid-3">
+    <label>Purchase ledger<select id="purchaseLedgerId"></select><small class="source" id="purchaseLedgerHint"></small></label>
+    <label>Freight (₹)<input id="freightAmount" type="number" min="0" step="0.01"></label>
+    <label>Round off (₹)<input id="roundOffAmount" type="number" step="0.01"></label>
+    <label id="freightRow">Freight ledger<select id="freightLedgerId"></select><small class="source" id="freightLedgerHint"></small></label>
+  </div>
+  <h3>Rates</h3>
+  <p class="hint">The GRN carries no rate; the purchase invoice does. Each line starts at its PO rate.</p>
+  <div class="table-wrap"><table class="lines" id="piLinesTable"></table></div>
+  <p class="hint" id="piNote"></p>
+  <div id="piTotals" class="totals"></div>
+  <button id="previewBtn" class="primary">Preview the vouchers</button>
+  <p id="piStatus" class="status"></p>
+</section>
+
+<!-- 6 · preview and post ----------------------------------------------------->
 <section id="previewPanel" class="panel hidden">
-  <h2><span class="step">5</span> Exactly what would be written</h2>
+  <h2><span class="step">6</span> Exactly what would be written</h2>
   <div id="voucherNos" class="voucher-nos"></div>
   <div class="grid grid-2">
     <div><h3>GRN — <code>ItemTransactionMain</code></h3><pre id="grnPreview"></pre></div>
@@ -144,10 +213,15 @@
   <p id="previewStatus" class="status"></p>
 </section>
 
-<!-- 7 ─ history ------------------------------------------------------------>
+<!-- history ------------------------------------------------------------------->
 <section id="historyPanel" class="panel hidden">
   <h2>History</h2>
-  <button id="refreshHistory" class="link">Refresh</button>
+  <div class="history-actions">
+    <button id="refreshHistory" class="link" type="button">Refresh</button>
+    <!-- Testing only. Hidden unless the server sets SP_ALLOW_DRAFT_DELETE=true. -->
+    <button id="deleteDraftsBtn" class="danger hidden" type="button">Delete test drafts</button>
+  </div>
+  <p id="historyStatus" class="status"></p>
   <table class="lines" id="historyTable"></table>
 </section>
 

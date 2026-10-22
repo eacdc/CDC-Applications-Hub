@@ -197,7 +197,7 @@ code, pre { font-family: var(--mono); }
 /* ── layout ───────────────────────────────────────────────────────────── */
 
 main {
-  max-width: 1100px;
+  max-width: 1640px;
   margin: 0 auto;
   padding: 28px 24px 96px;
   display: flex;
@@ -282,6 +282,8 @@ main {
 .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* The supplier box carries a note underneath; line the two fields up by the top. */
+.grid.supplier-row { align-items: start; }
 
 label {
   display: flex;
@@ -480,6 +482,19 @@ table.lines td.num, table.lines th.num {
 }
 table.lines input { padding: 6px 8px; font-size: 13px; background: var(--surface); }
 table.lines tr.unmatched td { background: var(--block-soft); }
+table.lines td.why { color: var(--ink-3); font-size: 12px; line-height: 1.45; max-width: 36ch; }
+table.lines tr.closed td { background: var(--warn-soft); }
+table.lines tr.closed:hover td { background: var(--warn-soft); }
+
+.badge-closed {
+  margin-left: 8px;
+  background: var(--warn-soft); border-color: var(--warn-line); color: var(--warn);
+  font-size: 9.5px; padding: 2px 7px; vertical-align: 1px;
+}
+
+.scope-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
+.scope-row .tabs { margin: 0; }
+.scope-row .hint { margin: 0; flex: 1 1 280px; }
 table.lines tr.unmatched:hover td { background: var(--block-soft); }
 
 /* ── checks ───────────────────────────────────────────────────────────── */
@@ -565,6 +580,171 @@ pre {
 }
 #postNote { font-size: 12.5px; max-width: 60ch; }
 
+/* ── receive against POs ──────────────────────────────────────────────── */
+
+/* The two grids, stacked as on the ERP's GRN screen. */
+.grid-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin: 22px 0 8px; }
+.grid-head h3 { margin: 0; }
+.grid-head .hint { margin: 0; }
+.grid-head .link { margin-left: auto; }
+.count {
+  display: inline-block; min-width: 18px; margin-left: 6px; padding: 0 6px;
+  border-radius: 999px; background: var(--surface-sunken); border: 1px solid var(--line);
+  font-size: 10.5px; line-height: 16px; color: var(--ink-3); text-align: center;
+}
+.count:empty { display: none; }
+
+.grid-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 6px 0 0; }
+.grid-tools .hint { margin: 0; }
+
+.table-wrap { width: 100%; overflow-x: auto; }
+
+/* Fixed layout: columns take their share and text wraps or truncates inside
+   them, so a table fits the page instead of pushing past it. */
+#receiptTable, #pendingTable, #piLinesTable { table-layout: fixed; width: 100%; }
+#receiptTable th, #pendingTable th, #piLinesTable th { white-space: normal; vertical-align: bottom; }
+
+#receiptTable .c-no { width: 3%; }
+#receiptTable .c-po { width: 13%; }
+#receiptTable .c-code { width: 7%; }
+#receiptTable .c-name { width: 25%; }
+#receiptTable .c-qty { width: 9%; }
+#receiptTable .c-unit { width: 6%; }
+#receiptTable .c-wt { width: 7%; }
+#receiptTable .c-wh { width: 13%; }
+#receiptTable .c-act { width: 8%; }
+/* The tag goes under the P.O. No. whole, and the links never break mid-word. */
+#receiptTable td .badge { display: table; margin: 4px 0 0; white-space: nowrap; }
+#receiptTable td.row-actions .link { white-space: nowrap; }
+#receiptTable td, #piLinesTable td { overflow-wrap: anywhere; }
+#receiptTable td.wrap, #piLinesTable td.wrap { white-space: normal; }
+.from-invoice { display: block; margin-top: 3px; font-size: 11.5px; color: var(--ink-3); }
+
+#piLinesTable { margin-bottom: 14px; }
+#piLinesTable .c-no { width: 4%; }
+#piLinesTable .c-po { width: 13%; }
+#piLinesTable .c-name { width: 35%; }
+#piLinesTable .c-qty { width: 9%; }
+#piLinesTable .c-unit { width: 6%; }
+#piLinesTable .c-rate { width: 9%; }
+#piLinesTable .c-amt { width: 9%; }
+#piLinesTable .c-gst { width: 6%; }
+table.lines input.cell-input { width: 100%; padding: 5px 7px; font-size: 12.5px; text-align: right; background: var(--surface); }
+table.lines input.cell-input.needs { border-color: var(--warn); background: var(--warn-soft); }
+table.lines select.cell-select { width: 100%; min-width: 0; }
+
+table.lines select.cell-select { padding: 5px 26px 5px 8px; font-size: 12.5px; background-color: var(--surface); }
+table.lines td.row-actions .link { display: inline-block; margin: 0 10px 3px 0; }
+.link.danger-link { color: var(--block); }
+
+.badge-manual {
+  margin-left: 8px;
+  background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent);
+  font-size: 9.5px; padding: 2px 7px; vertical-align: 1px;
+}
+
+.assign-bar { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin: 6px 0 2px; }
+.assign-bar label { min-width: 300px; flex: 0 1 520px; }
+.assign-bar .hint { margin: 0 0 9px; }
+
+/* The grid: a search box under every heading, as on the ERP's own screen. */
+table.grid-table thead tr.filter-row th { padding: 4px 6px; background: var(--surface); }
+table.grid-table input.filter { padding: 5px 7px; font-size: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; }
+table.grid-table tbody tr.pick { cursor: pointer; }
+table.grid-table tbody tr.pick:hover td { background: var(--accent-soft); }
+table.grid-table tbody tr.rate-hit td:first-child { box-shadow: inset 3px 0 0 var(--ok); }
+table.grid-table tbody tr.used td { color: var(--ink-3); }
+table.grid-table td.empty { text-align: center; color: var(--ink-3); padding: 18px; }
+/* The grid: every row one line high, so ten rows is always ten rows. Long
+   item names truncate; the full text is in each cell's tooltip. */
+#pendingTable td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#pendingTable th:nth-child(1) { width: 9%; }
+#pendingTable th:nth-child(2) { width: 7%; }
+#pendingTable th:nth-child(3) { width: 5%; }
+#pendingTable th:nth-child(4) { width: 5.5%; }
+#pendingTable th:nth-child(5) { width: 17.5%; }
+#pendingTable th:nth-child(6), #pendingTable th:nth-child(7) { width: 6%; }
+#pendingTable th:nth-child(8) { width: 3.5%; }
+#pendingTable th:nth-child(9), #pendingTable th:nth-child(10) { width: 6.5%; }
+#pendingTable th:nth-child(11), #pendingTable th:nth-child(12) { width: 4.5%; }
+#pendingTable th:nth-child(13) { width: 5%; }
+#pendingTable th:nth-child(14) { width: 8%; }
+#pendingTable th:nth-child(15) { width: 5.5%; }
+table.grid-table tbody tr.used td { background: var(--ok-soft); }
+/* Fifteen columns: a denser cell, so P.O. No., dates and quantities show whole. */
+#pendingTable th, #pendingTable td { padding: 7px 6px; }
+#pendingTable td { font-size: 12px; }
+#pendingTable thead tr.filter-row th { padding: 4px 3px; }
+#pendingTable input.filter { padding: 4px 5px; font-size: 11.5px; }
+
+/* Ten rows, then scroll; the headings and search boxes stay in view. */
+.scroll-box {
+  overflow-y: auto; overflow-x: hidden;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); margin-top: 14px;
+}
+/* overflow must be visible here: a clipping ancestor stops a sticky head
+   from sticking, and table.lines clips for its rounded corners. The box
+   does the clipping instead. */
+.scroll-box table.lines { margin-top: 0; border: none; border-radius: 0; overflow: visible; }
+.scroll-box thead { position: sticky; top: 0; z-index: 2; }
+.scroll-box thead th { background: var(--surface-2); }
+.scroll-box thead tr.filter-row th { background: var(--surface); box-shadow: 0 1px 0 var(--line); }
+
+small.source { font-size: 11px; font-weight: 400; color: var(--ok); letter-spacing: 0; min-height: 14px; }
+small.source.warn { color: var(--warn); }
+small.source.bad { color: var(--block); }
+
+.totals { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.totals .total {
+  display: flex; flex-direction: column; gap: 2px; min-width: 110px;
+  padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-xs); background: var(--surface-2);
+}
+.totals .total span { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); }
+.totals .total b { font-size: 14px; font-variant-numeric: tabular-nums; }
+.totals .total.grand { border-color: var(--accent-line); background: var(--accent-soft); }
+
+/* ── entry mode ───────────────────────────────────────────────────────── */
+
+.mode-tabs { margin: 4px 0 16px; }
+
+/* ── checks, folded or open ───────────────────────────────────────────── */
+
+.checks-box { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line); }
+.checks-box > summary {
+  display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none;
+  font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3);
+}
+.checks-box > summary::-webkit-details-marker { display: none; }
+.checks-box > summary::before {
+  content: ''; width: 0; height: 0; border-left: 5px solid currentColor;
+  border-top: 4px solid transparent; border-bottom: 4px solid transparent; transition: transform .15s ease;
+}
+.checks-box[open] > summary::before { transform: rotate(90deg); }
+.checks-box > summary:hover { color: var(--ink); }
+.checks-box > summary:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 4px; }
+.checks-count {
+  font-size: 11.5px; font-weight: 600; text-transform: none; letter-spacing: 0;
+  padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-sunken); color: var(--ink-2);
+}
+.checks-count.ok { background: var(--ok-soft); border-color: var(--ok-line); color: var(--ok); }
+.checks-count.warn { background: var(--warn-soft); border-color: var(--warn-line); color: var(--warn); }
+.checks-count.bad { background: var(--block-soft); border-color: var(--block-line); color: var(--block); }
+#checksList { margin-top: 12px; }
+.check-sev { margin-left: 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; opacity: .8; }
+#receiptTable tr.just-added td { animation: just-added 2.4s ease-out; }
+@keyframes just-added { from { background: var(--accent-soft, var(--warn-soft)); } to { background: transparent; } }
+
+/* ── history ──────────────────────────────────────────────────────────── */
+
+.history-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+}
+.history-actions .danger { padding: 6px 13px; font-size: 12.5px; }
+
 /* ── utility ──────────────────────────────────────────────────────────── */
 
 .hidden { display: none !important; }
@@ -577,6 +757,8 @@ pre {
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
   #whoami { display: none; }
   table.lines { font-size: 12.5px; }
+  #receiptTable, #pendingTable, #piLinesTable { table-layout: auto; min-width: 760px; }
+  .scroll-box { overflow-x: auto; }
   table.lines th, table.lines td { padding: 8px 9px; }
 }
 
