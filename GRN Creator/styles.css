@@ -723,6 +723,9 @@ small.source.bad { color: var(--block); }
 #registerTable .c-by { width: 8%; }
 #registerTable .c-act { width: 8%; }
 #registerTable td.row-actions { overflow: visible; }
+#registerTable thead tr.filter-row th { padding: 4px 4px; }
+#registerTable input.filter, #registerTable select.filter { padding: 4px 6px; font-size: 11.5px; width: 100%; min-width: 0; }
+#registerTable select.filter { padding-right: 20px; background-position: right 4px center; }
 #registerTable .badge { font-size: 10.5px; padding: 2px 8px; }
 .badge.state-none { background: var(--surface-sunken); color: var(--ink-3); border-color: var(--line); }
 .badge.state-part { background: var(--warn-soft); color: var(--warn); border-color: var(--warn-line); }
@@ -746,6 +749,60 @@ small.source.bad { color: var(--block); }
 .edit-plan { margin-top: 16px; padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-sunken); font-size: 13px; }
 .edit-plan ul { margin: 8px 0 0 18px; padding: 0; }
 .edit-plan .warn-note { margin: 8px 0 0; color: var(--warn); }
+
+/* ── the purchase invoice screen ──────────────────────────────────────── */
+
+.grid-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.pi-state { display: flex; flex-direction: column; gap: 4px; padding-top: 18px; font-size: 12px; font-weight: 600; color: var(--accent); }
+.pi-screen input[readonly] { background: var(--surface-sunken); }
+
+table.pi-grid { table-layout: fixed; width: 100%; margin-top: 16px; }
+table.pi-grid th { white-space: normal; vertical-align: bottom; font-size: 9.5px; padding: 7px 4px; }
+table.pi-grid td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; padding: 6px 3px; }
+table.pi-grid input.cell-input { padding: 4px 4px; font-size: 11px; }
+table.pi-grid th:nth-child(1) { width: 6.5%; }
+table.pi-grid th:nth-child(2) { width: 4.5%; }
+table.pi-grid th:nth-child(3) { width: 3.5%; }
+table.pi-grid th:nth-child(4) { width: 10%; }
+table.pi-grid th:nth-child(5) { width: 4%; }
+table.pi-grid th:nth-child(6) { width: 3%; }
+table.pi-grid th:nth-child(7) { width: 4%; }
+table.pi-grid th:nth-child(8) { width: 5.5%; }
+table.pi-grid th:nth-child(9) { width: 3%; }
+table.pi-grid th:nth-child(10) { width: 5.5%; }
+table.pi-grid th:nth-child(11) { width: 2.5%; }
+table.pi-grid th:nth-child(12) { width: 2.25%; }
+table.pi-grid th:nth-child(13) { width: 2.25%; }
+table.pi-grid th:nth-child(14) { width: 2.25%; }
+table.pi-grid th:nth-child(15) { width: 2.25%; }
+table.pi-grid th:nth-child(16) { width: 4.5%; }
+table.pi-grid th:nth-child(17) { width: 4.5%; }
+table.pi-grid th:nth-child(18) { width: 4.5%; }
+table.pi-grid th:nth-child(19) { width: 5.5%; }
+table.pi-grid th:nth-child(20) { width: 5%; }
+table.pi-grid th:nth-child(21) { width: 4%; }
+table.pi-grid th:nth-child(22) { width: 3.5%; }
+table.pi-grid th:nth-child(23) { width: 4%; }
+table.pi-grid th:nth-child(24) { width: 3.5%; }
+
+.pi-bottom { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 24px; margin-top: 20px; align-items: start; }
+.charge-add { display: flex; gap: 8px; align-items: center; }
+.charge-add select { flex: 1; min-width: 0; }
+.add-btn { width: 38px; height: 38px; padding: 0; font-size: 20px; line-height: 1; flex: none; }
+table.charges-table { table-layout: fixed; width: 100%; margin-top: 10px; }
+table.charges-table th { font-size: 9.5px; padding: 7px 6px; white-space: normal; }
+table.charges-table td { font-size: 12px; padding: 6px 6px; }
+table.charges-table th:nth-child(1) { width: 34%; }
+table.charges-table th:nth-child(2) { width: 9%; }
+table.charges-table th:nth-child(3) { width: 12%; }
+table.charges-table th:nth-child(4), table.charges-table th:nth-child(5) { width: 10%; }
+table.charges-table th:nth-child(6) { width: 15%; }
+table.charges-table th:nth-child(7) { width: 10%; }
+table.charges-table select.cell-select { font-size: 12px; }
+.pi-remark { margin-top: 16px; }
+.pi-remark textarea { width: 100%; resize: vertical; font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); }
+.badge-btn { cursor: pointer; font: inherit; }
+.badge-btn:hover { filter: brightness(.95); text-decoration: underline; }
 
 /* ── entry mode ───────────────────────────────────────────────────────── */
 

@@ -187,17 +187,40 @@
 <!-- 5 · purchase invoice ----------------------------------------------------->
 <section id="piPanel" class="panel hidden">
   <h2><span class="step">5</span> Purchase invoice</h2>
-  <div class="grid grid-3">
-    <label>Purchase ledger<select id="purchaseLedgerId"></select><small class="source" id="purchaseLedgerHint"></small></label>
-    <label>Freight (₹)<input id="freightAmount" type="number" min="0" step="0.01"></label>
-    <label>Round off (₹)<input id="roundOffAmount" type="number" step="0.01"></label>
-    <label id="freightRow">Freight ledger<select id="freightLedgerId"></select><small class="source" id="freightLedgerHint"></small></label>
+  <!-- the ERP's Purchase Invoice screen; History's copy is cloned from this -->
+  <div id="piScreen" class="pi-screen">
+    <div class="grid grid-5">
+      <label>Voucher No<input id="piVoucherNo" readonly placeholder="Given on save"></label>
+      <label>Voucher Date<input id="piVoucherDate" readonly></label>
+      <label>Supplier Name<input id="piSupplier" readonly></label>
+      <label>Purchase Ledger<select id="purchaseLedgerId"></select><small class="source" id="purchaseLedgerHint"></small></label>
+      <div class="pi-state"><span id="piState"></span><span>Country : India</span></div>
+    </div>
+    <div class="table-wrap"><table class="lines pi-grid" id="piLinesTable"></table></div>
+    <div class="pi-bottom">
+      <div class="pi-charges">
+        <label>Additional Charges
+          <span class="charge-add">
+            <select id="freightLedgerId"></select>
+            <button id="addChargeBtn" class="add-btn" type="button" title="Add this charge" aria-label="Add this charge">+</button>
+          </span>
+          <small class="source" id="freightLedgerHint"></small>
+        </label>
+        <table class="lines charges-table" id="chargesTable"></table>
+      </div>
+      <div class="grid grid-3 pi-sums">
+        <label>Basic Amount<input id="piBasic" readonly></label>
+        <label>Bill No.<input id="billNo"></label>
+        <label>Bill Date<input id="billDate" type="date"></label>
+        <label>Total Tax<input id="piTotalTax" readonly></label>
+        <label>Round Off A/C<input id="roundOffAmount" type="number" step="0.01"></label>
+        <label>Gross Amount<input id="piGross" readonly></label>
+        <label>D.Note No<input id="dnoteNo" readonly></label>
+      </div>
+    </div>
+    <label class="pi-remark">Remark<textarea id="piRemark" rows="2"></textarea></label>
+    <p class="hint" id="piNote"></p>
   </div>
-  <h3>Rates</h3>
-  <p class="hint">The GRN carries no rate; the purchase invoice does. Each line starts at its PO rate.</p>
-  <div class="table-wrap"><table class="lines" id="piLinesTable"></table></div>
-  <p class="hint" id="piNote"></p>
-  <div id="piTotals" class="totals"></div>
   <button id="previewBtn" class="primary">Preview the vouchers</button>
   <p id="piStatus" class="status"></p>
 </section>
@@ -236,7 +259,7 @@
     <button id="regLoad" class="primary" type="button">Show</button>
     <span class="hint" id="regSummary"></span>
   </div>
-  <div class="table-wrap scroll-box" id="regWrap"><table class="lines" id="registerTable"></table></div>
+  <div class="table-wrap scroll-box" id="regWrap"><table class="lines grid-table" id="registerTable"></table></div>
   <p id="registerStatus" class="status"></p>
 </section>
 
@@ -258,10 +281,23 @@
   <div class="post-row">
     <button id="geCheckBtn" class="primary" type="button">Check changes</button>
     <button id="geSaveBtn" type="button" disabled>Save to ERP</button>
+    <button id="geMakePiBtn" type="button" class="hidden">Make purchase invoice</button>
     <button id="geDeleteBtn" class="danger" type="button">Delete GRN</button>
     <button id="geCloseBtn" class="link" type="button">Close</button>
   </div>
   <p id="grnEditStatus" class="status"></p>
+</section>
+
+<section id="grnPiPanel" class="panel hidden">
+  <h2 id="grnPiTitle">Purchase invoice</h2>
+  <p class="hint" id="grnPiNote"></p>
+  <div id="gpScreenHost"></div>
+  <div class="post-row">
+    <button id="gpCheckBtn" class="primary" type="button">Check</button>
+    <button id="gpSaveBtn" type="button" disabled>Save to ERP</button>
+    <button id="gpCloseBtn" class="link" type="button">Close</button>
+  </div>
+  <p id="gpStatus" class="status"></p>
 </section>
 
 <section id="historyPanel" class="panel hidden">

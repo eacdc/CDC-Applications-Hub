@@ -343,7 +343,7 @@ async function loadReference() {
     return /freight/i.test(r.LedgerName || '');
   });
   fillSelect('freightLedgerId', freight, 'LedgerID',
-    function (r) { return r.LedgerName; }, null, 'None');
+    function (r) { return r.LedgerName; }, null, 'Choose a charge...');
 
   var supplierList = $('supplierList');
   supplierList.innerHTML = '';
@@ -646,6 +646,8 @@ async function loadDefaults() {
     setDefault('defaultWarehouse', 'warehouseHint', d.warehouse);
     setDefault('purchaseLedgerId', 'purchaseLedgerHint', d.purchaseLedger);
     setDefault('freightLedgerId', 'freightLedgerHint', d.freightLedger);
+    (state.charges || []).forEach(function (c) { if (!num(c.ledgerId)) c.ledgerId = num($('freightLedgerId').value); });
+    renderPiTotals();
     state.defaultWarehouseId = num($('defaultWarehouse').value);
     paintDefaultWarehouse();
     if (state.documentSet && state.documentSet.extractedLines) renderReceipt();
@@ -1331,8 +1333,19 @@ function fillGrnDetails(header) {
   $('gateEntryNo').value = text(header.gateEntryNo);
   $('gateEntryDate').value = localDateInput(header.gateEntryDate);
   $('vehicleNo').value = text(header.vehicleNo);
-  $('freightAmount').value = text(header.freight);
-  $('roundOffAmount').value = text(header.roundOff);
+  // The purchase invoice: Bill No. / Date default to the D.N.; the freight on
+  // an invoice read by AI becomes a row under Additional charges.
+  $('billNo').value = text(header.billNo || header.invoiceNo);
+  $('billDate').value = localDateInput(header.billDate || header.invoiceDate);
+  $('dnoteNo').value = text(header.invoiceNo);
+  $('piRemark').value = text(header.remark);
+  state.billNoDirty = Boolean(header.billNo && header.billNo !== header.invoiceNo);
+  var saved = state.documentSet && state.documentSet.context && state.documentSet.context.freightCharges;
+  state.charges = saved && saved.length
+    ? saved.map(function (f) { return { ledgerId: f.ledgerId, amount: f.amount }; })
+    : (num(header.freight) > 0 ? [{ ledgerId: num($('freightLedgerId').value), amount: num(header.freight) }] : []);
+  state.roundOffDirty = header.roundOff !== null && header.roundOff !== undefined && header.roundOff !== '';
+  $('roundOffAmount').value = state.roundOffDirty ? text(header.roundOff) : '';
 }
 
 function grnHeader() {
@@ -1342,8 +1355,11 @@ function grnHeader() {
     gateEntryNo: v('gateEntryNo'),
     gateEntryDate: v('gateEntryDate'),
     vehicleNo: v('vehicleNo'),
-    freight: num($('freightAmount').value),
+    freight: round2((state.charges || []).reduce(function (s, c) { return s + (num(c.amount) || 0); }, 0)),
     roundOff: num($('roundOffAmount').value),
+    billNo: v('billNo'),
+    billDate: v('billDate'),
+    remark: $('piRemark').value.trim(),
   };
   if (state.entryMode === 'manual') {
     out.invoiceNo = v('dnNo');
@@ -1358,115 +1374,259 @@ function postContext() {
     employeeLedgerId: num($('receivedBy').value),
     warehouseId: num($('defaultWarehouse').value),
     purchaseLedgerId: num($('purchaseLedgerId').value),
-    freightLedgerId: num($('freightLedgerId').value),
+    // The first freight row's ledger is the one check INV018 looks at.
+    freightLedgerId: ((state.charges || []).filter(function (c) { return num(c.amount) > 0; })[0] || {}).ledgerId || null,
+    freightCharges: (state.charges || []).filter(function (c) { return num(c.amount) > 0; })
+      .map(function (c) { return { ledgerId: num(c.ledgerId), amount: num(c.amount) }; }),
   };
 }
 
 /**
- * What the purchase invoice will carry, worked out from the lines the way the
- * writer does it: freight shared over the lines by value, GST on each line's
- * share at its HSN rate. It is the same in both modes - an AI-read invoice's
- * printed total is shown beside it, so a difference is visible before posting.
+ * The purchase invoice screen, laid out as the ERP's own: the lines grid, the
+ * Additional charges table, and the totals. One renderer for both places it
+ * appears - step 5 of a new GRN (ids as written), and History's "Make purchase
+ * invoice" for a GRN posted without one (the same ids with a "gp" prefix).
+ * The figures are worked out the way the writer does: freight shared over the
+ * lines by value, GST on each line's share at its HSN rate, the round-off to
+ * the nearest rupee unless someone types one.
  */
-/**
- * The purchase invoice's lines: quantity in the purchase unit (what is
- * billed), the PO rate, and the rate actually charged - editable, starting at
- * the PO rate. A rate off the PO rate is marked; check INV005 says the same.
- */
-var PI_COLUMNS = [
-  ['#', 'c-no'], ['P.O. No.', 'c-po'], ['Item Name', 'c-name'], ['Qty (P.U.)', 'c-qty num'],
-  ['Unit', 'c-unit'], ['PO rate', 'c-rate num'], ['Rate', 'c-rate num'], ['Amount', 'c-amt num'], ['GST %', 'c-gst num'],
+
+var GST_STATES = {
+  '01': 'Jammu and Kashmir', '02': 'Himachal Pradesh', '03': 'Punjab', '04': 'Chandigarh', '05': 'Uttarakhand',
+  '06': 'Haryana', '07': 'Delhi', '08': 'Rajasthan', '09': 'Uttar Pradesh', '10': 'Bihar', '11': 'Sikkim',
+  '12': 'Arunachal Pradesh', '13': 'Nagaland', '14': 'Manipur', '15': 'Mizoram', '16': 'Tripura', '17': 'Meghalaya',
+  '18': 'Assam', '19': 'West Bengal', '20': 'Jharkhand', '21': 'Odisha', '22': 'Chhattisgarh', '23': 'Madhya Pradesh',
+  '24': 'Gujarat', '26': 'Dadra and Nagar Haveli and Daman and Diu', '27': 'Maharashtra', '29': 'Karnataka', '30': 'Goa',
+  '31': 'Lakshadweep', '32': 'Kerala', '33': 'Tamil Nadu', '34': 'Puducherry', '35': 'Andaman and Nicobar Islands',
+  '36': 'Telangana', '37': 'Andhra Pradesh', '38': 'Ladakh',
+};
+
+function round2(v) { return Math.round((Number(v) || 0) * 100) / 100; }
+function pctText(v) { var n = num(v); return n === null ? '' : n.toFixed(2); }
+// The grid's amounts as the ERP's grid shows them: plain, two places, no commas.
+function amt(v) { var n = num(v); return n === null ? '' : n.toFixed(2); }
+
+function freightLedgers() {
+  return (state.reference.chargeLedgers || []).filter(function (r) { return /freight/i.test(r.LedgerName || ''); });
+}
+
+/** Per-line and total figures, as the writer will write them. */
+function computePi(lines, charges, roundOff) {
+  var basics = lines.map(function (l) {
+    var q = num(l.qty); var r = num(l.rate);
+    return q !== null && r !== null ? round2(q * r) : 0;
+  });
+  var basic = round2(basics.reduce(function (s, b) { return s + b; }, 0));
+  var freight = round2((charges || []).reduce(function (s, c) { return s + (num(c.amount) || 0); }, 0));
+  var shared = 0;
+  var rows = lines.map(function (l, i) {
+    var share = i === lines.length - 1 ? round2(freight - shared) : round2(basic > 0 ? freight * basics[i] / basic : 0);
+    shared = round2(shared + share);
+    var taxable = round2(basics[i] + share);
+    var c = round2(taxable * (num(l.cgstPercentage) || 0) / 100);
+    var s = round2(taxable * (num(l.sgstPercentage) || 0) / 100);
+    var g = round2(taxable * (num(l.igstPercentage) || 0) / 100);
+    return { basic: basics[i], share: share, taxable: taxable, cgst: c, sgst: s, igst: g, total: round2(taxable + c + s + g) };
+  });
+  var sum = function (k) { return round2(rows.reduce(function (t, r) { return t + r[k]; }, 0)); };
+  var cgst = sum('cgst'); var sgst = sum('sgst'); var igst = sum('igst');
+  var net = round2(basic + freight + cgst + sgst + igst);
+  var autoRoundOff = round2(Math.round(net) - net);
+  var ro = roundOff === null || roundOff === undefined ? autoRoundOff : round2(roundOff);
+  return { rows: rows, basic: basic, freight: freight, cgst: cgst, sgst: sgst, igst: igst,
+    tax: round2(cgst + sgst + igst), net: net, autoRoundOff: autoRoundOff, roundOff: ro, gross: round2(net + ro) };
+}
+
+var PI_GRID = [
+  ['P.O. No.', function (l) { return text(l.poVoucherNo); }],
+  ['P.O. Date', function (l) { return displayDate(l.poDate); }],
+  ['Item Code', function (l) { return text(l.itemCode); }],
+  ['Item Name', function (l) { return text(l.itemName || l.description); }],
+  ['Purchase Qty', function (l) { return qtyText(l.poQty); }, 'num'],
+  ['Stock Unit', function (l) { return text(l.stockUnit); }],
+  ['Receipt Qty', function (l) { return qtyText(l.qty); }, 'num'],
+  ['Rate', null, 'num'],
+  ['Purchase Unit', function (l) { return text(l.purchaseUnit || l.uom); }],
+  ['Basic Amt', function (l, c) { return amt(c.basic); }, 'num'],
+  ['Width', function (l) { return qtyText(l.widthMm); }, 'num'],
+  ['GST %', function (l) { return pctText(l.gstPercentage); }, 'num'],
+  ['CGST %', function (l) { return pctText(l.cgstPercentage); }, 'num'],
+  ['SGST %', function (l) { return pctText(l.sgstPercentage); }, 'num'],
+  ['IGST %', function (l) { return pctText(l.igstPercentage); }, 'num'],
+  ['CGST Amt', function (l, c) { return amt(c.cgst); }, 'num'],
+  ['SGST Amt', function (l, c) { return amt(c.sgst); }, 'num'],
+  ['IGST Amt', function (l, c) { return amt(c.igst); }, 'num'],
+  ['Total Amt', function (l, c) { return amt(c.total); }, 'num'],
+  ['Narration', function (l) { return text(l.itemName || l.description); }],
+  ['F-Year', function (l) { return text(l.poFYear); }],
+  ['Group Name', function (l) { return text(l.itemGroupName); }],
+  ['HSN Code', function (l) { return text(l.expectedHsn || l.hsn); }],
+  ['Landed Price', function (l) { return amt(l.rate); }, 'num'],
 ];
 
-function renderPiLines() {
-  var table = $('piLinesTable');
+/**
+ * Draw the screen. `m` is the model: {lines, charges, roundOffDirty,
+ * supplierName, supplierGstin, onRate(line, value), onChange(), printedTotal}.
+ * Returns the figures.
+ */
+function renderPiScreen(p, m) {
+  var id = function (name) { return $(p + name); };
+  id('piVoucherDate').value = displayDate(new Date());
+  id('piSupplier').value = text(m.supplierName);
+  var code = String(m.supplierGstin || '').trim().slice(0, 2);
+  id('piState').textContent = GST_STATES[code] ? 'State : ' + GST_STATES[code] : '';
+
+  var typed = m.roundOffDirty ? num(id('roundOffAmount').value) : null;
+  var c = computePi(m.lines, m.charges, typed);
+  if (!m.roundOffDirty) id('roundOffAmount').value = c.roundOff.toFixed(2);
+
+  // the lines
+  var table = id('piLinesTable');
   table.innerHTML = '';
   var head = table.insertRow();
-  PI_COLUMNS.forEach(function (c) { head.appendChild(el('th', c[1], c[0])); });
-  var lines = (state.documentSet && state.documentSet.extractedLines) || [];
-  if (!lines.length) {
+  PI_GRID.forEach(function (col) { head.appendChild(el('th', col[2] || null, col[0])); });
+  if (!m.lines.length) {
     var empty = table.insertRow().insertCell();
-    empty.colSpan = PI_COLUMNS.length;
+    empty.colSpan = PI_GRID.length;
     empty.className = 'empty';
-    empty.textContent = 'No lines yet.';
-    return;
+    empty.textContent = 'No lines on a PO yet.';
   }
-  lines.forEach(function (line) {
+  m.lines.forEach(function (line, i) {
     var row = table.insertRow();
-    if (!line.matchedPoTransactionId) row.className = 'unmatched';
-    else if (line.matchedPoClosed) row.className = 'closed';
-    row.insertCell().textContent = text(line.lineNo);
-    row.insertCell().textContent = line.poVoucherNo || '- no PO -';
-    var name = row.insertCell(); name.className = 'wrap'; name.textContent = text(line.itemName || line.description);
-    var q = row.insertCell(); q.className = 'num'; q.textContent = qtyText(line.qty);
-    row.insertCell().textContent = text(line.purchaseUnit || line.uom);
-    var po = row.insertCell(); po.className = 'num'; po.textContent = money(line.matchedPoRate);
-
-    var off = num(line.matchedPoRate) !== null && num(line.rate) !== null
-      && Math.abs(num(line.rate) - num(line.matchedPoRate)) > 0.01;
-    var rateCell = row.insertCell(); rateCell.className = 'num';
-    var input = el('input', 'cell-input' + (off ? ' needs' : ''));
-    input.type = 'number';
-    input.min = '0';
-    input.step = '0.01';
-    input.value = text(line.rate);
-    input.title = off ? 'Not the PO rate of ' + money(line.matchedPoRate) : 'Rate';
-    input.dataset.field = 'rate';
-    input.dataset.line = line.lineNo;
-    input.setAttribute('aria-label', 'Rate, line ' + line.lineNo);
-    input.addEventListener('change', function () { editLine(line.lineNo, { rate: num(input.value) }, 'piStatus'); });
-    rateCell.appendChild(input);
-
-    var amt = row.insertCell(); amt.className = 'num'; amt.textContent = money(line.amount);
-    var gst = row.insertCell(); gst.className = 'num'; gst.textContent = qtyText(line.gstPercentage);
+    PI_GRID.forEach(function (col) {
+      var cell = row.insertCell();
+      if (col[2]) cell.className = col[2];
+      if (col[0] === 'Rate') {
+        var off = num(line.matchedPoRate) !== null && num(line.rate) !== null
+          && Math.abs(num(line.rate) - num(line.matchedPoRate)) > 0.01;
+        var input = el('input', 'cell-input' + (off ? ' needs' : ''));
+        input.type = 'number'; input.min = '0'; input.step = '0.01';
+        input.value = text(line.rate);
+        input.title = off ? 'Not the PO rate of ' + money(line.matchedPoRate) : 'PO rate ' + money(line.matchedPoRate);
+        input.dataset.field = 'rate';
+        input.dataset.line = line.lineNo;
+        input.setAttribute('aria-label', 'Rate, line ' + line.lineNo);
+        input.addEventListener('change', function () { m.onRate(line, num(input.value)); });
+        cell.appendChild(input);
+        return;
+      }
+      var v = col[1](line, c.rows[i]);
+      cell.textContent = v;
+      cell.title = v;
+    });
   });
+
+  // Additional charges: the GST rows fill themselves; freight rows are added.
+  var ct = id('chargesTable');
+  ct.innerHTML = '';
+  var ch = ct.insertRow();
+  ['Tax Ledger', 'Tax %', 'Calcu. ON', 'GST Applic.', 'In Amount', 'Amount', ''].forEach(function (h, k) {
+    ch.appendChild(el('th', k === 1 || k === 5 ? 'num' : null, h));
+  });
+  var tick = function (on) { var b = el('input'); b.type = 'checkbox'; b.checked = on; b.disabled = true; return b; };
+  [['CGST', c.cgst], ['SGST', c.sgst], ['IGST', c.igst]].forEach(function (t) {
+    if (!(t[1] > 0)) return;
+    var r = ct.insertRow();
+    r.insertCell().textContent = t[0];
+    var pc = r.insertCell(); pc.className = 'num'; pc.textContent = '0';
+    r.insertCell().textContent = 'Value';
+    r.insertCell().appendChild(tick(true));
+    r.insertCell().appendChild(tick(false));
+    var a = r.insertCell(); a.className = 'num'; a.textContent = money(t[1]);
+    r.insertCell();
+  });
+  (m.charges || []).forEach(function (f, k) {
+    var r = ct.insertRow();
+    var lc = r.insertCell();
+    var sel = el('select', 'cell-select');
+    var none = el('option', null, 'Choose...'); none.value = ''; sel.appendChild(none);
+    freightLedgers().forEach(function (L) {
+      var o = el('option', null, L.LedgerName); o.value = L.LedgerID;
+      if (String(L.LedgerID) === String(f.ledgerId)) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', function () { f.ledgerId = num(sel.value); m.onChange(); });
+    lc.appendChild(sel);
+    var ledger = freightLedgers().filter(function (L) { return String(L.LedgerID) === String(f.ledgerId); })[0];
+    var pc = r.insertCell(); pc.className = 'num';
+    pc.textContent = ledger ? (/inward\s+freight/i.test(ledger.LedgerName) ? '18' : '0') : '';
+    r.insertCell().textContent = 'Value';
+    r.insertCell().appendChild(tick(true));
+    r.insertCell().appendChild(tick(true));
+    var ac = r.insertCell(); ac.className = 'num';
+    var amt = el('input', 'cell-input' + (num(f.amount) > 0 ? '' : ' needs'));
+    amt.type = 'number'; amt.min = '0'; amt.step = '0.01';
+    amt.value = text(f.amount);
+    amt.dataset.charge = k;
+    amt.setAttribute('aria-label', 'Freight amount');
+    amt.addEventListener('change', function () { f.amount = num(amt.value); m.onChange(); });
+    ac.appendChild(amt);
+    var dc = r.insertCell();
+    var del = el('button', 'link danger-link', 'Delete'); del.type = 'button';
+    del.addEventListener('click', function () { m.charges.splice(k, 1); m.onChange(); });
+    dc.appendChild(del);
+  });
+  if (ct.rows.length === 1) {
+    var e2 = ct.insertRow().insertCell();
+    e2.colSpan = 7; e2.className = 'empty'; e2.textContent = 'No tax or charges yet.';
+  }
+
+  id('piBasic').value = money(c.basic);
+  id('piTotalTax').value = money(c.tax);
+  id('piGross').value = money(c.gross);
+
+  var notes = [];
+  var noRate = m.lines.filter(function (l) { return l.gstPercentage === null || l.gstPercentage === undefined; })
+    .map(function (l) { return l.lineNo; });
+  if (noRate.length) notes.push('No GST rate for line ' + lineNoList(noRate) + ": the supplier's state is not known, so the tax could not be split.");
+  if (m.printedTotal !== null && m.printedTotal !== undefined && m.lines.length) {
+    var diff = round2(c.gross - m.printedTotal);
+    notes.push(Math.abs(diff) < 0.01
+      ? 'Agrees with the invoice total of ₹' + money(m.printedTotal) + '.'
+      : 'The invoice total is ₹' + money(m.printedTotal) + '; this comes to ₹' + money(c.gross)
+        + ' (' + (diff > 0 ? '+' : '') + money(diff) + ').');
+  }
+  id('piNote').textContent = notes.join(' ');
+  return c;
+}
+
+/** Add the charge chosen in the Additional Charges list as a freight row. */
+function addCharge(p, charges, onChange) {
+  var ledgerId = num($(p + 'freightLedgerId').value);
+  if (!ledgerId) return;
+  charges.push({ ledgerId: ledgerId, amount: null });
+  onChange();
+  var inputs = $(p + 'chargesTable').querySelectorAll('input[data-charge]');
+  if (inputs.length) inputs[inputs.length - 1].focus();
+}
+
+// Step 5 of a new GRN.
+
+function supplierGstinFor(ledgerId) {
+  var s = supplierById(ledgerId);
+  return s ? (s.GSTNo || s.GSTIN || '') : '';
+}
+
+function newGrnPiModel() {
+  var set = state.documentSet || {};
+  var h = set.extractedHeader || {};
+  var supplierId = set.context && set.context.supplierLedgerId;
+  var sup = supplierById(supplierId);
+  return {
+    lines: (set.extractedLines || []).filter(function (l) { return l.matchedPoTransactionId && !l.matchedPoClosed; }),
+    charges: state.charges,
+    roundOffDirty: state.roundOffDirty,
+    supplierName: sup ? sup.LedgerName : '',
+    supplierGstin: h.supplierGstin || supplierGstinFor(supplierId),
+    printedTotal: state.entryMode === 'ai' ? num(h.grandTotal) : null,
+    onRate: function (line, v) { editLine(line.lineNo, { rate: v }, 'piStatus'); },
+    onChange: function () { hide('previewPanel'); renderPiTotals(); },
+  };
 }
 
 function renderPiTotals() {
-  renderPiLines();
-  var set = state.documentSet || {};
-  var h = set.extractedHeader || {};
-  var lines = (set.extractedLines || []).filter(function (l) { return l.matchedPoTransactionId && !l.matchedPoClosed; });
-  var gross = lines.reduce(function (s, l) { return s + (num(l.amount) || 0); }, 0);
-  var freight = num($('freightAmount').value) || 0;
-  var roundOff = num($('roundOffAmount').value) || 0;
-  var cgst = 0; var sgst = 0; var igst = 0; var noRate = [];
-  lines.forEach(function (l) {
-    var g = num(l.amount) || 0;
-    var taxable = g + (gross > 0 ? freight * g / gross : 0);
-    if (l.gstPercentage === null || l.gstPercentage === undefined) noRate.push(l.lineNo);
-    cgst += taxable * (num(l.cgstPercentage) || 0) / 100;
-    sgst += taxable * (num(l.sgstPercentage) || 0) / 100;
-    igst += taxable * (num(l.igstPercentage) || 0) / 100;
-  });
-  var total = gross + freight + cgst + sgst + igst + roundOff;
-
-  $('freightRow').classList.toggle('hidden', !(freight > 0));
-  var host = $('piTotals');
-  host.innerHTML = '';
-  [['Sub total', gross], ['Freight', freight], ['CGST', cgst], ['SGST', sgst],
-    ['IGST', igst], ['Round off', roundOff], ['Total', total]].forEach(function (pair) {
-    if (pair[0] !== 'Total' && pair[0] !== 'Sub total' && !(Math.abs(pair[1]) > 0.0049)) return;
-    var item = el('div', 'total' + (pair[0] === 'Total' ? ' grand' : ''));
-    item.appendChild(el('span', null, pair[0]));
-    item.appendChild(el('b', null, '₹' + money(pair[1])));
-    host.appendChild(item);
-  });
-
-  var notes = [];
-  if (noRate.length) {
-    notes.push('No GST rate for line ' + lineNoList(noRate) + ': the supplier\'s state is not known, '
-      + 'so the tax could not be split.');
-  }
-  var printed = num(h.grandTotal);
-  if (state.entryMode === 'ai' && printed !== null && lines.length) {
-    var diff = Math.round((total - printed) * 100) / 100;
-    notes.push(Math.abs(diff) < 0.01
-      ? 'Agrees with the invoice total of ₹' + money(printed) + '.'
-      : 'The invoice total is ₹' + money(printed) + '; these lines come to ₹' + money(total)
-        + ' (' + (diff > 0 ? '+' : '') + money(diff) + ').');
-  }
-  $('piNote').textContent = notes.join(' ');
+  state.charges = state.charges || [];
+  return renderPiScreen('', newGrnPiModel());
 }
 
 // -- 6 · preview and post ---------------------------------------------------
@@ -1480,7 +1640,9 @@ function missingForPost() {
   if (!$('receivedBy').value) missing.push('received by');
   if (!$('defaultWarehouse').value) missing.push('warehouse');
   if (!$('purchaseLedgerId').value) missing.push('purchase ledger');
-  if ((num($('freightAmount').value) || 0) > 0 && !$('freightLedgerId').value) missing.push('freight ledger');
+  if ((state.charges || []).some(function (c) { return num(c.amount) > 0 && !num(c.ledgerId); })) missing.push('a ledger on every freight row');
+  if ((state.charges || []).some(function (c) { return num(c.ledgerId) && !(num(c.amount) > 0); })) missing.push('the amount on every freight row');
+  if (!$('billNo').value.trim()) missing.push('bill no.');
   return missing;
 }
 
@@ -1634,11 +1796,27 @@ function supplierIdFrom(value) {
   return m ? m[1] : '';
 }
 
+// Each column says what it shows as text: the same text its search box matches.
 var REGISTER_COLUMNS = [
-  ['GRN No.', 'c-grn'], ['Date', 'c-date'], ['Supplier', 'c-sup'], ['D.N. No.', 'c-dn'], ['D.N. Date', 'c-date'],
-  ['Lines', 'c-n num'], ['Qty (S.U.)', 'c-q num'], ['Issued', 'c-iss'], ['Purchase invoice', 'c-pi'],
-  ['Made in', 'c-made'], ['Created by', 'c-by'], ['', 'c-act'],
+  { key: 'voucherNo', label: 'GRN No.', cls: 'c-grn' },
+  { key: 'voucherDate', label: 'Date', cls: 'c-date', value: function (g) { return displayDate(g.voucherDate); } },
+  { key: 'supplierName', label: 'Supplier', cls: 'c-sup' },
+  { key: 'deliveryNoteNo', label: 'D.N. No.', cls: 'c-dn' },
+  { key: 'deliveryNoteDate', label: 'D.N. Date', cls: 'c-date', value: function (g) { return displayDate(g.deliveryNoteDate); } },
+  { key: 'lines', label: 'Lines', cls: 'c-n num' },
+  { key: 'stockQty', label: 'Qty (S.U.)', cls: 'c-q num', value: function (g) { return qtyText(g.stockQty) + (g.stockUnit ? ' ' + g.stockUnit : ''); } },
+  { key: 'issued', label: 'Issued', cls: 'c-iss', options: ['None', 'Part', 'Full'], value: function (g) { return g.issued === 'none' ? 'None' : g.issued === 'full' ? 'Full' : 'Part'; } },
+  { key: 'piVoucherNo', label: 'Purchase invoice', cls: 'c-pi', value: function (g) {
+    return g.piVoucherNo ? g.piVoucherNo + (g.purchaseInvoices > 1 ? ' +' + (g.purchaseInvoices - 1) : '') : 'Not made';
+  } },
+  { key: 'madeIn', label: 'Made in', cls: 'c-made', options: ['ERP', 'GRN Creator'] },
+  { key: 'createdByName', label: 'Created by', cls: 'c-by' },
+  { key: 'actions', label: '', cls: 'c-act', noFilter: true },
 ];
+
+function registerValue(col, g) {
+  return col.value ? col.value(g) : text(g[col.key]);
+}
 
 async function loadRegister() {
   var params = ['from=' + encodeURIComponent($('regFrom').value), 'to=' + encodeURIComponent($('regTo').value)];
@@ -1665,68 +1843,111 @@ async function loadRegister() {
 function renderRegister() {
   var reg = state.register || { grns: [] };
   var table = $('registerTable');
-  table.innerHTML = '';
-  var thead = table.createTHead();
-  var head = thead.insertRow();
-  REGISTER_COLUMNS.forEach(function (c) { head.appendChild(el('th', c[1], c[0])); });
-  var body = table.createTBody();
+  state.regFilters = state.regFilters || {};
+
+  // The head, with a search box under every heading, is built once, so
+  // typing in one does not lose the cursor.
+  if (!table.tHead) {
+    var thead = table.createTHead();
+    var labels = thead.insertRow();
+    var filters = thead.insertRow();
+    filters.className = 'filter-row';
+    REGISTER_COLUMNS.forEach(function (col) {
+      labels.appendChild(el('th', col.cls, col.label));
+      var th = el('th');
+      if (col.options) {
+        // A few fixed values: a list to pick from, not a box to type in.
+        var pick = el('select', 'filter');
+        pick.setAttribute('aria-label', 'Filter ' + col.label);
+        var any = el('option', null, 'All'); any.value = ''; pick.appendChild(any);
+        col.options.forEach(function (v) { var o = el('option', null, v); o.value = v; pick.appendChild(o); });
+        pick.value = state.regFilters[col.key] || '';
+        pick.addEventListener('change', function () {
+          state.regFilters[col.key] = pick.value;
+          renderRegister();
+        });
+        th.appendChild(pick);
+      } else if (!col.noFilter) {
+        var input = el('input', 'filter');
+        input.placeholder = 'Search';
+        input.setAttribute('aria-label', 'Search ' + col.label);
+        input.value = state.regFilters[col.key] || '';
+        input.addEventListener('input', function () {
+          state.regFilters[col.key] = input.value;
+          renderRegister();
+        });
+        th.appendChild(input);
+      }
+      filters.appendChild(th);
+    });
+  }
+
+  var body = table.tBodies[0] || table.createTBody();
+  body.innerHTML = '';
 
   var grns = reg.grns || [];
-  var issued = grns.filter(function (g) { return g.issued !== 'none'; }).length;
-  var noPi = grns.filter(function (g) { return !g.piVoucherNo; }).length;
+  var shown = grns.filter(function (g) {
+    return REGISTER_COLUMNS.every(function (col) {
+      var f = (state.regFilters[col.key] || '').trim().toLowerCase();
+      if (!f) return true;
+      var v = registerValue(col, g).toLowerCase();
+      return col.options ? v === f : v.indexOf(f) !== -1;
+    });
+  });
+  var issued = shown.filter(function (g) { return g.issued !== 'none'; }).length;
+  var noPi = shown.filter(function (g) { return !g.piVoucherNo; }).length;
   $('regSummary').textContent = grns.length
-    ? grns.length + ' GRN' + (grns.length === 1 ? '' : 's') + (reg.truncated ? ' (the newest 500 - narrow the dates for the rest)' : '')
+    ? (shown.length === grns.length ? '' : shown.length + ' of ')
+      + grns.length + ' GRN' + (grns.length === 1 ? '' : 's') + (reg.truncated ? ' (the newest 500 - narrow the dates for the rest)' : '')
       + ' - ' + issued + ' issued from, ' + noPi + ' without a purchase invoice.'
       + (reg.canEdit ? '' : ' You can view them; editing is for the people named in SP_GRN_EDITORS.')
     : '';
 
-  if (!grns.length) {
+  if (!shown.length) {
     var c = body.insertRow().insertCell();
     c.colSpan = REGISTER_COLUMNS.length;
     c.className = 'empty';
-    c.textContent = 'No GRNs in this range.';
+    c.textContent = grns.length ? 'No GRN matches the search.' : 'No GRNs in this range.';
     sizeRegisterBox();
     return;
   }
 
-  grns.forEach(function (g) {
+  shown.forEach(function (g) {
     var row = body.insertRow();
-    row.insertCell().textContent = g.voucherNo;
-    row.insertCell().textContent = displayDate(g.voucherDate);
-    var sup = row.insertCell(); sup.textContent = text(g.supplierName); sup.title = text(g.supplierName);
-    var dn = row.insertCell(); dn.textContent = text(g.deliveryNoteNo); dn.title = text(g.deliveryNoteNo);
-    row.insertCell().textContent = displayDate(g.deliveryNoteDate);
-    var n = row.insertCell(); n.className = 'num'; n.textContent = text(g.lines);
-    var q = row.insertCell(); q.className = 'num'; q.textContent = qtyText(g.stockQty) + (g.stockUnit ? ' ' + g.stockUnit : '');
-
-    var iss = row.insertCell();
-    var label = g.issued === 'none' ? 'None' : g.issued === 'full' ? 'Full' : 'Part';
-    var tag = el('span', 'badge state-' + g.issued, label);
-    if (g.issued !== 'none') tag.title = qtyText(g.issuedQty) + ' issued from ' + g.linesIssued + ' line(s), on ' + g.issues + ' issue(s)';
-    iss.appendChild(tag);
-
-    var pi = row.insertCell();
-    if (g.piVoucherNo) pi.textContent = g.piVoucherNo + (g.purchaseInvoices > 1 ? ' +' + (g.purchaseInvoices - 1) : '');
-    else pi.appendChild(el('span', 'badge state-nopi', 'Not made'));
-
-    row.insertCell().textContent = g.madeIn;
-    var by = row.insertCell(); by.textContent = text(g.createdByName); by.title = text(g.createdByName);
-
-    var act = row.insertCell();
-    act.className = 'row-actions';
-    var open = el('button', 'link', reg.canEdit ? 'Edit' : 'View');
-    open.type = 'button';
-    open.addEventListener('click', function () { openGrn(g.transactionId); });
-    act.appendChild(open);
-    if (reg.canEdit) {
-      var del = el('button', 'link danger-link', 'Delete');
-      del.type = 'button';
-      var why = g.piVoucherNo ? 'Purchase invoice ' + g.piVoucherNo + ' is made from it. Delete that in the ERP first.'
-        : g.issued !== 'none' ? 'Stock has been issued from it. Delete those issue lines first.' : '';
-      if (why) { del.disabled = true; del.title = why; }
-      del.addEventListener('click', function () { removeGrn(g.transactionId, g.voucherNo); });
-      act.appendChild(del);
-    }
+    REGISTER_COLUMNS.forEach(function (col) {
+      var cell = row.insertCell();
+      if (/\bnum\b/.test(col.cls)) cell.className = 'num';
+      var shownText = col.noFilter ? '' : registerValue(col, g);
+      if (col.key === 'issued') {
+        var tag = el('span', 'badge state-' + g.issued, shownText);
+        if (g.issued !== 'none') tag.title = qtyText(g.issuedQty) + ' issued from ' + g.linesIssued + ' line(s), on ' + g.issues + ' issue(s)';
+        cell.appendChild(tag);
+      } else if (col.key === 'piVoucherNo' && !g.piVoucherNo) {
+        var make = el('button', 'badge state-nopi badge-btn', shownText);
+        make.type = 'button';
+        make.title = 'Make the purchase invoice for ' + g.voucherNo;
+        make.addEventListener('click', function () { openGrnPi(g.transactionId); });
+        cell.appendChild(make);
+      } else if (col.key === 'actions') {
+        cell.className = 'row-actions';
+        var open = el('button', 'link', reg.canEdit ? 'Edit' : 'View');
+        open.type = 'button';
+        open.addEventListener('click', function () { openGrn(g.transactionId); });
+        cell.appendChild(open);
+        if (reg.canEdit) {
+          var del = el('button', 'link danger-link', 'Delete');
+          del.type = 'button';
+          var why = g.piVoucherNo ? 'Purchase invoice ' + g.piVoucherNo + ' is made from it. Delete that in the ERP first.'
+            : g.issued !== 'none' ? 'Stock has been issued from it. Delete those issue lines first.' : '';
+          if (why) { del.disabled = true; del.title = why; }
+          del.addEventListener('click', function () { removeGrn(g.transactionId, g.voucherNo); });
+          cell.appendChild(del);
+        }
+      } else {
+        cell.textContent = shownText;
+        cell.title = shownText;
+      }
+    });
   });
   sizeRegisterBox();
 }
@@ -1866,6 +2087,8 @@ function renderGrnEdit() {
   $('geCheckBtn').classList.toggle('hidden', !editable);
   $('geSaveBtn').classList.toggle('hidden', !editable);
   $('geDeleteBtn').classList.toggle('hidden', !editable);
+  // Anyone who may post a GRN may make its purchase invoice.
+  $('geMakePiBtn').classList.toggle('hidden', g.purchaseInvoices.length > 0);
   $('geDeleteBtn').disabled = Boolean(g.deleteLocked);
   $('geDeleteBtn').title = g.deleteLocked || '';
 }
@@ -1998,6 +2221,119 @@ async function removeGrn(transactionId, voucherNo) {
   }
 }
 
+// -- History: a purchase invoice for a GRN posted without one --------------
+
+function gpModel() {
+  var d = state.gp.draft;
+  return {
+    lines: d.lines.map(function (l) {
+      var r = state.gp.rates[l.transactionDetailId];
+      return Object.assign({}, l, { rate: r !== undefined ? r : l.rate });
+    }),
+    charges: state.gp.charges,
+    roundOffDirty: state.gp.roundOffDirty,
+    supplierName: d.supplierName,
+    supplierGstin: supplierGstinFor(d.supplierLedgerId),
+    printedTotal: null,
+    onRate: function (line, v) { state.gp.rates[line.transactionDetailId] = v; gpChanged(); },
+    onChange: gpChanged,
+  };
+}
+
+function gpChanged() {
+  $('gpSaveBtn').disabled = true;
+  $('gppiVoucherNo').value = '';
+  renderPiScreen('gp', gpModel());
+}
+
+async function openGrnPi(transactionId) {
+  show('grnPiPanel');
+  setStatus('gpStatus', 'Opening...');
+  $('gpSaveBtn').disabled = true;
+  try {
+    var d = await api('/receiving/grns/' + transactionId + '/purchase-invoice');
+    state.gp = { draft: d, rates: {}, charges: [], roundOffDirty: false };
+    $('grnPiTitle').textContent = 'Purchase invoice for ' + d.voucherNo;
+    $('grnPiNote').textContent = 'The lines are ' + d.voucherNo + "'s own, at their PO rates; change a rate if the bill differs."
+      + (d.writesEnabled ? '' : ' ERP writes are off: Check shows what would be written, and nothing is saved.');
+    var pl = d.defaults && d.defaults.purchaseLedger;
+    var fl = d.defaults && d.defaults.freightLedger;
+    fillSelect('gppurchaseLedgerId', state.reference.purchaseLedgers, 'LedgerID', function (r) { return r.LedgerName; },
+      pl ? pl.ledgerId : null, 'Choose...');
+    $('gppurchaseLedgerHint').textContent = pl ? 'From ' + pl.source : '';
+    fillSelect('gpfreightLedgerId', freightLedgers(), 'LedgerID', function (r) { return r.LedgerName; },
+      fl ? fl.ledgerId : null, 'Choose a charge...');
+    $('gpfreightLedgerHint').textContent = fl ? 'From ' + fl.source : '';
+    $('gpbillNo').value = text(d.deliveryNoteNo);
+    $('gpbillDate').value = localDateInput(d.deliveryNoteDate);
+    $('gpdnoteNo').value = text(d.deliveryNoteNo);
+    $('gppiRemark').value = '';
+    $('gproundOffAmount').value = '';
+    gpChanged();
+    setStatus('gpStatus', '', null);
+    $('grnPiPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (err) {
+    setStatus('gpStatus', err.message, 'error');
+  }
+}
+
+function gpBody() {
+  var charges = state.gp.charges.filter(function (c) { return num(c.amount) > 0; });
+  return {
+    purchaseLedgerId: num($('gppurchaseLedgerId').value),
+    billNo: $('gpbillNo').value.trim(),
+    billDate: $('gpbillDate').value || null,
+    remark: $('gppiRemark').value.trim(),
+    roundOff: num($('gproundOffAmount').value),
+    freightCharges: charges.map(function (c) { return { ledgerId: num(c.ledgerId), amount: num(c.amount) }; }),
+    rates: state.gp.rates,
+  };
+}
+
+function gpMissing() {
+  var missing = [];
+  if (!$('gppurchaseLedgerId').value) missing.push('purchase ledger');
+  if (!$('gpbillNo').value.trim()) missing.push('bill no.');
+  if (state.gp.charges.some(function (c) { return num(c.amount) > 0 && !num(c.ledgerId); })) missing.push('a ledger on every freight row');
+  if (state.gp.charges.some(function (c) { return num(c.ledgerId) && !(num(c.amount) > 0); })) missing.push('the amount on every freight row');
+  return missing;
+}
+
+async function checkGrnPi() {
+  var missing = gpMissing();
+  if (missing.length) { setStatus('gpStatus', 'Still needed: ' + missing.join(', ') + '.', 'error'); return; }
+  setStatus('gpStatus', 'Checking...');
+  try {
+    var r = await api('/receiving/grns/' + state.gp.draft.transactionId + '/purchase-invoice?dryRun=true', { method: 'POST', body: gpBody() });
+    $('gppiVoucherNo').value = r.pi.voucherNo;
+    var shown = computePi(gpModel().lines, state.gp.charges, num($('gproundOffAmount').value));
+    var agree = Math.abs(r.totals.netAmount - shown.gross) < 0.01;
+    $('gpSaveBtn').disabled = !r.writesEnabled;
+    setStatus('gpStatus', (agree ? 'The server agrees: ₹' + money(r.totals.netAmount) + '. '
+      : 'The server makes it ₹' + money(r.totals.netAmount) + ', not ₹' + money(shown.gross) + '. ')
+      + (r.writesEnabled ? 'Save to ERP to make it.' : 'ERP writes are off, so nothing has been saved.'),
+      agree && r.writesEnabled ? 'ok' : 'warn');
+  } catch (err) {
+    setStatus('gpStatus', err.message, 'error');
+  }
+}
+
+async function saveGrnPi() {
+  if (!window.confirm('Make the purchase invoice for ' + state.gp.draft.voucherNo + ' in the ERP?')) return;
+  $('gpSaveBtn').disabled = true;
+  setStatus('gpStatus', 'Saving...');
+  try {
+    var r = await api('/receiving/grns/' + state.gp.draft.transactionId + '/purchase-invoice', { method: 'POST', body: gpBody() });
+    setStatus('registerStatus', 'Purchase invoice ' + r.pi.voucherNo + ' made for ' + state.gp.draft.voucherNo + '.', 'ok');
+    hide('grnPiPanel');
+    if (state.grn && state.grn.transactionId === state.gp.draft.transactionId) openGrn(state.grn.transactionId);
+    state.gp = null;
+    loadRegister();
+  } catch (err) {
+    setStatus('gpStatus', err.message, 'error');
+  }
+}
+
 // -- testing cleanup --------------------------------------------------------
 
 /**
@@ -2060,7 +2396,29 @@ $('rematchBtn').addEventListener('click', function () {
 });
 $('previewBtn').addEventListener('click', preview);
 $('startManualBtn').addEventListener('click', startManual);
-['freightAmount', 'roundOffAmount'].forEach(function (id) { $(id).addEventListener('input', renderPiTotals); });
+// History's purchase invoice screen is a copy of step 5's, ids prefixed "gp".
+$('gpScreenHost').innerHTML = $('piScreen').outerHTML.replace(/\bid="/g, 'id="gp');
+$('roundOffAmount').addEventListener('input', function () { state.roundOffDirty = $('roundOffAmount').value !== ''; hide('previewPanel'); renderPiTotals(); });
+$('addChargeBtn').addEventListener('click', function () {
+  state.charges = state.charges || [];
+  addCharge('', state.charges, function () { hide('previewPanel'); renderPiTotals(); });
+});
+$('billNo').addEventListener('input', function () { state.billNoDirty = true; });
+// A D.N. no. typed by hand is the bill no. too, until the bill no. is changed.
+$('dnNo').addEventListener('input', function () {
+  $('dnoteNo').value = $('dnNo').value;
+  if (!state.billNoDirty) $('billNo').value = $('dnNo').value;
+});
+$('dnDate').addEventListener('input', function () { if (!state.billNoDirty) $('billDate').value = $('dnDate').value; });
+$('gproundOffAmount').addEventListener('input', function () { if (state.gp) { state.gp.roundOffDirty = $('gproundOffAmount').value !== ''; gpChanged(); } });
+$('gpaddChargeBtn').addEventListener('click', function () { if (state.gp) addCharge('gp', state.gp.charges, gpChanged); });
+['gppurchaseLedgerId', 'gpbillNo', 'gpbillDate', 'gppiRemark'].forEach(function (id) {
+  $(id).addEventListener('input', function () { $('gpSaveBtn').disabled = true; });
+});
+$('gpCheckBtn').addEventListener('click', checkGrnPi);
+$('gpSaveBtn').addEventListener('click', saveGrnPi);
+$('gpCloseBtn').addEventListener('click', function () { hide('grnPiPanel'); state.gp = null; });
+$('geMakePiBtn').addEventListener('click', function () { openGrnPi(state.grn.transactionId); });
 window.addEventListener('resize', sizePendingBox);
 $('postBtn').addEventListener('click', post);
 $('refreshHistory').addEventListener('click', loadHistory);
