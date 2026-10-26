@@ -307,7 +307,9 @@
 </section>
 
 <section id="historyPanel" class="panel hidden">
-  <h2>Drafts in GRN Creator</h2>
+  <!-- Folded by default: the list grows long and is rarely the thing wanted. -->
+  <details id="draftsBox" class="drafts-box">
+  <summary><h2>Drafts in GRN Creator</h2> <span id="draftsCount" class="checks-count"></span></summary>
   <div class="history-actions">
     <button id="refreshHistory" class="link" type="button">Refresh</button>
     <!-- Testing only. Hidden unless the server sets SP_ALLOW_DRAFT_DELETE=true. -->
@@ -315,6 +317,7 @@
   </div>
   <p id="historyStatus" class="status"></p>
   <table class="lines" id="historyTable"></table>
+  </details>
 </section>
 </div>
 

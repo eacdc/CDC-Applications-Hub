@@ -740,6 +740,10 @@ button.ref-pick:disabled { border-color: transparent; background: none; }
 }
 td.flag-host .flag-btn { top: 1px; right: 1px; }
 .flag-btn:hover { transform: scale(1.15); }
+/* Over-receipt on the purchase invoice grid: the cell is text, not an input. */
+td.over-receipt { color: var(--block); background: var(--block-soft); font-weight: 600; padding-right: 18px; }
+.over-flag { position: absolute; top: 1px; right: 1px; line-height: 0; color: var(--block); }
+.over-note { color: var(--block); font-weight: 550; margin-bottom: 4px; }
 input.flag-on, select.flag-on { border-color: var(--block) !important; box-shadow: 0 0 0 2px var(--block-soft); }
 .flag-summary { color: var(--block); font-size: 13px; font-weight: 550; margin: 10px 0; }
 .flag-chip {
@@ -942,6 +946,18 @@ table.charges-table select.cell-select { font-size: 12px; }
 
 /* ── history ──────────────────────────────────────────────────────────── */
 
+/* Drafts: a folded list, opened from its heading. */
+.drafts-box > summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
+.drafts-box > summary::-webkit-details-marker { display: none; }
+.drafts-box > summary::before {
+  content: ''; width: 0; height: 0; border-left: 6px solid var(--ink-3);
+  border-top: 5px solid transparent; border-bottom: 5px solid transparent; transition: transform .15s ease;
+}
+.drafts-box[open] > summary::before { transform: rotate(90deg); }
+.drafts-box > summary h2 { margin: 0; }
+.drafts-box > summary:hover h2 { color: var(--ink); }
+.drafts-box > summary:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 4px; }
+.drafts-box[open] > summary { margin-bottom: 12px; }
 .history-actions {
   display: flex;
   align-items: center;
