@@ -742,6 +742,11 @@ td.flag-host .flag-btn { top: 1px; right: 1px; }
 .flag-btn:hover { transform: scale(1.15); }
 input.flag-on, select.flag-on { border-color: var(--block) !important; box-shadow: 0 0 0 2px var(--block-soft); }
 .flag-summary { color: var(--block); font-size: 13px; font-weight: 550; margin: 10px 0; }
+.flag-chip {
+  font: inherit; color: var(--block); background: var(--block-soft); border: 1px solid var(--block);
+  border-radius: 5px; padding: 1px 6px; margin: 0 1px; cursor: pointer; letter-spacing: 0; text-transform: none;
+}
+.flag-chip:hover { background: var(--block); color: var(--surface); }
 
 /* The grid: a search box under every heading, as on the ERP's own screen. */
 table.grid-table thead tr.filter-row th { padding: 4px 6px; background: var(--surface); }

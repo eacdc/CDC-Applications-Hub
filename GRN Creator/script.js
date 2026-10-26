@@ -1214,6 +1214,20 @@ var FLAG_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="tru
 /** Step 4's own inputs for header fields shown there. */
 var FLAG_STEP4 = { invoiceNo: 'dnNo', invoiceDate: 'dnDate', eWayBillNo: 'eWayBillNo', gateEntryNo: 'gateEntryNo',
   gateEntryDate: 'gateEntryDate', vehicleNo: 'vehicleNo' };
+/** Names for the fields step 2 does not show: they live on step 4's form. */
+var FLAG_STEP4_LABELS = { eWayBillNo: 'E-way bill', gateEntryNo: 'Gate entry no.',
+  gateEntryDate: 'Gate entry date', vehicleNo: 'Vehicle no.' };
+
+/** What a flagged field is called, as the summary line names it. */
+function flagLabel(field) {
+  var m = /^lines\.(\d+)(?:\.(\w+))?$/.exec(field);
+  if (!m) {
+    var header = HEADER_FIELDS.filter(function (f) { return f[0] === field; })[0];
+    return header ? header[1] : (FLAG_STEP4_LABELS[field] || field);
+  }
+  var line = m[2] && LINE_FIELDS.filter(function (f) { return f[0] === m[2]; })[0];
+  return (line ? line[1] : 'Qty, rate and amount') + ' on line ' + m[1];
+}
 
 /** Open flags, less the ones a person has already changed on the page. */
 function openFieldFlags() {
@@ -1221,6 +1235,11 @@ function openFieldFlags() {
   return ((state.documentSet && state.documentSet.fieldFlags) || []).filter(function (f) {
     return !f.resolved && !edited[f.field];
   });
+}
+
+/** The one input a person can actually see, if any: hidden panels do not count. */
+function visibleFlagTarget(field) {
+  return flagTargets(field).filter(function (i) { return i.offsetParent !== null; })[0] || null;
 }
 
 /** Every input on the page that shows this field. */
@@ -1276,13 +1295,35 @@ function paintFlags() {
       }
     });
   });
+  // The count alone is a riddle when a flagged field sits on a step not yet on
+  // screen; so name every one, and let the name itself open its flag.
   var n = flags.length;
-  var words = n + ' field' + (n === 1 ? ' is' : 's are') + ' red-flagged: correct each one, or click its flag and mark it checked. '
-    + 'The GRN cannot be posted until none is left.';
   ['reviewFlags', 'postFlags'].forEach(function (id) {
-    $(id).textContent = n ? words : '';
-    $(id).classList.toggle('hidden', !n);
+    var box = $(id);
+    box.innerHTML = '';
+    box.classList.toggle('hidden', !n);
+    if (!n) return;
+    box.appendChild(document.createTextNode(n + ' field' + (n === 1 ? ' is' : 's are') + ' red-flagged: '));
+    flags.forEach(function (flag, i) {
+      var chip = el('button', 'flag-chip', flagLabel(flag.field));
+      chip.type = 'button';
+      chip.title = flag.reason;
+      chip.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); gotoFlag(flag, chip); });
+      box.appendChild(chip);
+      if (i < n - 1) box.appendChild(document.createTextNode(', '));
+    });
+    box.appendChild(document.createTextNode('. Correct each one, or click its flag and mark it checked. '
+      + 'The GRN cannot be posted until none is left.'));
   });
+}
+
+/** Go to a flagged field from the summary, and open its reason. */
+function gotoFlag(flag, chip) {
+  var input = visibleFlagTarget(flag.field);
+  if (!input) { openFlag(flag, chip); return; }   // its step is not on screen yet
+  input.scrollIntoView({ block: 'center' });
+  try { input.focus({ preventScroll: true }); } catch (err) { input.focus(); }
+  openFlag(flag, input.parentElement.querySelector('.flag-btn') || input);
 }
 
 function openFlag(flag, anchor) {
@@ -2734,7 +2775,7 @@ Array.prototype.forEach.call(document.querySelectorAll('#appTabs .tab'), functio
 $('regLoad').addEventListener('click', loadRegister);
 document.addEventListener('click', function (e) {
   if ($('pop').classList.contains('hidden')) return;
-  if ($('pop').contains(e.target) || (e.target.closest && e.target.closest('.flag-btn, .ref-pick, #pendingTable tbody tr'))) return;
+  if ($('pop').contains(e.target) || (e.target.closest && e.target.closest('.flag-btn, .flag-chip, .ref-pick, #pendingTable tbody tr'))) return;
   closePop();
 });
 document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePop(); });
