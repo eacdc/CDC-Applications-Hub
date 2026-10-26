@@ -451,7 +451,7 @@ async function changeSupplier(id) {
       // and the new supplier's PO lines to pick from.
       state.documentSet = await api('/receiving/document-sets/' + state.setId);
       state.checks = [];
-      renderReceipt(); renderAssignOptions(); renderChecks({}); renderPiTotals();
+      renderReceipt(); renderChecks({}); renderPiTotals();
       await loadPendingPos();
     } else {
       ['matchPanel', 'grnPanel', 'piPanel'].forEach(hide);
@@ -482,6 +482,68 @@ function selectSource(source) {
   $('sourceUrl').classList.toggle('hidden', source !== 'url');
 }
 
+// -- the invoice's pages: files chosen or photos taken, in order -------------
+
+/** Longest side a photo is sent at; the reader works at 2,048 pixels anyway. */
+var PHOTO_MAX_SIDE = 2400;
+
+function addPages(files) {
+  state.pages = state.pages || [];
+  Array.prototype.forEach.call(files || [], function (f) { state.pages.push(f); });
+  renderPageList();
+}
+
+function renderPageList() {
+  var host = $('pageList');
+  host.innerHTML = '';
+  (state.pages || []).forEach(function (file, i) {
+    var item = el('div', 'page-item');
+    if (/^image\//.test(file.type || '')) {
+      var img = el('img');
+      img.alt = '';
+      img.src = URL.createObjectURL(file);
+      img.onload = function () { URL.revokeObjectURL(img.src); };
+      item.appendChild(img);
+    } else {
+      item.appendChild(el('span', 'page-pdf', 'PDF'));
+    }
+    var meta = el('div', 'page-meta');
+    meta.appendChild(el('b', null, 'Page ' + (i + 1)));
+    meta.appendChild(el('span', null, file.name + ' - ' + Math.max(1, Math.round(file.size / 1024)) + ' KB'));
+    item.appendChild(meta);
+    var rm = el('button', 'link danger-link', 'Remove');
+    rm.type = 'button';
+    rm.addEventListener('click', function () { state.pages.splice(i, 1); renderPageList(); });
+    item.appendChild(rm);
+    host.appendChild(item);
+  });
+  $('pickFileBtn').querySelector('span').textContent = (state.pages || []).length ? 'Add a file' : 'Upload a file';
+  $('takePhotoBtn').querySelector('span').textContent = (state.pages || []).length ? 'Add a photo' : 'Take a photo';
+}
+
+/**
+ * A phone photo is 3-5 MB at 4,000 pixels; the reader uses 2,048. Shrink it
+ * before upload - turned upright from its EXIF on the way - and leave PDFs and
+ * small images alone.
+ */
+async function shrinkPhoto(file) {
+  if (!/^image\/(jpeg|png|webp|heic|heif)/i.test(file.type || '') || typeof createImageBitmap !== 'function') return file;
+  try {
+    var bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    var scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    if (scale === 1 && file.size < 1.5 * 1024 * 1024) return file;
+    var canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    var blob = await new Promise(function (resolve) { canvas.toBlob(resolve, 'image/jpeg', 0.88); });
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' });
+  } catch (e) {
+    return file;
+  }
+}
+
 /** Biggest file we will inline rather than store. Base64 adds about a third. */
 var MAX_INLINE_BYTES = 6 * 1024 * 1024;
 
@@ -500,7 +562,8 @@ function readAsDataUrl(file) {
  * image is inlined as a data URL - the read still works, but NOTHING IS
  * STORED, and the status line says so rather than swallowing it.
  */
-async function uploadInvoice(file) {
+async function uploadInvoice(file, pageNo) {
+  pageNo = pageNo || 1;
   try {
     var presigned = await api('/receiving/upload-url', {
       method: 'POST',
@@ -512,7 +575,7 @@ async function uploadInvoice(file) {
       body: file,
     });
     if (!put.ok) throw new Error('storage refused the upload (HTTP ' + put.status + ')');
-    return { slot: { storageKey: presigned.key, pageNo: 1 }, stored: true };
+    return { slot: { storageKey: presigned.key, pageNo: pageNo }, stored: true };
   } catch (err) {
     if (!/^image\//.test(file.type || '')) {
       throw new Error('Could not upload to storage (' + err.message + '), and only images can be '
@@ -522,26 +585,28 @@ async function uploadInvoice(file) {
       throw new Error('Could not upload to storage (' + err.message + '), and ' + file.name
         + ' is too large to read without it.');
     }
-    return { slot: { url: await readAsDataUrl(file), pageNo: 1 }, stored: false };
+    return { slot: { url: await readAsDataUrl(file), pageNo: pageNo }, stored: false };
   }
 }
 
 async function extract() {
   $('extractBtn').disabled = true;
   try {
-    var slot;
+    var slots = [];
     var notStored = false;
     if (state.source === 'file') {
-      var file = $('invoiceFile').files[0];
-      if (!file) throw new Error('Choose a file, or switch to the URL tab.');
-      setStatus('captureStatus', 'Uploading ' + file.name + '...');
-      var uploaded = await uploadInvoice(file);
-      slot = uploaded.slot;
-      if (!uploaded.stored) notStored = true;
+      var pages = state.pages || [];
+      if (!pages.length) throw new Error('Upload a file or take a photo, or switch to the URL tab.');
+      for (var i = 0; i < pages.length; i++) {
+        setStatus('captureStatus', 'Sending page ' + (i + 1) + ' of ' + pages.length + '...');
+        var uploaded = await uploadInvoice(await shrinkPhoto(pages[i]), i + 1);
+        slots.push(uploaded.slot);
+        if (!uploaded.stored) notStored = true;
+      }
     } else {
       var url = $('invoiceUrl').value.trim();
       if (!url) throw new Error('Paste a URL, or switch to the file tab.');
-      slot = { url: url, pageNo: 1 };
+      slots.push({ url: url, pageNo: 1 });
     }
 
     setStatus('captureStatus', 'Creating the document set...');
@@ -549,7 +614,7 @@ async function extract() {
       method: 'POST',
       // Usually empty: the server identifies the supplier from the invoice.
       // If someone chose one first, that choice stands.
-      body: { supplierLedgerId: num($('supplierLedgerId').value), slots: { supplierInvoice: [slot] } },
+      body: { supplierLedgerId: num($('supplierLedgerId').value), slots: { supplierInvoice: slots } },
     });
     state.setId = set._id;
 
@@ -611,10 +676,11 @@ async function startManual() {
     state.documentSet = set;
     state.checks = [];
     state.reasons = {};
+    state.flagEdited = {};
     ['reviewPanel', 'previewPanel'].forEach(hide);
     fillGrnDetails(set.extractedHeader || {});
     ['matchPanel', 'grnPanel', 'piPanel'].forEach(show);
-    renderReceipt(); renderAssignOptions(); renderChecks({}); renderPiTotals();
+    renderReceipt(); renderChecks({}); renderPiTotals();
     paintSupplier();
     await loadPendingPos();
     loadDefaults();
@@ -662,11 +728,11 @@ async function loadDefaults() {
 // details, and live in step 4 as they do on the ERP's own screen.
 var HEADER_FIELDS = [
   ['invoiceNo', 'Invoice no.'], ['invoiceDate', 'Invoice date'],
-  ['supplierGstin', 'Supplier GSTIN'], ['buyerGstin', 'Buyer GSTIN'],
+  ['supplierGstin', 'Supplier GSTIN'], ['buyerGstin', 'Buyer GSTIN'], ['shipToGstin', 'Ship-to GSTIN'],
   ['taxType', 'Tax type'], ['poNumbers', 'PO numbers (header)'],
   // Freight and round-off are edited in step 5, where they shape the purchase
   // invoice; these are the invoice's own printed figures, for the checks.
-  ['subTotal', 'Sub total'],
+  ['subTotal', 'Sub total'], ['taxable', 'Taxable value'],
   ['cgst', 'CGST'], ['sgst', 'SGST'], ['igst', 'IGST'],
   ['grandTotal', 'Grand total'],
 ];
@@ -716,6 +782,7 @@ function renderReview() {
       cell.appendChild(input);
     });
   });
+  paintFlags();
 }
 
 function collectCorrections() {
@@ -837,7 +904,6 @@ function applyMatchResult(result) {
     if (!$('reviewPanel').classList.contains('hidden')) renderReview();
   }
   renderReceipt();
-  renderAssignOptions();
   renderPending();
   renderChecks(result);
   renderPiTotals();
@@ -982,11 +1048,13 @@ async function setLineWarehouse(lineNo, warehouseId) {
   }
 }
 
-/** Up to the Pending POs grid with a line ready to be placed. */
+/** Up to the Pending POs grid, with the rows at this line's rate marked. */
 function chooseFor(lineNo) {
-  $('assignLine').value = String(lineNo);
+  state.chooseLine = lineNo;
   renderPending();
   $('pendingView').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setStatus('matchStatus', 'Tick line ' + lineNo + ' under Ref Supp inv item on the PO line it belongs to. '
+    + 'Rows at its rate are marked green.', 'ok');
 }
 
 // -- the Pending POs tab ----------------------------------------------------
@@ -998,6 +1066,8 @@ var PENDING_COLUMNS = [
   { key: 'itemCode', label: 'Item Code' },
   { key: 'subGroup', label: 'Sub Group' },
   { key: 'itemName', label: 'Item Name' },
+  // The invoice items on this PO line - ticked by the matcher, changeable by anyone.
+  { key: 'refInv', label: 'Ref Supp inv item', value: function (r) { return r.refInv || ''; } },
   { key: 'orderedQty', label: 'P.O. Qty (P.U.)', num: true, value: function (r) { return qtyText(r.orderedQty); } },
   { key: 'orderedStockQty', label: 'P.O. Qty (S.U.)', num: true, value: function (r) { return qtyText(r.orderedStockQty); } },
   { key: 'tolerancePct', label: 'Tol. (%)', num: true, value: function (r) { return qtyText(r.tolerancePct || 0); } },
@@ -1025,29 +1095,6 @@ async function loadPendingPos() {
   }
 }
 
-function renderAssignOptions() {
-  var select = $('assignLine');
-  var keep = select.value;
-  select.innerHTML = '';
-  var addNew = el('option', null, 'adds it as a new line');
-  addNew.value = 'new';
-  select.appendChild(addNew);
-  var lines = (state.documentSet && state.documentSet.extractedLines) || [];
-  lines.forEach(function (l) {
-    var o = el('option', null, 'puts line ' + l.lineNo + ' on it - ' + text(l.description).slice(0, 36)
-      + ' - ' + qtyText(l.qty) + ' @ ' + money(l.rate)
-      + (l.poVoucherNo ? ' (now ' + l.poVoucherNo + ')' : ' (no PO)'));
-    o.value = l.lineNo;
-    select.appendChild(o);
-  });
-  // Keep the choice if it still exists. Otherwise: manual entry adds lines;
-  // an invoice starts on its first line with no PO.
-  var firstUnmatched = lines.filter(function (l) { return !l.matchedPoTransactionId; })[0];
-  var fallback = state.entryMode === 'manual' ? 'new' : String((firstUnmatched || {}).lineNo || 'new');
-  var exists = Array.prototype.some.call(select.options, function (o) { return o.value === keep; });
-  select.value = keep && exists ? keep : fallback;
-}
-
 /**
  * The supplier's PO lines, with a search box under every heading - the same
  * grid as the top of the ERP's GRN screen. Rows already carrying an invoice
@@ -1063,14 +1110,19 @@ function renderPending() {
       (used[l.matchedPoTransactionDetailId] = used[l.matchedPoTransactionDetailId] || []).push(l.lineNo);
     }
   });
+  var byNo = {};
+  lines.forEach(function (l) { byNo[l.lineNo] = l; });
   var rows = state.poLines.map(function (r) {
     var copy = Object.assign({}, r);
-    copy.usedBy = used[r.transactionDetailId] ? lineNoList(used[r.transactionDetailId]) : '';
+    var on = used[r.transactionDetailId] || [];
+    copy.usedBy = on.length ? lineNoList(on) : '';
+    copy.refInv = on.map(function (n) { return n + ' ' + text((byNo[n] || {}).description); }).join('; ');
     return copy;
   });
 
-  var selected = lines.filter(function (l) { return String(l.lineNo) === $('assignLine').value; })[0];
+  var selected = state.chooseLine ? byNo[state.chooseLine] : null;
   var selectedRate = selected ? num(selected.rate) : null;
+  var picking = state.entryMode !== 'manual';
 
   // Build the head once, so typing in a filter does not lose focus.
   if (!table.tHead) {
@@ -1111,21 +1163,30 @@ function renderPending() {
     if (r.usedBy) classes.push('used');
     if (selectedRate !== null && Math.abs(num(r.rate) - selectedRate) <= 0.01) classes.push('rate-hit');
     row.className = classes.join(' ');
-    var target = $('assignLine').value;
-    var note = (r.usedBy ? 'Already on line ' + r.usedBy + '. ' : '') + (r.closed ? 'Closed PO. ' : '')
-      + (target === 'new' ? 'Click to add ' : 'Click to put line ' + target + ' on ')
-      + r.poVoucherNo + ' - ' + text(r.itemName);
+    var note = (r.usedBy ? 'Invoice line ' + r.usedBy + ' is on it. ' : '') + (r.closed ? 'Closed PO. ' : '')
+      + (picking ? 'Click to choose the invoice items on ' : 'Click to add ') + r.poVoucherNo + ' - ' + text(r.itemName);
     PENDING_COLUMNS.forEach(function (col) {
       var c = row.insertCell();
       if (col.num) c.className = 'num';
+      if (col.key === 'refInv') {
+        c.className = 'ref-cell';
+        c.dataset.ref = r.transactionDetailId;
+        var pick = el('button', 'ref-pick' + (r.refInv ? '' : ' empty'), r.refInv || (picking ? 'Choose...' : ''));
+        pick.type = 'button';
+        pick.title = r.refInv || 'Choose the invoice items on this PO line';
+        pick.disabled = !picking;
+        pick.addEventListener('click', function (e) { e.stopPropagation(); openRefPicker(r, pick); });
+        c.appendChild(pick);
+        return;
+      }
       c.textContent = cellValue(col, r);
       // Rows stay one line high; the full text is a hover away.
       c.title = col.key === 'itemName' ? cellValue(col, r) + '\n' + note : note;
     });
     row.addEventListener('click', function () {
-      var target = $('assignLine').value;
-      if (target === 'new') addLine(r.transactionDetailId);
-      else assign(num(target), r.transactionDetailId);
+      if (!picking) { addLine(r.transactionDetailId); return; }
+      var cell = row.querySelector('.ref-pick');
+      if (cell) openRefPicker(r, cell);
     });
   });
 
@@ -1138,6 +1199,215 @@ function renderPending() {
   }
   $('pendingCount').textContent = rows.length ? String(rows.length) : '';
   sizePendingBox();
+  // A picker open on a row stays open while its ticks are saved.
+  if (state.refPopRow) {
+    var again = document.querySelector('#pendingTable td[data-ref="' + state.refPopRow + '"] .ref-pick');
+    var poRow = state.poLines.filter(function (x) { return String(x.transactionDetailId) === String(state.refPopRow); })[0];
+    if (again && poRow) openRefPicker(poRow, again); else closePop();
+  }
+}
+
+// -- red flags ---------------------------------------------------------------
+
+var FLAG_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">'
+  + '<path d="M5 22V3h12.5l-2 4 2 4H7v11z" fill="currentColor"/></svg>';
+/** Step 4's own inputs for header fields shown there. */
+var FLAG_STEP4 = { invoiceNo: 'dnNo', invoiceDate: 'dnDate', eWayBillNo: 'eWayBillNo', gateEntryNo: 'gateEntryNo',
+  gateEntryDate: 'gateEntryDate', vehicleNo: 'vehicleNo' };
+
+/** Open flags, less the ones a person has already changed on the page. */
+function openFieldFlags() {
+  var edited = state.flagEdited || {};
+  return ((state.documentSet && state.documentSet.fieldFlags) || []).filter(function (f) {
+    return !f.resolved && !edited[f.field];
+  });
+}
+
+/** Every input on the page that shows this field. */
+function flagTargets(field) {
+  var out = [];
+  var push = function (node) { if (node) out.push(node); };
+  var m = /^lines\.(\d+)(?:\.(\w+))?$/.exec(field);
+  if (!m) {
+    push($('hdr_' + field));
+    if (FLAG_STEP4[field]) push($(FLAG_STEP4[field]));
+    return out;
+  }
+  var lineNo = m[1];
+  var f = m[2] || 'qty';
+  var lines = (state.documentSet && state.documentSet.extractedLines) || [];
+  var index = lines.findIndex(function (l) { return String(l.lineNo) === lineNo; });
+  if (index >= 0) push($('line_' + index + '_' + f));
+  if (f === 'qty') {
+    push(lineInput('receiptTable', 'stockQty', lineNo));
+    push(lineInput('receiptTable', 'qty', lineNo));
+  }
+  if (f === 'rate' || !m[2]) push(lineInput('piLinesTable', 'rate', lineNo));
+  return out;
+}
+
+/** Put a red flag beside every flagged field on the page, and say how many there are. */
+function paintFlags() {
+  Array.prototype.forEach.call(document.querySelectorAll('.flag-btn'), function (b) { b.remove(); });
+  Array.prototype.forEach.call(document.querySelectorAll('.flag-on'), function (i) { i.classList.remove('flag-on'); });
+  var flags = openFieldFlags();
+  flags.forEach(function (flag) {
+    flagTargets(flag.field).forEach(function (input) {
+      input.classList.add('flag-on');
+      var host = input.parentElement;
+      host.classList.add('flag-host');
+      var btn = el('button', 'flag-btn');
+      btn.type = 'button';
+      btn.innerHTML = FLAG_SVG;
+      btn.title = flag.reason;
+      btn.setAttribute('aria-label', 'Red flag: ' + flag.reason);
+      btn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); openFlag(flag, btn); });
+      host.appendChild(btn);
+      // Changing the value is the other way to clear it; the server agrees on save.
+      if (!input.dataset.flagWatch) {
+        input.dataset.flagWatch = '1';
+        input.addEventListener('input', function () {
+          var still = openFieldFlags().filter(function (f) { return flagTargets(f.field).indexOf(input) !== -1; });
+          if (!still.length) return;
+          state.flagEdited = state.flagEdited || {};
+          still.forEach(function (f) { state.flagEdited[f.field] = true; });
+          paintFlags();
+        });
+      }
+    });
+  });
+  var n = flags.length;
+  var words = n + ' field' + (n === 1 ? ' is' : 's are') + ' red-flagged: correct each one, or click its flag and mark it checked. '
+    + 'The GRN cannot be posted until none is left.';
+  ['reviewFlags', 'postFlags'].forEach(function (id) {
+    $(id).textContent = n ? words : '';
+    $(id).classList.toggle('hidden', !n);
+  });
+}
+
+function openFlag(flag, anchor) {
+  var box = el('div');
+  box.appendChild(el('div', 'pop-title flag-title', flag.source === 'MODEL' ? 'The reader was not sure of this' : 'A check found a problem'));
+  box.appendChild(el('p', null, flag.reason));
+  var ok = el('button', 'primary', 'Mark as checked');
+  ok.type = 'button';
+  ok.addEventListener('click', async function () {
+    ok.disabled = true;
+    try {
+      var res = await api('/receiving/document-sets/' + state.setId + '/flags/confirm', { method: 'POST', body: { field: flag.field } });
+      state.documentSet.fieldFlags = res.fieldFlags;
+      closePop();
+      paintFlags();
+    } catch (err) {
+      ok.disabled = false;
+      box.appendChild(el('p', 'error', err.message));
+    }
+  });
+  box.appendChild(ok);
+  box.appendChild(el('p', 'hint', 'Or change the value: that clears it too.'));
+  openPop(anchor, box);
+}
+
+// -- the floating panel -----------------------------------------------------
+
+function closePop() {
+  hide('pop');
+  $('pop').innerHTML = '';
+  state.refPopRow = null;
+}
+
+/** Show `content` in the floating panel, under `anchor`. */
+function openPop(anchor, content) {
+  var pop = $('pop');
+  pop.innerHTML = '';
+  pop.appendChild(content);
+  show('pop');
+  var r = anchor.getBoundingClientRect();
+  var width = Math.min(420, window.innerWidth - 24);
+  pop.style.width = width + 'px';
+  pop.style.left = Math.max(12, Math.min(r.left + window.scrollX, window.scrollX + window.innerWidth - width - 12)) + 'px';
+  pop.style.top = (r.bottom + window.scrollY + 6) + 'px';
+}
+
+/**
+ * The invoice items on one PO line: every line the AI read, ticked where it
+ * sits on this PO line. Ticking moves a line here; unticking leaves it on no
+ * PO line, and "Match again" will not put it back.
+ */
+function openRefPicker(r, anchor) {
+  state.refPopRow = r.transactionDetailId;
+  var lines = (state.documentSet && state.documentSet.extractedLines) || [];
+  var unit = text(r.purchaseUnit).trim();
+  var box = el('div', 'picker');
+
+  var head = el('div', 'picker-head');
+  head.appendChild(el('div', 'picker-po', r.poVoucherNo));
+  head.appendChild(el('div', 'picker-item', text(r.itemCode) + '  ' + text(r.itemName)));
+  var chips = el('div', 'picker-chips');
+  chips.appendChild(el('span', 'chip', 'Pending ' + qtyText(r.pendingQty) + (unit ? ' ' + unit : '')));
+  chips.appendChild(el('span', 'chip', 'PO rate ' + money(r.rate)));
+  head.appendChild(chips);
+  box.appendChild(head);
+
+  box.appendChild(el('div', 'picker-label', 'Invoice items on this PO line'));
+  var list = el('div', 'ref-list');
+  if (!lines.length) list.appendChild(el('p', 'hint', 'No invoice lines.'));
+  var ticked = 0;
+  lines.forEach(function (l) {
+    var here = String(l.matchedPoTransactionDetailId) === String(r.transactionDetailId);
+    if (here) ticked += 1;
+    var item = el('label', 'ref-item' + (here ? ' on' : ''));
+    var tick = el('input');
+    tick.type = 'checkbox';
+    tick.checked = here;
+    tick.addEventListener('change', function () { placeFromGrid(l.lineNo, tick.checked ? r.transactionDetailId : null); });
+    item.appendChild(tick);
+
+    var body = el('span', 'ref-body');
+    var top = el('span', 'ref-top');
+    top.appendChild(el('span', 'ref-no', 'Line ' + l.lineNo));
+    top.appendChild(el('span', 'ref-desc', text(l.description)));
+    body.appendChild(top);
+    var meta = el('span', 'ref-meta', qtyText(l.qty) + ' ' + text(l.uom) + '  @  ' + money(l.rate) + '  =  ' + money(l.amount));
+    if (num(l.rate) !== null && num(r.rate) !== null && Math.abs(num(l.rate) - num(r.rate)) <= 0.01) {
+      meta.appendChild(el('span', 'chip chip-ok', 'PO rate'));
+    }
+    body.appendChild(meta);
+    if (!here) {
+      body.appendChild(el('span', 'ref-where' + (l.poVoucherNo ? ' moves' : ''),
+        l.poVoucherNo ? 'Now on ' + l.poVoucherNo + ' - ticking moves it here' : 'On no PO line'));
+    }
+    item.appendChild(body);
+    list.appendChild(item);
+  });
+  box.appendChild(list);
+
+  var foot = el('div', 'picker-foot');
+  foot.appendChild(el('span', 'hint', ticked ? ticked + ' ticked' : 'None ticked'));
+  var done = el('button', 'primary picker-done', 'Done');
+  done.type = 'button';
+  done.addEventListener('click', closePop);
+  foot.appendChild(done);
+  box.appendChild(foot);
+  openPop(anchor, box);
+}
+
+/** A tick or untick in the picker: put the line on this PO line, or on none. */
+async function placeFromGrid(lineNo, detailId) {
+  try {
+    setStatus('matchStatus', detailId ? 'Placing line ' + lineNo + '...' : 'Taking line ' + lineNo + ' off...');
+    var result = await api('/receiving/document-sets/' + state.setId + '/lines/' + lineNo + '/assign', {
+      method: 'POST', body: detailId ? { poTransactionDetailId: detailId } : { unplace: true },
+    });
+    applyMatchResult(result);
+    hide('previewPanel');
+    var line = (state.documentSet.extractedLines || []).filter(function (l) { return String(l.lineNo) === String(lineNo); })[0];
+    setStatus('matchStatus', detailId
+      ? 'Line ' + lineNo + ' is now on ' + (line && line.poVoucherNo) + '.'
+      : 'Line ' + lineNo + ' is on no PO line now; "Match again" leaves it so.', 'ok');
+  } catch (err) {
+    setStatus('matchStatus', err.message, 'error');
+  }
 }
 
 /**
@@ -1346,6 +1616,7 @@ function fillGrnDetails(header) {
     : (num(header.freight) > 0 ? [{ ledgerId: num($('freightLedgerId').value), amount: num(header.freight) }] : []);
   state.roundOffDirty = header.roundOff !== null && header.roundOff !== undefined && header.roundOff !== '';
   $('roundOffAmount').value = state.roundOffDirty ? text(header.roundOff) : '';
+  paintFlags();
 }
 
 function grnHeader() {
@@ -1626,7 +1897,9 @@ function newGrnPiModel() {
 
 function renderPiTotals() {
   state.charges = state.charges || [];
-  return renderPiScreen('', newGrnPiModel());
+  var figures = renderPiScreen('', newGrnPiModel());
+  paintFlags();
+  return figures;
 }
 
 // -- 6 · preview and post ---------------------------------------------------
@@ -1721,6 +1994,12 @@ function renderPreview(result) {
 }
 
 async function post() {
+  var flagged = openFieldFlags().length;
+  if (flagged) {
+    setStatus('previewStatus', flagged + ' field' + (flagged === 1 ? ' is' : 's are') + ' still red-flagged. Correct each one, '
+      + 'or click its flag and mark it checked, then post.', 'error');
+    return;
+  }
   var ok = window.confirm('Write a real GRN and purchase invoice to ' + state.context.site
     + '? This cannot be undone from here.');
   if (!ok) return;
@@ -2424,7 +2703,6 @@ $('postBtn').addEventListener('click', post);
 $('refreshHistory').addEventListener('click', loadHistory);
 $('deleteDraftsBtn').addEventListener('click', deleteDrafts);
 $('supplierSearch').addEventListener('input', onSupplierInput);
-$('assignLine').addEventListener('change', renderPending);
 $('defaultWarehouse').addEventListener('change', function () {
   state.defaultWarehouseId = num($('defaultWarehouse').value);
   $('warehouseHint').textContent = '';
@@ -2435,6 +2713,11 @@ $('defaultWarehouse').addEventListener('change', function () {
 [['receivedBy', 'receivedByHint'], ['purchaseLedgerId', 'purchaseLedgerHint'],
   ['freightLedgerId', 'freightLedgerHint']].forEach(function (pair) {
   $(pair[0]).addEventListener('change', function () { $(pair[1]).textContent = ''; });
+});
+$('pickFileBtn').addEventListener('click', function () { $('invoiceFile').click(); });
+$('takePhotoBtn').addEventListener('click', function () { $('invoiceCamera').click(); });
+['invoiceFile', 'invoiceCamera'].forEach(function (id) {
+  $(id).addEventListener('change', function () { addPages($(id).files); $(id).value = ''; });
 });
 Array.prototype.forEach.call(document.querySelectorAll('#sourceTabs .tab'), function (tab) {
   tab.addEventListener('click', function () { selectSource(tab.dataset.source); });
@@ -2449,6 +2732,12 @@ Array.prototype.forEach.call(document.querySelectorAll('#appTabs .tab'), functio
   tab.addEventListener('click', function () { setApp(tab.dataset.app); });
 });
 $('regLoad').addEventListener('click', loadRegister);
+document.addEventListener('click', function (e) {
+  if ($('pop').classList.contains('hidden')) return;
+  if ($('pop').contains(e.target) || (e.target.closest && e.target.closest('.flag-btn, .ref-pick, #pendingTable tbody tr'))) return;
+  closePop();
+});
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePop(); });
 $('regSearch').addEventListener('keydown', function (e) { if (e.key === 'Enter') loadRegister(); });
 $('geCheckBtn').addEventListener('click', checkGrnEdit);
 $('geSaveBtn').addEventListener('click', saveGrnEdit);

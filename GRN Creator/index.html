@@ -85,13 +85,21 @@
 
   <div id="aiPane">
   <div class="tabs" id="sourceTabs">
-    <button class="tab active" data-source="file" type="button">Upload a file</button>
+    <button class="tab active" data-source="file" type="button">File or photo</button>
     <button class="tab" data-source="url" type="button">Paste a URL</button>
   </div>
 
   <div id="sourceFile" class="source">
-    <input type="file" id="invoiceFile" accept="application/pdf,image/png,image/jpeg">
-    <p class="hint">Uploaded to R2 with a presigned PUT, exactly as the tablet would.</p>
+    <div class="capture-row">
+      <button type="button" id="pickFileBtn" class="capture-btn"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span>Upload a file</span></button>
+      <!-- capture="environment": on a phone this opens the rear camera directly -->
+      <button type="button" id="takePhotoBtn" class="capture-btn"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span>Take a photo</span></button>
+      <input type="file" id="invoiceFile" accept="application/pdf,image/png,image/jpeg" multiple hidden>
+      <input type="file" id="invoiceCamera" accept="image/*" capture="environment" hidden>
+    </div>
+    <div id="pageList" class="page-list"></div>
+    <p class="hint">A PDF, or a photo of each page - a two-page invoice is two photos, in order. Photos are made
+       smaller before they are sent, so they go quickly on mobile data.</p>
   </div>
   <div id="sourceUrl" class="source hidden">
     <input type="url" id="invoiceUrl" placeholder="https://…/invoice.pdf">
@@ -120,6 +128,7 @@
   <p class="hint">Everything is editable. Corrections are saved before matching, so the checks
      run on what you confirmed. Changing a line clears its PO match - except a match you
      chose by hand, which is kept.</p>
+  <p id="reviewFlags" class="flag-summary hidden"></p>
   <div class="grid grid-4" id="headerFields"></div>
   <table class="lines" id="linesTable"></table>
   <button id="matchBtn" class="primary">Match to POs</button>
@@ -144,11 +153,7 @@
       <h3>Pending POs <span id="pendingCount" class="count"></span></h3>
       <span class="hint">Type under any heading to search.</span>
     </div>
-    <div class="assign-bar">
-      <label>Clicking a PO line
-        <select id="assignLine"></select>
-      </label>
-    </div>
+    <p class="hint">Tick each invoice item under <b>Ref Supp inv item</b> on the PO line it belongs to; the matcher's choices are ticked already.</p>
     <div class="table-wrap scroll-box" id="pendingWrap"><table class="lines grid-table" id="pendingTable"></table></div>
   </div>
 
@@ -221,6 +226,7 @@
     <label class="pi-remark">Remark<textarea id="piRemark" rows="2"></textarea></label>
     <p class="hint" id="piNote"></p>
   </div>
+  <p id="postFlags" class="flag-summary hidden"></p>
   <button id="previewBtn" class="primary">Preview the vouchers</button>
   <p id="piStatus" class="status"></p>
 </section>
@@ -312,6 +318,8 @@
 </section>
 </div>
 
+<!-- one floating panel for the whole page: a flag's reason, or an invoice-item picker -->
+<div id="pop" class="pop hidden" role="dialog"></div>
 </main>
 
 <script src="config.js"></script>
