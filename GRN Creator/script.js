@@ -714,14 +714,6 @@ async function loadDefaults() {
     setDefault('freightLedgerId', 'freightLedgerHint', d.freightLedger);
     if ($('freightLedgerHint').textContent) $('freightLedgerHint').textContent += freightShare(d);
     (state.charges || []).forEach(function (c) { if (!num(c.ledgerId)) c.ledgerId = num($('freightLedgerId').value); });
-    // A supplier who usually charges freight starts with its row, waiting for
-    // the amount - once per draft, so a row deleted on purpose stays deleted.
-    var offerKey = state.setId + ':' + ((state.documentSet && state.documentSet.context && state.documentSet.context.supplierLedgerId) || '');
-    if (d.freightUsual && !(state.charges || []).length && num($('freightLedgerId').value)
-      && state.freightRowOfferedFor !== offerKey) {
-      state.charges = [{ ledgerId: num($('freightLedgerId').value), amount: null }];
-    }
-    state.freightRowOfferedFor = offerKey;
     renderPiTotals();
     state.defaultWarehouseId = num($('defaultWarehouse').value);
     paintDefaultWarehouse();
@@ -2763,12 +2755,8 @@ async function openGrnPi(transactionId) {
   $('gpSaveBtn').disabled = true;
   try {
     var d = await api('/receiving/grns/' + transactionId + '/purchase-invoice');
-    var usualFreight = d.defaults && d.defaults.freightUsual && d.defaults.freightLedger;
-    state.gp = {
-      draft: d, rates: {}, billed: {}, roundOffDirty: false,
-      // A supplier who usually charges freight starts with its row, waiting for the amount.
-      charges: usualFreight ? [{ ledgerId: d.defaults.freightLedger.ledgerId, amount: null }] : [],
-    };
+    // Freight rows are the person's to add: the ledger is pre-chosen, the row is not.
+    state.gp = { draft: d, rates: {}, billed: {}, charges: [], roundOffDirty: false };
     $('grnPiTitle').textContent = 'Purchase invoice for ' + d.voucherNo;
     $('grnPiNote').textContent = 'The lines are ' + d.voucherNo + "'s own, at their PO rates; change a rate if the bill differs."
       + (d.writesEnabled ? '' : ' ERP writes are off: Check shows what would be written, and nothing is saved.');
