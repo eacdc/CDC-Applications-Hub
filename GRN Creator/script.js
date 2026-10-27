@@ -1203,6 +1203,8 @@ var PENDING_COLUMNS = [
   { key: 'tolerancePct', label: 'Tol. (%)', num: true, value: function (r) { return qtyText(r.tolerancePct || 0); } },
   { key: 'pendingQty', label: 'Pending Qty (P.U.)', num: true, value: function (r) { return qtyText(r.pendingQty); } },
   { key: 'pendingStockQty', label: 'Pending Qty (S.U.)', num: true, value: function (r) { return qtyText(r.pendingStockQty); } },
+  // The PO rate, per purchase unit - often the quickest way to tell two PO lines apart.
+  { key: 'rate', label: 'Rate', num: true, value: function (r) { return money(r.rate); } },
   { key: 'purchaseUnit', label: 'Purchase Unit', value: function (r) { return text(r.purchaseUnit).trim(); } },
   { key: 'stockUnit', label: 'Stock Unit' },
   { key: 'poRefRemark', label: 'P.O. Ref. Remark' },

@@ -653,7 +653,7 @@ table.lines td.row-actions .link { display: inline-block; margin: 0 10px 3px 0; 
 }
 
 /* Ref Supp inv item: the invoice items on each PO line. */
-#pendingTable td.ref-cell { padding: 4px 5px; overflow: visible; }
+#pendingTable td.ref-cell { padding: 4px 5px; overflow: hidden; }
 button.ref-pick {
   width: 100%; padding: 4px 7px; font-size: 11.5px; font-weight: 500; text-align: left;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -767,22 +767,23 @@ table.grid-table td.empty { text-align: center; color: var(--ink-3); padding: 18
 /* The grid: every row one line high, so ten rows is always ten rows. Long
    item names truncate; the full text is in each cell's tooltip. */
 #pendingTable td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#pendingTable th:nth-child(1) { width: 8.5%; }
-#pendingTable th:nth-child(2) { width: 6.5%; }
+#pendingTable th:nth-child(1) { width: 8%; }
+#pendingTable th:nth-child(2) { width: 6%; }
 #pendingTable th:nth-child(3) { width: 5%; }
 #pendingTable th:nth-child(4) { width: 5%; }
-#pendingTable th:nth-child(5) { width: 14.5%; }
-#pendingTable th:nth-child(6) { width: 12%; }
+#pendingTable th:nth-child(5) { width: 13%; }
+#pendingTable th:nth-child(6) { width: 11%; }
 #pendingTable th:nth-child(7) { width: 5.5%; }
 #pendingTable th:nth-child(8) { width: 5.5%; }
 #pendingTable th:nth-child(9) { width: 3%; }
 #pendingTable th:nth-child(10) { width: 6%; }
 #pendingTable th:nth-child(11) { width: 6%; }
-#pendingTable th:nth-child(12) { width: 4%; }
+#pendingTable th:nth-child(12) { width: 5%; }
 #pendingTable th:nth-child(13) { width: 4%; }
 #pendingTable th:nth-child(14) { width: 4%; }
-#pendingTable th:nth-child(15) { width: 6%; }
-#pendingTable th:nth-child(16) { width: 4.5%; }
+#pendingTable th:nth-child(15) { width: 3.5%; }
+#pendingTable th:nth-child(16) { width: 5.5%; }
+#pendingTable th:nth-child(17) { width: 4%; }
 table.grid-table tbody tr.used td { background: var(--ok-soft); }
 /* Fifteen columns: a denser cell, so P.O. No., dates and quantities show whole. */
 #pendingTable th, #pendingTable td { padding: 7px 6px; }
