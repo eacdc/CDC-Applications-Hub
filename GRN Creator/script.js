@@ -606,12 +606,25 @@ function renderPageList() {
     item.appendChild(meta);
     var rm = el('button', 'link danger-link', 'Remove');
     rm.type = 'button';
-    rm.addEventListener('click', function () { state.pages.splice(i, 1); renderPageList(); });
+    rm.addEventListener('click', function () { removePage(i); });
     item.appendChild(rm);
     host.appendChild(item);
   });
   $('pickFileBtn').querySelector('span').textContent = (state.pages || []).length ? 'Add a file' : 'Upload a file';
   $('takePhotoBtn').querySelector('span').textContent = (state.pages || []).length ? 'Add a photo' : 'Take a photo';
+}
+
+/**
+ * Before the invoice is read, a page just comes off the list. Once it has been
+ * read, everything below was worked out from these pages: taking one away
+ * starts the whole page again, signed in still. The draft stays in History.
+ */
+function removePage(i) {
+  if (!state.setId) { state.pages.splice(i, 1); renderPageList(); return; }
+  var ok = window.confirm('This invoice has already been read. Removing a page starts again '
+    + 'from the beginning - everything entered below is cleared.\n\n'
+    + 'The draft so far stays in History. Start again?');
+  if (ok) window.location.reload();
 }
 
 /**
@@ -814,6 +827,8 @@ async function loadDefaults() {
     if ($('freightLedgerHint').textContent) $('freightLedgerHint').textContent += freightShare(d);
     (state.charges || []).forEach(function (c) { if (!num(c.ledgerId)) c.ledgerId = num($('freightLedgerId').value); });
     renderPiTotals();
+    // Defaults that arrive after Match was pressed: INV018 must see the ledger.
+    syncFreightLedger();
     state.defaultWarehouseId = num($('defaultWarehouse').value);
     paintDefaultWarehouse();
     if (state.documentSet && state.documentSet.extractedLines) renderReceipt();
@@ -832,7 +847,7 @@ var HEADER_FIELDS = [
   ['taxType', 'Tax type'], ['poNumbers', 'PO numbers (header)'],
   // Freight and round-off are edited in step 5, where they shape the purchase
   // invoice; these are the invoice's own printed figures, for the checks.
-  ['subTotal', 'Sub total'], ['taxable', 'Taxable value'],
+  ['subTotal', 'Sub total'], ['discount', 'Bill discount'], ['taxable', 'Taxable value'],
   ['cgst', 'CGST'], ['sgst', 'SGST'], ['igst', 'IGST'],
   ['grandTotal', 'Grand total'],
 ];
@@ -843,6 +858,9 @@ var LINE_FIELDS = [
   ['description', 'Description', false], ['gsm', 'GSM', true], ['size', 'Size', false], ['hsn', 'HSN', false],
   ['qty', 'Qty', true], ['uom', 'Unit', false],
   ['rate', 'Rate', true], ['amount', 'Amount', true],
+  // A trade discount as printed: Sonafine's "Disc %" 20 takes 1,10,544 to
+  // 88,435.20, and the purchase invoice posts the line net of it.
+  ['discountPct', 'Disc %', true], ['discountAmount', 'Disc amt', true], ['taxableValue', 'After disc.', true],
   ['poRef', 'PO ref', false],
 ];
 
@@ -924,6 +942,8 @@ async function match() {
       body: {
         extractedHeader: edited.header,
         extractedLines: edited.lines,
+        // The freight ledger filled in by default, so INV018 sees it.
+        context: freightContext(),
         reason: 'Reviewed in GRN Creator before matching',
       },
     });
@@ -1603,7 +1623,9 @@ function openRefPicker(r, anchor) {
     top.appendChild(el('span', 'ref-no', 'Line ' + l.lineNo));
     top.appendChild(el('span', 'ref-desc', text(l.description)));
     body.appendChild(top);
-    var meta = el('span', 'ref-meta', qtyText(l.qty) + ' ' + text(l.uom) + '  @  ' + money(l.rate) + '  =  ' + money(l.amount));
+    var off = lineMoneyOf(l);
+    var meta = el('span', 'ref-meta', qtyText(l.qty) + ' ' + text(l.uom) + '  @  ' + money(l.rate) + '  =  ' + money(l.amount)
+      + (off.discount ? '  less ' + (off.pct ? pctText(off.pct) + '%' : money(off.discount)) + '  =  ' + money(off.net) : ''));
     if (num(l.rate) !== null && num(r.rate) !== null && Math.abs(num(l.rate) - num(r.rate)) <= 0.01) {
       meta.appendChild(el('span', 'chip chip-ok', 'PO rate'));
     }
@@ -1755,10 +1777,10 @@ var CHECK_PASSED = {
   INV002: 'Every line is on an open PO of this supplier',
   INV003: 'No line receives more than 10% over what is still pending on its PO',
   INV004: 'Sheets and kg agree within 1%',
-  INV005: 'Every rate matches its PO rate',
+  INV005: 'Every rate, after any discount, matches its PO rate',
   INV006: 'Every line amount equals quantity x rate',
   INV007: 'The lines add up to the invoice subtotal',
-  INV008: 'Taxable value equals subtotal + freight',
+  INV008: 'Taxable value equals the goods after discount + freight',
   INV009: 'GST equals taxable value x rate',
   INV010: 'Grand total equals taxable + tax + round off',
   INV011: 'Round off is within ±₹1',
@@ -1770,18 +1792,41 @@ var CHECK_PASSED = {
   INV017: "HSN matches the item's HSN",
   INV018: 'Freight, if any, has a ledger',
   INV019: 'None of the POs is already fully received',
+  INV020: 'Every discount works out: amount less discount is the value after it',
+  INV021: 'No discount was left unread - the figures add up as read',
 };
+
+/**
+ * Blocks that cannot be ignored, and what to do instead. The server's list
+ * (services/check-overrides.js) is the one that counts; this only keeps an
+ * Ignore button off a check the server would refuse to ignore.
+ */
+var CHECK_NOT_IGNORABLE = {
+  INV001: 'Cannot be ignored: posting again would receive the goods twice. Edit or delete the existing GRN from History.',
+  INV013: 'Cannot be ignored: the invoice is not billed to CDC. If the buyer GSTIN was misread, correct it in the header.',
+  INV002: 'Cannot be ignored: the GRN would be posted without this line. Put it on a PO line, or remove it.',
+  INV018: 'Cannot be ignored: choose the freight ledger under Additional charges.',
+};
+
+/** A blocking check a person ignored, with a reason - stamped by the server. */
+function isIgnored(c) {
+  return !c.passed && c.severity === 'BLOCK' && Boolean(c.overrideReason);
+}
 
 function renderChecks(result) {
   var host = $('checksList');
   host.innerHTML = '';
 
   var failed = state.checks.filter(function (c) { return !c.passed; });
-  var blocking = failed.filter(function (c) { return c.severity === 'BLOCK'; });
+  var ignored = failed.filter(isIgnored);
+  var blocking = failed.filter(function (c) { return c.severity === 'BLOCK' && !isIgnored(c); });
   var summary = $('checksSummary');
+  var counts = [];
+  if (blocking.length) counts.push(blocking.length + ' blocking');
+  if (ignored.length) counts.push(ignored.length + ' ignored');
   summary.textContent = !state.checks.length ? 'none yet'
     : failed.length
-      ? failed.length + ' of ' + state.checks.length + ' failed' + (blocking.length ? ' - ' + blocking.length + ' blocking' : '')
+      ? failed.length + ' of ' + state.checks.length + ' failed' + (counts.length ? ' - ' + counts.join(', ') : '')
       : 'all ' + state.checks.length + ' passed';
   summary.className = 'checks-count ' + (blocking.length ? 'bad' : failed.length ? 'warn' : state.checks.length ? 'ok' : '');
 
@@ -1797,33 +1842,144 @@ function renderChecks(result) {
   state.checks.slice().sort(function (a, b) {
     return (a.passed ? 1 : 0) - (b.passed ? 1 : 0);
   }).forEach(function (c) {
-    var kind = c.passed ? 'check-pass' : (c.severity === 'BLOCK' ? 'check-block' : 'check-warn');
+    var kind = c.passed ? 'check-pass'
+      : isIgnored(c) ? 'check-ignored'
+        : (c.severity === 'BLOCK' ? 'check-block' : 'check-warn');
     var box = el('div', 'check ' + kind);
 
     var line = el('div');
     line.appendChild(el('code', null, c.code + (c.lineNo ? ' - line ' + c.lineNo : '')));
     line.appendChild(document.createTextNode(c.passed ? (CHECK_PASSED[c.code] || c.message) : c.message));
     if (!c.passed) {
-      line.appendChild(el('span', 'check-sev', c.severity === 'BLOCK' ? 'blocks posting' : 'needs a reason'));
+      line.appendChild(el('span', 'check-sev', isIgnored(c) ? 'ignored'
+        : c.severity === 'BLOCK' ? 'blocks posting' : 'needs a reason'));
     }
     box.appendChild(line);
 
-    // A warning posts only with a typed reason, stored on the voucher. A
-    // block has no reason field at all - it cannot be overridden.
+    // A warning posts only with a typed reason, stored on the voucher.
     if (!c.passed && c.severity === 'WARN') {
       var label = el('label', 'reason', 'Reason (required)');
       var input = el('input');
       input.placeholder = 'Why is this acceptable?';
+      // Kept across a re-render, as after ignoring or un-ignoring a block.
+      input.value = state.reasons[c.code] || '';
       input.addEventListener('input', function () { state.reasons[c.code] = input.value; });
       label.appendChild(input);
       box.appendChild(label);
     }
+    // A block posts only once someone ignores it, with a reason the server
+    // stores against their name. Undo puts it back.
+    if (!c.passed && c.severity === 'BLOCK') renderIgnore(box, c);
     host.appendChild(box);
   });
 
   setStatus('matchStatus', result && result.isBlocked
-    ? 'Blocking checks failed - the preview and the post are both refused until they are resolved.'
+    ? 'Blocking checks failed - the preview and the post are both refused until they are resolved or ignored.'
     : '', result && result.isBlocked ? 'warn' : null);
+}
+
+/**
+ * Under a failing block: who ignored it and why, with Undo - or an Ignore
+ * button that opens a reason box. Nothing is ignored until the server has
+ * stored the reason.
+ */
+function renderIgnore(box, c) {
+  if (isIgnored(c)) {
+    var by = el('div', 'ignored-by');
+    by.appendChild(el('strong', null, 'Ignored by ' + (c.overriddenByName || c.overriddenBy || 'someone') + ': '));
+    by.appendChild(document.createTextNode(c.overrideReason));
+    var undo = el('button', 'link', 'Undo');
+    undo.type = 'button';
+    undo.addEventListener('click', function () { unignoreCheck(c, undo); });
+    by.appendChild(undo);
+    box.appendChild(by);
+    return;
+  }
+  if (CHECK_NOT_IGNORABLE[c.code]) {
+    box.appendChild(el('div', 'hint ignore-hint', CHECK_NOT_IGNORABLE[c.code]));
+    return;
+  }
+
+  var open = el('button', 'link', 'Ignore');
+  open.type = 'button';
+  var form = el('div', 'ignore-form hidden');
+  var label = el('label', 'reason', 'Reason (required)');
+  var input = el('input');
+  input.placeholder = 'Why can this be ignored?';
+  label.appendChild(input);
+  form.appendChild(label);
+  var actions = el('div', 'ignore-actions');
+  var ok = el('button', null, 'Ignore this check');
+  ok.type = 'button';
+  var cancel = el('button', 'link', 'Cancel');
+  cancel.type = 'button';
+  var note = el('span', 'status');
+  actions.appendChild(ok);
+  actions.appendChild(cancel);
+  actions.appendChild(note);
+  form.appendChild(actions);
+
+  open.addEventListener('click', function () {
+    form.classList.remove('hidden');
+    open.classList.add('hidden');
+    input.focus();
+  });
+  cancel.addEventListener('click', function () {
+    form.classList.add('hidden');
+    open.classList.remove('hidden');
+    input.value = '';
+    note.textContent = '';
+  });
+  var confirmIgnore = function () {
+    if (!input.value.trim()) {
+      note.textContent = 'Give the reason first.';
+      note.className = 'status error';
+      input.focus();
+      return;
+    }
+    ignoreCheck(c, input.value.trim(), ok, note);
+  };
+  ok.addEventListener('click', confirmIgnore);
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); confirmIgnore(); } });
+
+  box.appendChild(open);
+  box.appendChild(form);
+}
+
+/** The checks as the server now has them, after an ignore or an undo. */
+function applyCheckResult(result) {
+  state.documentSet = result.documentSet;
+  state.checks = result.checks || [];
+  // Whatever preview was on screen was built under the old checks.
+  hide('previewPanel');
+  renderChecks(result);
+}
+
+async function ignoreCheck(c, reason, button, note) {
+  button.disabled = true;
+  try {
+    var result = await api('/receiving/document-sets/' + state.setId + '/checks/ignore', {
+      method: 'POST', body: { code: c.code, lineNo: c.lineNo === undefined ? null : c.lineNo, reason: reason },
+    });
+    applyCheckResult(result);
+  } catch (err) {
+    button.disabled = false;
+    note.textContent = err.message;
+    note.className = 'status error';
+  }
+}
+
+async function unignoreCheck(c, button) {
+  button.disabled = true;
+  try {
+    var result = await api('/receiving/document-sets/' + state.setId + '/checks/unignore', {
+      method: 'POST', body: { code: c.code, lineNo: c.lineNo === undefined ? null : c.lineNo },
+    });
+    applyCheckResult(result);
+  } catch (err) {
+    button.disabled = false;
+    setStatus('matchStatus', err.message, 'error');
+  }
 }
 
 // -- 4 · GRN details and 5 · purchase invoice -------------------------------
@@ -1877,15 +2033,43 @@ function grnHeader() {
 
 /** What the post needs that the invoice does not say. Never CreatedBy. */
 function postContext() {
+  var out = freightContext();
+  out.employeeLedgerId = num($('receivedBy').value);
+  out.warehouseId = num($('defaultWarehouse').value);
+  out.purchaseLedgerId = num($('purchaseLedgerId').value);
+  return out;
+}
+
+/** The freight rows under Additional charges, as the draft stores them. */
+function freightContext() {
+  var rows = (state.charges || []).filter(function (c) { return num(c.amount) > 0; });
   return {
-    employeeLedgerId: num($('receivedBy').value),
-    warehouseId: num($('defaultWarehouse').value),
-    purchaseLedgerId: num($('purchaseLedgerId').value),
     // The first freight row's ledger is the one check INV018 looks at.
-    freightLedgerId: ((state.charges || []).filter(function (c) { return num(c.amount) > 0; })[0] || {}).ledgerId || null,
-    freightCharges: (state.charges || []).filter(function (c) { return num(c.amount) > 0; })
-      .map(function (c) { return { ledgerId: num(c.ledgerId), amount: num(c.amount) }; }),
+    freightLedgerId: num((rows[0] || {}).ledgerId) || null,
+    freightCharges: rows.map(function (c) { return { ledgerId: num(c.ledgerId), amount: num(c.amount) }; }),
   };
+}
+
+/**
+ * INV018 is worked out from the freight ledger stored with the draft, which
+ * the page used to send only on Preview - so a ledger filled in by default,
+ * or chosen in step 5, still showed as missing. When the freight ledger on
+ * the page is not the stored one, store it and run the checks again.
+ */
+async function syncFreightLedger() {
+  var stored = (state.documentSet && state.documentSet.context) || {};
+  var now = freightContext();
+  // Before the first match there are no checks to refresh; Match stores it.
+  if (!state.setId || !(state.checks || []).length) return;
+  if ((num(stored.freightLedgerId) || null) === now.freightLedgerId) return;
+  try {
+    await api('/receiving/document-sets/' + state.setId, {
+      method: 'PATCH', body: { context: now, reason: 'Freight ledger' },
+    });
+    await runMatch('piStatus');
+  } catch (err) {
+    setStatus('piStatus', err.message, 'error');
+  }
 }
 
 /**
@@ -1945,12 +2129,44 @@ function fillChargeSelect(id, selected) {
   });
 }
 
-/** Per-line and total figures, as the writer will write them. */
-function computePi(lines, charges, roundOff) {
-  var basics = lines.map(function (l) {
-    var q = piQtyOf(l); var r = num(l.rate);
-    return q !== null && r !== null ? round2(q * r) : 0;
+/**
+ * A line's trade discount, as the server's lineMoney works it out: the
+ * discount amount where one is given, else the percentage of qty x rate, else
+ * the gap to a printed value after discount.
+ */
+function lineMoneyOf(l) {
+  var q = piQtyOf(l); var r = num(l.rate);
+  var gross = q !== null && r !== null ? round2(q * r) : (num(l.amount) || 0);
+  var pct = num(l.discountPct) || null;
+  var given = num(l.discountAmount) || null;
+  var after = num(l.taxableValue);
+  var discount = given !== null ? given
+    : (pct !== null ? round2(gross * pct / 100) : (after !== null && after < gross ? round2(gross - after) : 0));
+  return { gross: gross, pct: pct, discount: discount, net: round2(gross - discount) };
+}
+
+/**
+ * Per-line and total figures, as the writer will write them. A discounted
+ * line is posted as CDC always has: at the rate after discount, with Gross =
+ * Basic = its value after discount and no discount on the ERP's line. The
+ * printed rate and discount ride along for the note. `billDiscount` is a
+ * discount on the whole bill, spread over the lines on their value after
+ * their own discounts - the last line takes the remainder.
+ */
+function computePi(lines, charges, roundOff, billDiscount) {
+  var money = lines.map(lineMoneyOf);
+  var netTotal = money.reduce(function (s, m) { return s + m.net; }, 0);
+  var bill = round2(num(billDiscount) || 0);
+  var spread = 0;
+  money.forEach(function (m, i) {
+    if (!bill || !(netTotal > 0)) return;
+    var share = i === money.length - 1 ? round2(bill - spread) : round2(bill * m.net / netTotal);
+    spread = round2(spread + share);
+    m.discount = round2(m.discount + share);
+    m.net = round2(m.gross - m.discount);
+    m.pct = null;
   });
+  var basics = money.map(function (m) { return m.net; });
   var basic = round2(basics.reduce(function (s, b) { return s + b; }, 0));
   var freight = round2((charges || []).reduce(function (s, c) { return s + (num(c.amount) || 0); }, 0));
   var shared = 0;
@@ -1961,7 +2177,11 @@ function computePi(lines, charges, roundOff) {
     var c = round2(taxable * (num(l.cgstPercentage) || 0) / 100);
     var s = round2(taxable * (num(l.sgstPercentage) || 0) / 100);
     var g = round2(taxable * (num(l.igstPercentage) || 0) / 100);
-    return { basic: basics[i], share: share, taxable: taxable, cgst: c, sgst: s, igst: g, total: round2(taxable + c + s + g) };
+    var q = piQtyOf(l);
+    return { printedRate: num(l.rate), printedGross: money[i].gross, pct: money[i].pct, discount: money[i].discount,
+      // The posted rate, and the landed rate with it: after discount.
+      rate: money[i].discount && q > 0 ? round2(basics[i] / q) : num(l.rate),
+      basic: basics[i], share: share, taxable: taxable, cgst: c, sgst: s, igst: g, total: round2(taxable + c + s + g) };
   });
   var sum = function (k) { return round2(rows.reduce(function (t, r) { return t + r[k]; }, 0)); };
   var cgst = sum('cgst'); var sgst = sum('sgst'); var igst = sum('igst');
@@ -2069,12 +2289,13 @@ var PI_GRID = [
   ['F-Year', function (l) { return text(l.poFYear); }],
   ['Group Name', function (l) { return text(l.itemGroupName); }],
   ['HSN Code', function (l) { return text(l.expectedHsn || l.hsn); }],
-  ['Landed Price', function (l) { return amt(l.rate); }, 'num'],
+  ['Landed Price', function (l, c) { return amt(c.rate); }, 'num'],
 ];
 
 /**
  * Draw the screen. `m` is the model: {lines, charges, roundOffDirty,
- * supplierName, supplierGstin, onRate(line, value), onChange(), printedTotal}.
+ * supplierName, supplierGstin, onRate(line, value), onChange(), printedTotal,
+ * billDiscount}.
  * Returns the figures.
  */
 function renderPiScreen(p, m) {
@@ -2085,7 +2306,7 @@ function renderPiScreen(p, m) {
   id('piState').textContent = GST_STATES[code] ? 'State : ' + GST_STATES[code] : '';
 
   var typed = m.roundOffDirty ? num(id('roundOffAmount').value) : null;
-  var c = computePi(m.lines, m.charges, typed);
+  var c = computePi(m.lines, m.charges, typed, m.billDiscount);
   if (!m.roundOffDirty) id('roundOffAmount').value = c.roundOff.toFixed(2);
 
   var over = overReceipts(m.lines);
@@ -2107,8 +2328,22 @@ function renderPiScreen(p, m) {
       var cell = row.insertCell();
       if (col[2]) cell.className = col[2];
       if (col[0] === 'Rate') {
-        var off = num(line.matchedPoRate) !== null && num(line.rate) !== null
-          && Math.abs(num(line.rate) - num(line.matchedPoRate)) > 0.01;
+        // As INV005 judges it: the rate after any discount against the PO's.
+        var figs = c.rows[i];
+        var paid = figs.rate;
+        var off = num(line.matchedPoRate) !== null && paid !== null
+          && Math.abs(paid - num(line.matchedPoRate)) > 0.01;
+        if (figs.discount) {
+          // Posted at the rate after discount; the printed rate and discount
+          // are a note. They are corrected in step 2, where they were read.
+          cell.textContent = amt(paid);
+          var printed = figs.printedRate + (figs.pct ? ' less ' + pctText(figs.pct) + '%' : ' less ' + money(figs.discount));
+          cell.appendChild(el('small', 'cell-note', printed));
+          cell.title = 'Printed ' + money(figs.printedRate) + ' x qty = ' + money(figs.printedGross) + ', less discount '
+            + money(figs.discount) + ': posted at ' + money(paid) + '. PO rate ' + money(line.matchedPoRate) + '.';
+          if (off) cell.classList.add('needs');
+          return;
+        }
         var input = el('input', 'cell-input' + (off ? ' needs' : ''));
         // 'any': a supplier's 17.925 a sheet must go in as billed.
         input.type = 'number'; input.min = '0'; input.step = 'any';
@@ -2276,9 +2511,10 @@ function newGrnPiModel() {
     supplierName: sup ? sup.LedgerName : '',
     supplierGstin: h.supplierGstin || supplierGstinFor(supplierId),
     printedTotal: state.entryMode === 'ai' ? num(h.grandTotal) : null,
+    billDiscount: num(h.discount),
     onRate: function (line, v) { editLine(line.lineNo, { rate: v }, 'piStatus'); },
     onBilled: function (line, v) { editLine(line.lineNo, { billedKg: v }, 'piStatus'); },
-    onChange: function () { hide('previewPanel'); renderPiTotals(); },
+    onChange: function () { hide('previewPanel'); renderPiTotals(); syncFreightLedger(); },
   };
 }
 

@@ -536,6 +536,21 @@ table.lines tr.unmatched:hover td { background: var(--block-soft); }
 .check .reason { margin-top: 9px; }
 .check .reason input { background: var(--surface); }
 
+/* A block someone ignored: still shown as failed, but greyed and dashed, so
+   it reads as excused rather than as passing or as still blocking. */
+.check-ignored {
+  border-color: var(--line-strong); border-left-color: var(--block); border-left-style: dashed;
+  background: var(--surface-sunken); color: var(--ink-2);
+}
+.check-ignored .check-sev { color: var(--block); }
+.check > .link { align-self: flex-start; margin-top: 6px; }
+.check .ignored-by { margin-top: 6px; font-size: 12.5px; color: var(--ink); }
+.check .ignored-by .link { margin-left: 10px; }
+.check .ignore-hint { margin: 6px 0 0; }
+.check .ignore-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+.check .ignore-actions button:not(.link) { padding: 6px 13px; font-size: 12.5px; }
+.check .ignore-actions .status { margin: 0; }
+
 /* ── preview ──────────────────────────────────────────────────────────── */
 
 .voucher-nos { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -1162,3 +1177,7 @@ table.charges-table select.cell-select { font-size: 12px; }
 @media (max-width: 720px) {
   .suggest li { padding: 12px; min-height: 44px; font-size: 15px; }
 }
+
+/* A rate posted after discount: the printed rate and discount underneath. */
+table.lines td .cell-note { display: block; font-size: 0.75em; color: var(--ink-3); white-space: nowrap; }
+table.lines td.needs { background: var(--warn-soft); }
