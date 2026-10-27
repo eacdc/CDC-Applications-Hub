@@ -1236,6 +1236,68 @@ function renderPending() {
   }
 }
 
+// -- phones: rows become cards ----------------------------------------------
+
+/** The width at which the stylesheet turns table rows into cards. */
+var PHONE_QUERY = '(max-width: 720px)';
+function isPhone() { return window.matchMedia(PHONE_QUERY).matches; }
+
+/**
+ * Tell every cell which column it belongs to. On a phone the stylesheet shows
+ * each row as a card and prints this label above each value, so no render
+ * function has to know about it: whatever a table's rows are built from, the
+ * labels follow from its heading row.
+ */
+function labelCells(table) {
+  var head = table.rows[0];
+  if (!head) return;
+  var labels = Array.prototype.map.call(head.cells, function (c) { return c.textContent.trim(); });
+  Array.prototype.forEach.call(table.rows, function (row) {
+    Array.prototype.forEach.call(row.cells, function (cell, i) {
+      var label = cell.colSpan > 1 ? '' : (labels[i] || '');
+      if (cell.dataset.label !== label) cell.dataset.label = label;
+      if (cell.tagName === 'TD') {
+        // The name of the thing: shown large and across the whole card.
+        cell.classList.toggle('cell-title', /^(item name|description|supplier|tax ledger)$/i.test(label));
+      }
+    });
+  });
+}
+
+/** Keep every table's labels current as its rows are rebuilt. */
+function watchTables() {
+  var tables = Array.prototype.slice.call(document.querySelectorAll('table.lines'));
+  if (typeof MutationObserver !== 'undefined') {
+    // The callback runs before the browser paints, so a rebuilt table never
+    // shows a frame of unlabelled cards. Only the tables that changed are redone.
+    var observer = new MutationObserver(function (records) {
+      var changed = [];
+      records.forEach(function (r) {
+        var t = r.target.closest ? r.target.closest('table.lines') : null;
+        if (t && changed.indexOf(t) === -1) changed.push(t);
+      });
+      changed.forEach(labelCells);
+    });
+    tables.forEach(function (t) { observer.observe(t, { childList: true, subtree: true }); });
+  }
+  tables.forEach(labelCells);
+  // The search boxes are shut on a phone until asked for.
+  Array.prototype.forEach.call(document.querySelectorAll('.filters-toggle'), function (btn) {
+    btn.addEventListener('click', function () {
+      var open = $(btn.dataset.target).classList.toggle('filters-open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      btn.textContent = open ? 'Hide filters' : 'Filters';
+    });
+  });
+  // Turning the phone, or resizing: the scroll boxes size themselves again.
+  var mq = window.matchMedia(PHONE_QUERY);
+  var resize = function () {
+    ['pendingWrap', 'regWrap'].forEach(function (id) { if ($(id)) $(id).style.maxHeight = ''; });
+    sizePendingBox(); sizeRegisterBox();
+  };
+  if (mq.addEventListener) mq.addEventListener('change', resize); else if (mq.addListener) mq.addListener(resize);
+}
+
 // -- red flags ---------------------------------------------------------------
 
 var FLAG_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">'
@@ -1488,6 +1550,7 @@ function sizePendingBox() {
   var wrap = $('pendingWrap');
   var table = $('pendingTable');
   if (!wrap || wrap.offsetParent === null) return;   // hidden: sized when shown
+  if (isPhone()) { wrap.style.maxHeight = '65vh'; return; }   // cards: a screenful, then scroll
   var height = table.tHead ? table.tHead.offsetHeight : 0;
   var rows = table.tBodies[0] ? table.tBodies[0].rows : [];
   for (var i = 0; i < Math.min(10, rows.length); i++) height += rows[i].offsetHeight;
@@ -2458,6 +2521,7 @@ function sizeRegisterBox() {
   var wrap = $('regWrap');
   var table = $('registerTable');
   if (!wrap || wrap.offsetParent === null) return;
+  if (isPhone()) { wrap.style.maxHeight = '70vh'; return; }
   var height = table.tHead ? table.tHead.offsetHeight : 0;
   var rows = table.tBodies[0] ? table.tBodies[0].rows : [];
   for (var i = 0; i < Math.min(15, rows.length); i++) height += rows[i].offsetHeight;
@@ -2902,6 +2966,7 @@ $('previewBtn').addEventListener('click', preview);
 $('startManualBtn').addEventListener('click', startManual);
 // History's purchase invoice screen is a copy of step 5's, ids prefixed "gp".
 $('gpScreenHost').innerHTML = $('piScreen').outerHTML.replace(/\bid="/g, 'id="gp');
+watchTables();
 $('roundOffAmount').addEventListener('input', function () { state.roundOffDirty = $('roundOffAmount').value !== ''; hide('previewPanel'); renderPiTotals(); });
 $('addChargeBtn').addEventListener('click', function () {
   state.charges = state.charges || [];

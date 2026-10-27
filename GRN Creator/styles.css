@@ -987,3 +987,158 @@ table.charges-table select.cell-select { font-size: 12px; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+/* ── phones: a table's rows become cards ───────────────────────────────────
+   A 16-column grid cannot be read on a 375px screen, and sideways scrolling
+   hides half of every row. Under 720px each row is a card; script.js
+   (labelCells) puts the column heading on every cell as data-label, and it is
+   printed above its value here. The headings row is hidden. */
+.filters-toggle { display: none; }
+
+@media (max-width: 880px) {
+  .pi-bottom { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+}
+
+@media (max-width: 720px) {
+  .filters-toggle { display: inline-flex; align-items: center; min-height: 36px; padding: 0 2px; }
+  .table-wrap, .scroll-box { overflow-x: visible; }
+  .scroll-box { overflow-y: auto; overscroll-behavior: contain; padding: 8px; }
+
+  table.lines, table.lines thead, table.lines tbody {
+    display: block; width: 100% !important; min-width: 0 !important;
+  }
+  table.lines {
+    table-layout: auto !important; border: 0 !important; border-radius: 0 !important;
+    overflow: visible !important; background: none; margin-top: 10px; font-size: 13.5px;
+  }
+  .scroll-box thead { position: static; }
+  table.lines tr:has(> th) { display: none !important; }
+
+  /* The search boxes: shut by default, opened by the Filters button. */
+  .filters-open table.lines tr.filter-row {
+    display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px 10px;
+    padding: 10px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+    background: var(--surface-2);
+  }
+  .filters-open table.lines tr.filter-row th {
+    display: block; padding: 0 !important; background: none; box-shadow: none; border: 0; min-width: 0;
+    text-transform: none; letter-spacing: 0; font-size: 12px;
+  }
+  .filters-open table.lines tr.filter-row th:empty { display: none; }
+  .filters-open table.lines tr.filter-row th::before {
+    content: attr(data-label); display: block; margin-bottom: 3px;
+    font-size: 10.5px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3);
+  }
+  .filters-open table.lines input.filter, .filters-open table.lines select.filter {
+    width: 100%; min-height: 40px; font-size: 16px; padding: 6px 9px;
+  }
+
+  /* One row, one card. */
+  table.lines tbody tr {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 9px 14px;
+    padding: 12px; margin: 0 0 10px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  }
+  table.lines tbody tr:last-child { margin-bottom: 0; }
+  table.lines tr.unmatched { background: var(--block-soft); border-color: var(--block); }
+  table.lines tr.closed { background: var(--warn-soft); }
+  table.grid-table tbody tr.pick { cursor: pointer; }
+  table.grid-table tbody tr.used { background: var(--ok-soft); }
+  table.grid-table tbody tr.rate-hit { box-shadow: inset 4px 0 0 var(--ok); }
+
+  /* The column widths of the wide layout mean nothing to a card. */
+  table.lines th, table.lines td { width: auto !important; max-width: none !important; }
+  table.lines td {
+    display: block; min-width: 0; padding: 0 !important; border: 0 !important;
+    background: transparent !important; text-align: left !important;
+    white-space: normal !important; overflow: visible !important; text-overflow: clip !important;
+    overflow-wrap: anywhere; font-size: 13.5px !important; color: var(--ink);
+  }
+  table.lines td::before {
+    content: attr(data-label); display: block; margin-bottom: 3px;
+    font-size: 10.5px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3);
+  }
+  table.lines td[data-label=""]::before, table.lines td:not([data-label])::before,
+  table.lines td.cell-title::before, table.lines td.empty::before { content: none; }
+  table.lines td:empty { display: none; }
+
+  table.lines td.cell-title { grid-column: 1 / -1; font-size: 14.5px !important; font-weight: 600; }
+  table.lines td.empty, table.lines td[colspan] { grid-column: 1 / -1; text-align: center !important; color: var(--ink-3); }
+  table.lines td[data-label="Warehouse"], table.lines td[data-label^="Ref Supp"] { grid-column: 1 / -1; }
+  table.lines td[data-label="#"]::before { content: 'Line'; }
+  table.lines td[data-label="#"] { font-weight: 650; }
+  table.lines td .from-invoice { font-weight: 400; }
+
+  /* What a person types goes first; the facts they check against follow. */
+  table.lines td[data-label="#"], table.lines td[data-label="GRN No."], table.lines td[data-label="P.O. No."] { order: -10; }
+  table.lines td.cell-title { order: -9; }
+  table.lines td[data-label^="Receipt Qty"], table.pi-grid td[data-label="Rate"],
+  table.lines td[data-label^="Pending Qty"] { order: -8; }
+  table.lines td[data-label="Warehouse"], table.lines td[data-label^="Ref Supp"] { order: -7; }
+  table.lines td.row-actions { order: 99; }
+  table.pi-grid td[data-label="Narration"] { display: none; }
+
+  /* Buttons and links in a card: big enough for a thumb. */
+  table.lines td.row-actions {
+    grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 20px;
+    padding-top: 8px !important; border-top: 1px solid var(--line) !important;
+  }
+  table.lines td.row-actions .link { margin: 0; padding: 8px 0; min-height: 36px; }
+  table.lines input:not([type="checkbox"]), table.lines select, button.ref-pick {
+    width: 100%; min-height: 42px; font-size: 16px !important; padding: 6px 10px;
+  }
+  table.lines input.cell-input { text-align: left; }
+  table.lines input[type="checkbox"] { width: 22px; height: 22px; }
+  button.ref-pick { white-space: normal; text-align: left; height: auto; font-size: 13.5px !important; padding: 8px 10px; }
+
+  /* The two long grids (Pending POs, the GRN register): what identifies the row
+     and what is decided on it come first and large; the many other facts are
+     smaller, three to a row, so a card is not a screenful. */
+  table.grid-table tbody tr { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px 10px; }
+  table.grid-table td { grid-column: span 2; font-size: 12.5px !important; }
+  table.grid-table td::before { font-size: 9.5px; margin-bottom: 2px; }
+  table.grid-table td.cell-title, table.grid-table td[data-label^="Ref Supp"],
+  table.grid-table td.row-actions { grid-column: 1 / -1; }
+  table.grid-table td[data-label="P.O. No."], table.grid-table td[data-label="GRN No."],
+  table.grid-table td[data-label^="Pending Qty"], table.grid-table td[data-label="Date"],
+  table.grid-table td[data-label="D.N. No."] {
+    grid-column: span 3; font-size: 13.5px !important;
+  }
+  table.grid-table td[data-label^="Pending Qty"] { font-weight: 650; }
+
+  /* The purchase invoice: three small fields to a row, the rest as usual. */
+  table.pi-grid tbody tr { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 9px 10px; }
+  table.pi-grid td { grid-column: span 2; font-size: 12.5px !important; }
+  table.pi-grid td::before { font-size: 9.5px; }
+  table.pi-grid td[data-label="Item Name"], table.pi-grid td[data-label="P.O. No."] { grid-column: 1 / -1; }
+  table.pi-grid td[data-label="Receipt Qty"], table.pi-grid td[data-label="Rate"] { grid-column: span 3; font-size: 13.5px !important; }
+  table.pi-grid td[data-label="Receipt Qty"]::before, table.pi-grid td[data-label="Rate"]::before { font-size: 10.5px; }
+  table.pi-grid td.over-receipt { padding-right: 0 !important; }
+  table.pi-grid td .over-flag { right: 2px; top: 0; }
+
+  /* The charges. GST rows are one line, the name and its amount; a freight
+     row is its ledger, then the amount to type, its tax %, and Delete. The
+     ticks (Calcu. on, GST applic., In amount) never change, so are not shown. */
+  table.charges-table tbody tr { grid-template-columns: repeat(6, minmax(0, 1fr)); align-items: end; padding: 10px 12px; }
+  table.charges-table td { grid-column: span 2; }
+  table.charges-table td[data-label="Calcu. ON"], table.charges-table td[data-label="GST Applic."],
+  table.charges-table td[data-label="In Amount"] { display: none; }
+  table.charges-table td[data-label="Tax Ledger"] { grid-column: span 4; order: -9; font-weight: 600; }
+  table.charges-table td[data-label="Tax Ledger"]::before, table.charges-table td[data-label="Amount"]:not(:has(input))::before { content: none; }
+  table.charges-table td[data-label="Tax Ledger"]:has(select) { grid-column: 1 / -1; }
+  table.charges-table td[data-label="Amount"] { order: -8; text-align: right !important; font-weight: 600; }
+  table.charges-table td[data-label="Amount"]:has(input) { grid-column: span 3; text-align: left !important; }
+  table.charges-table tr:not(:has(select)) td[data-label="Tax %"] { display: none; }
+  table.charges-table td[data-label="Tax %"] { grid-column: span 1; }
+  table.charges-table td[data-label=""] { grid-column: span 2; text-align: right !important; white-space: nowrap !important; }
+
+  /* The rest of the page, at phone width. */
+  .pi-sums, .pi-sums.grid-3 { grid-template-columns: 1fr 1fr; }
+  .pi-sums label:nth-child(n) { min-width: 0; }
+  .post-row, .history-actions { flex-wrap: wrap; }
+  .post-row button, #matchBtn, #previewBtn { min-height: 44px; }
+  .grid-head { flex-wrap: wrap; gap: 6px 12px; }
+  .app-tabs .tab { padding: 10px 14px; }
+}
+
+.checks-count:empty { display: none; }

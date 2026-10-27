@@ -152,6 +152,7 @@
     <div class="grid-head">
       <h3>Pending POs <span id="pendingCount" class="count"></span></h3>
       <span class="hint">Type under any heading to search.</span>
+      <button type="button" class="link filters-toggle" data-target="pendingWrap" aria-expanded="false">Filters</button>
     </div>
     <p class="hint">Tick each invoice item under <b>Ref Supp inv item</b> on the PO line it belongs to; the matcher's choices are ticked already.</p>
     <div class="table-wrap scroll-box" id="pendingWrap"><table class="lines grid-table" id="pendingTable"></table></div>
@@ -264,6 +265,7 @@
   <div class="grid-head">
     <button id="regLoad" class="primary" type="button">Show</button>
     <span class="hint" id="regSummary"></span>
+    <button type="button" class="link filters-toggle" data-target="regWrap" aria-expanded="false">Filters</button>
   </div>
   <div class="table-wrap scroll-box" id="regWrap"><table class="lines grid-table" id="registerTable"></table></div>
   <p id="registerStatus" class="status"></p>
