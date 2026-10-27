@@ -1142,3 +1142,18 @@ table.charges-table select.cell-select { font-size: 12px; }
 }
 
 .checks-count:empty { display: none; }
+
+/* Supplier suggestions: our own list, as phones do not show a <datalist> dependably. */
+.suggest {
+  position: absolute; z-index: 70; margin: 0; padding: 4px; list-style: none; overflow-y: auto;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .22); overscroll-behavior: contain;
+}
+.suggest li { padding: 9px 10px; border-radius: 6px; cursor: pointer; font-size: 14px; line-height: 1.3; }
+.suggest li small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--ink-3); }
+.suggest li.on, .suggest li:hover { background: var(--accent-soft); }
+.suggest li.none { color: var(--ink-3); cursor: default; }
+.suggest li.none:hover { background: none; }
+@media (max-width: 720px) {
+  .suggest li { padding: 12px; min-height: 44px; font-size: 15px; }
+}

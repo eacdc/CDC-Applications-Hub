@@ -339,15 +339,6 @@ async function loadReference() {
 
   fillChargeSelect('freightLedgerId', null);
 
-  var supplierList = $('supplierList');
-  supplierList.innerHTML = '';
-  state.reference.suppliers.forEach(function (row) {
-    var option = el('option');
-    // The datalist shows the name; the id is recovered on input.
-    option.value = row.LedgerName + '  [' + row.LedgerID + ']';
-    supplierList.appendChild(option);
-  });
-
   state.defaultWarehouseId = num($('defaultWarehouse').value);
   paintDefaultWarehouse();
 }
@@ -362,6 +353,114 @@ function paintDefaultWarehouse() {
 }
 
 // -- supplier picker --------------------------------------------------------
+
+/**
+ * A suggestion list under a box that picks a supplier. This replaces the
+ * browser's own <datalist>, which phones do not show dependably: some browsers
+ * (Samsung Internet, in-app ones) ignore it, and iPhones show it only as a
+ * strip above the keyboard. The box ends up holding "Name  [id]" as before, so
+ * everything that reads it is unchanged.
+ *
+ * Every word typed must appear somewhere in the supplier's name, city, GSTIN
+ * or code, in any order: "krishna van" finds "Krishna Vanijya Pvt Ltd".
+ */
+function attachSupplierSuggest(input) {
+  var box = el('ul', 'suggest hidden');
+  box.setAttribute('role', 'listbox');
+  document.body.appendChild(box);
+  var shown = [];
+  var active = -1;
+
+  function find(typed) {
+    var words = String(typed || '').toLowerCase().replace(/\[\d+\]\s*$/, '').split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    return (state.reference.suppliers || []).filter(function (r) {
+      var hay = [r.LedgerName, r.City, r.GSTNo, r.LedgerCode].join(' ').toLowerCase();
+      return words.every(function (w) { return hay.indexOf(w) !== -1; });
+    }).slice(0, 40);
+  }
+
+  function place() {
+    var r = input.getBoundingClientRect();
+    var vv = window.visualViewport;
+    var top = vv ? vv.offsetTop : 0;
+    var height = vv ? vv.height : window.innerHeight;
+    var below = top + height - r.bottom - 8;
+    var above = r.top - top - 8;
+    box.style.left = (r.left + window.pageXOffset) + 'px';
+    box.style.width = r.width + 'px';
+    // With a phone keyboard open there may be little room below the box.
+    if (below < 180 && above > below) {
+      box.style.maxHeight = Math.max(120, Math.min(320, above)) + 'px';
+      box.style.top = '';
+      box.style.bottom = (document.documentElement.clientHeight - (r.top + window.pageYOffset) + 4) + 'px';
+    } else {
+      box.style.maxHeight = Math.max(120, Math.min(320, below)) + 'px';
+      box.style.bottom = '';
+      box.style.top = (r.bottom + window.pageYOffset + 4) + 'px';
+    }
+  }
+
+  function close() { box.classList.add('hidden'); active = -1; }
+
+  function pick(row) {
+    input.value = row.LedgerName + '  [' + row.LedgerID + ']';
+    close();
+    // The same event typing makes, so whatever listens to the box carries on.
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.blur();   // puts the phone keyboard away
+  }
+
+  function mark(i) {
+    active = i;
+    Array.prototype.forEach.call(box.children, function (li, k) { li.classList.toggle('on', k === i); });
+    if (box.children[i] && box.children[i].scrollIntoView) box.children[i].scrollIntoView({ block: 'nearest' });
+  }
+
+  function open() {
+    // A finished choice ("Name  [id]") needs no suggestions.
+    if (/\[\d+\]\s*$/.test(input.value)) { close(); return; }
+    shown = find(input.value);
+    box.innerHTML = '';
+    if (!input.value.trim()) { close(); return; }
+    if (!shown.length) {
+      box.appendChild(el('li', 'none', 'No supplier matches "' + input.value.trim() + '".'));
+    }
+    shown.forEach(function (row, i) {
+      var li = el('li');
+      li.setAttribute('role', 'option');
+      li.appendChild(document.createTextNode(row.LedgerName));
+      var meta = [row.City, row.GSTNo].filter(Boolean).join('  -  ');
+      if (meta) li.appendChild(el('small', null, meta));
+      // pointerdown, not click: the box must not lose focus (and close) first.
+      li.addEventListener('pointerdown', function (e) { e.preventDefault(); });
+      li.addEventListener('click', function () { pick(row); });
+      li.addEventListener('mousemove', function () { if (active !== i) mark(i); });
+      box.appendChild(li);
+    });
+    active = -1;
+    box.classList.remove('hidden');
+    place();
+  }
+
+  input.addEventListener('input', open);
+  input.addEventListener('focus', open);
+  input.addEventListener('keydown', function (e) {
+    if (box.classList.contains('hidden')) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); mark(Math.min(shown.length - 1, active + 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); mark(Math.max(0, active - 1)); }
+    else if (e.key === 'Enter' && active >= 0 && shown[active]) { e.preventDefault(); pick(shown[active]); }
+    else if (e.key === 'Escape') { close(); }
+  });
+  // Tapping anywhere else closes it.
+  document.addEventListener('pointerdown', function (e) {
+    if (e.target !== input && !box.contains(e.target)) close();
+  });
+  var reposition = function () { if (!box.classList.contains('hidden')) place(); };
+  window.addEventListener('resize', reposition);
+  window.addEventListener('scroll', reposition, true);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', reposition);
+}
 
 function onSupplierInput() {
   var typed = $('supplierSearch').value;
@@ -2993,6 +3092,8 @@ $('postBtn').addEventListener('click', post);
 $('refreshHistory').addEventListener('click', loadHistory);
 $('deleteDraftsBtn').addEventListener('click', deleteDrafts);
 $('supplierSearch').addEventListener('input', onSupplierInput);
+attachSupplierSuggest($('supplierSearch'));
+attachSupplierSuggest($('regSupplier'));
 $('defaultWarehouse').addEventListener('change', function () {
   state.defaultWarehouseId = num($('defaultWarehouse').value);
   $('warehouseHint').textContent = '';

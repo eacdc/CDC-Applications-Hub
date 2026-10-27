@@ -76,8 +76,7 @@
   </div>
   <div class="grid grid-2">
     <label>Supplier ledger
-      <input id="supplierSearch" list="supplierList" placeholder="Filled in from the invoice - or type a name" autocomplete="off">
-      <datalist id="supplierList"></datalist>
+      <input id="supplierSearch" placeholder="Filled in from the invoice - or type a name" autocomplete="off" autocapitalize="none" spellcheck="false">
       <small class="source" id="supplierNote"></small>
     </label>
     <label>Selected<input id="supplierLedgerId" readonly></label>
@@ -259,7 +258,7 @@
   <div class="grid grid-4">
     <label>From<input id="regFrom" type="date"></label>
     <label>To<input id="regTo" type="date"></label>
-    <label>Supplier<input id="regSupplier" list="supplierList" placeholder="All suppliers" autocomplete="off"></label>
+    <label>Supplier<input id="regSupplier" placeholder="All suppliers" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
     <label>GRN / D.N. no.<input id="regSearch" placeholder="e.g. REC04597 or 0710"></label>
   </div>
   <div class="grid-head">
