@@ -538,7 +538,6 @@ async function changeSupplier(id) {
     });
     state.documentSet.context = state.documentSet.context || {};
     state.documentSet.context.supplierLedgerId = num(id);
-    hide('previewPanel');
     if (state.entryMode === 'manual') {
       // The server has taken every line off the old supplier's POs. Show that,
       // and the new supplier's PO lines to pick from.
@@ -723,6 +722,7 @@ async function extract() {
       body: { supplierLedgerId: num($('supplierLedgerId').value), slots: { supplierInvoice: slots } },
     });
     state.setId = set._id;
+    resetSaveButton();
 
     setStatus('captureStatus', 'Reading the invoice - this is the one slow step...');
     state.documentSet = await api('/receiving/document-sets/' + state.setId + '/extract', { method: 'POST' });
@@ -730,7 +730,7 @@ async function extract() {
     paintSupplier();
     renderReview();
     fillGrnDetails(state.documentSet.extractedHeader || {});
-    ['matchPanel', 'grnPanel', 'piPanel', 'previewPanel'].forEach(hide);
+    ['matchPanel', 'grnPanel', 'piPanel'].forEach(hide);
     show('reviewPanel');
     loadDefaults();   // in the background; it only pre-fills
 
@@ -779,11 +779,12 @@ async function startManual() {
       },
     });
     state.setId = set._id;
+    resetSaveButton();
     state.documentSet = set;
     state.checks = [];
     state.reasons = {};
     state.flagEdited = {};
-    ['reviewPanel', 'previewPanel'].forEach(hide);
+    ['reviewPanel'].forEach(hide);
     fillGrnDetails(set.extractedHeader || {});
     ['matchPanel', 'grnPanel', 'piPanel'].forEach(show);
     renderReceipt(); renderChecks({}); renderPiTotals();
@@ -949,7 +950,6 @@ async function match() {
     });
     await runMatch('reviewStatus');
     ['matchPanel', 'grnPanel', 'piPanel'].forEach(show);
-    hide('previewPanel');
     loadPendingPos();
     setStatus('reviewStatus', '', null);
   } catch (err) {
@@ -984,7 +984,6 @@ async function setScope(scope) {
   state.includeClosed = includeClosed;
   paintScope();
   if (!state.setId || $('matchPanel').classList.contains('hidden')) return;
-  hide('previewPanel');   // a preview from the other scope would mislead
   try {
     await runMatch('matchStatus');
     await loadPendingPos();
@@ -1657,7 +1656,6 @@ async function placeFromGrid(lineNo, detailId) {
       method: 'POST', body: detailId ? { poTransactionDetailId: detailId, poTransactionId: poTransactionIdFor(detailId) } : { unplace: true },
     });
     applyMatchResult(result);
-    hide('previewPanel');
     var line = (state.documentSet.extractedLines || []).filter(function (l) { return String(l.lineNo) === String(lineNo); })[0];
     setStatus('matchStatus', detailId
       ? 'Line ' + lineNo + ' is now on ' + (line && line.poVoucherNo) + '.'
@@ -1691,7 +1689,6 @@ async function assign(lineNo, detailId) {
       method: 'POST', body: { poTransactionDetailId: detailId, poTransactionId: poTransactionIdFor(detailId) },
     });
     applyMatchResult(result);
-    hide('previewPanel');
     flashLine(lineNo, 'stockQty');
     var placed = (state.documentSet.extractedLines || []).filter(function (l) {
       return String(l.lineNo) === String(lineNo);
@@ -1712,7 +1709,6 @@ async function addLine(detailId) {
       method: 'POST', body: { poTransactionDetailId: detailId, poTransactionId: poTransactionIdFor(detailId) },
     });
     applyMatchResult(result);
-    hide('previewPanel');
     var added = (state.documentSet.extractedLines || []).filter(function (l) {
       return String(l.lineNo) === String(result.lineNo);
     })[0];
@@ -1744,7 +1740,6 @@ async function editLine(lineNo, edit, statusId) {
       method: 'PATCH', body: edit,
     });
     applyMatchResult(result);
-    hide('previewPanel');
     setStatus(statusId, 'Line ' + lineNo + ' updated.', 'ok');
   } catch (err) {
     setStatus(statusId, err.message, 'error');
@@ -1757,7 +1752,6 @@ async function removeLine(lineNo) {
   try {
     var result = await api('/receiving/document-sets/' + state.setId + '/lines/' + lineNo, { method: 'DELETE' });
     applyMatchResult(result);
-    hide('previewPanel');
     setStatus('matchStatus', 'Line ' + lineNo + ' removed.', 'ok');
   } catch (err) {
     setStatus('matchStatus', err.message, 'error');
@@ -1951,7 +1945,6 @@ function applyCheckResult(result) {
   state.documentSet = result.documentSet;
   state.checks = result.checks || [];
   // Whatever preview was on screen was built under the old checks.
-  hide('previewPanel');
   renderChecks(result);
 }
 
@@ -2295,7 +2288,8 @@ var PI_GRID = [
 /**
  * Draw the screen. `m` is the model: {lines, charges, roundOffDirty,
  * supplierName, supplierGstin, onRate(line, value), onChange(), printedTotal,
- * billDiscount}.
+ * billDiscount}, and optionally onBilled(line, kg) and onQty(line, qty) - the
+ * Receipt Qty is typed into only where they are given.
  * Returns the figures.
  */
 function renderPiScreen(p, m) {
@@ -2375,6 +2369,19 @@ function renderPiScreen(p, m) {
             m.onBilled(line, v === null || Math.abs(v - (num(line.qty) || 0)) < 0.0005 ? null : v);
           });
           cell.appendChild(kg);
+        } else if (m.onQty) {
+          // Any other line bills what the GRN receives, so this is the GRN's
+          // quantity too: step 4 follows, in both its units.
+          var q = el('input', 'cell-input' + (!(num(line.qty) > 0) ? ' needs' : ''));
+          q.type = 'number'; q.min = '0'; q.step = 'any';
+          q.value = text(line.qty);
+          q.dataset.field = 'qty';
+          q.dataset.line = line.lineNo;
+          q.setAttribute('aria-label', 'Receipt qty, line ' + line.lineNo);
+          q.title = why.length ? why.join('\n') : 'Receipt qty in ' + text(line.purchaseUnit || line.uom) + ' - the GRN receives the same.';
+          if (why.length) q.classList.add('flag-on');
+          q.addEventListener('change', function () { m.onQty(line, num(q.value)); });
+          cell.appendChild(q);
         } else {
           var shown = col[1](line, c.rows[i]);
           cell.textContent = shown;
@@ -2514,7 +2521,12 @@ function newGrnPiModel() {
     billDiscount: num(h.discount),
     onRate: function (line, v) { editLine(line.lineNo, { rate: v }, 'piStatus'); },
     onBilled: function (line, v) { editLine(line.lineNo, { billedKg: v }, 'piStatus'); },
-    onChange: function () { hide('previewPanel'); renderPiTotals(); syncFreightLedger(); },
+    onQty: function (line, v) {
+      if (v === null) { renderPiTotals(); return; }
+      setStatus('piStatus', 'Saving line ' + line.lineNo + '...');
+      editLine(line.lineNo, { qty: v }, 'piStatus');
+    },
+    onChange: function () { renderPiTotals(); syncFreightLedger(); },
   };
 }
 
@@ -2542,14 +2554,31 @@ function missingForPost() {
   return missing;
 }
 
-/** Save steps 4 and 5, refresh the checks against them, then dry-run. */
-async function preview() {
+/** A new invoice gets the button back, whatever the last one did. */
+function resetSaveButton() {
+  $('saveErpBtn').disabled = false;
+  $('saveErpBtn').textContent = 'Save to ERP';
+}
+
+/**
+ * Save steps 4 and 5, refresh the checks against them, build the vouchers
+ * without writing them - so anything the server would refuse is refused
+ * before anyone is asked - then, on one confirmation, write them to the ERP.
+ */
+async function saveToErp() {
   var missing = missingForPost();
   if (missing.length) {
     setStatus('piStatus', 'Still needed: ' + missing.join(', ') + '.', 'error');
     return;
   }
-  $('previewBtn').disabled = true;
+  var flagged = openFieldFlags().length;
+  if (flagged) {
+    setStatus('piStatus', flagged + ' field' + (flagged === 1 ? ' is' : 's are') + ' still red-flagged. Correct each one, '
+      + 'or click its flag and mark it checked, then save.', 'error');
+    return;
+  }
+  $('saveErpBtn').disabled = true;
+  var posted = false;
   try {
     setStatus('piStatus', 'Saving the GRN details...');
     await api('/receiving/document-sets/' + state.setId, {
@@ -2559,92 +2588,57 @@ async function preview() {
     // Gate entry or e-way bill can change what the checks say.
     await runMatch('piStatus');
 
-    setStatus('piStatus', 'Building the vouchers without writing them...');
-    var result = await api('/receiving/document-sets/' + state.setId + '/post?dryRun=true', {
+    setStatus('piStatus', 'Checking the vouchers before writing them...');
+    var dry = await api('/receiving/document-sets/' + state.setId + '/post?dryRun=true', {
       method: 'POST', body: { context: postContext(), dryRun: true },
     });
-    state.erpWritesEnabled = Boolean(result.erpWritesEnabled);
-    renderPreview(result);
-    show('previewPanel');
-    $('previewPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    setStatus('piStatus', '', null);
-  } catch (err) {
-    var detail = err.payload && err.payload.checks
-      ? ' (' + err.payload.checks.map(function (c) { return c.code + (c.lineNo ? ' line ' + c.lineNo : ''); }).join(', ') + ')'
-      : '';
-    setStatus('piStatus', err.message + detail, 'error');
-  } finally {
-    $('previewBtn').disabled = false;
-  }
-}
-
-/**
- * The voucher numbers are the headline. A number of 1 means the FYear filter
- * matched nothing - the allocator bug - so it is shown red, where it cannot
- * be missed, rather than left in the JSON.
- */
-function renderPreview(result) {
-  var host = $('voucherNos');
-  host.innerHTML = '';
-
-  [['GRN', result.grn], ['Purchase invoice', result.pi]].forEach(function (pair) {
-    var voucherNo = pair[1] && pair[1].voucherNo ? pair[1].voucherNo : '-';
-    var box = el('div', 'voucher-no' + (/00001_/.test(voucherNo) ? ' bad' : ''));
-    box.appendChild(el('small', null, pair[0]));
-    box.appendChild(document.createTextNode(voucherNo));
-    host.appendChild(box);
-  });
-
-  var fy = el('div', 'voucher-no' + (/^\d{4}-\d{4}$/.test(result.fYear || '') ? '' : ' bad'));
-  fy.appendChild(el('small', null, 'FYear column'));
-  fy.appendChild(document.createTextNode(result.fYear || '-'));
-  host.appendChild(fy);
-
-  $('grnPreview').textContent = JSON.stringify(result.grn, null, 2);
-  $('piPreview').textContent = JSON.stringify(result.pi, null, 2);
-  $('closePreview').textContent = JSON.stringify(result.closedLines || [], null, 2);
-
-  if (state.erpWritesEnabled) {
-    $('postBtn').disabled = false;
-    $('postNote').textContent = 'ERP writes are ENABLED on this server. This writes real vouchers.';
+    state.erpWritesEnabled = Boolean(dry.erpWritesEnabled);
+    if (!state.erpWritesEnabled) {
+      show('writeBadge');
+      setStatus('piStatus', 'Saving to the ERP is off on this server (SP_ENABLE_ERP_WRITES is not true, or no write '
+        + 'login is configured). Nothing has been written.', 'error');
+      return;
+    }
     hide('writeBadge');
-  } else {
-    $('postBtn').disabled = true;
-    $('postNote').textContent =
-      'Posting is off: SP_ENABLE_ERP_WRITES is not true, or no write login is configured.';
-    show('writeBadge');
-  }
-}
+    // An FYear that is not "2026-2027" would number the vouchers from 1.
+    if (!/^\d{4}-\d{4}$/.test(dry.fYear || '')) {
+      setStatus('piStatus', 'The financial year came out as "' + (dry.fYear || '') + '", so the voucher numbers would be '
+        + 'wrong. Nothing has been written.', 'error');
+      return;
+    }
 
-async function post() {
-  var flagged = openFieldFlags().length;
-  if (flagged) {
-    setStatus('previewStatus', flagged + ' field' + (flagged === 1 ? ' is' : 's are') + ' still red-flagged. Correct each one, '
-      + 'or click its flag and mark it checked, then post.', 'error');
-    return;
-  }
-  var ok = window.confirm('Write a real GRN and purchase invoice to ' + state.context.site
-    + '? This cannot be undone from here.');
-  if (!ok) return;
+    var pi = dry.pi || {};
+    var totals = pi.totals || {};
+    var closing = (dry.closedLines || []).length;
+    var ok = window.confirm('Save to ' + state.context.site + ' ERP?\n\n'
+      + 'Supplier invoice ' + text(pi.invoiceNo) + '\n'
+      + 'GRN: ' + ((dry.grn && dry.grn.lines) || []).length + ' line(s)\n'
+      + 'Purchase invoice: basic ' + money(totals.totalBasicAmount) + ', tax ' + money(totals.totalTaxAmount)
+      + (num(totals.freight) ? ', freight ' + money(totals.freight) : '') + ', net ' + money(totals.netAmount) + '\n'
+      + (closing ? closing + ' PO line(s) will close.\n' : '')
+      + '\nThis writes a real GRN and purchase invoice and cannot be undone from here.');
+    if (!ok) { setStatus('piStatus', 'Not saved.', null); return; }
 
-  $('postBtn').disabled = true;
-  try {
-    setStatus('previewStatus', 'Posting...');
+    setStatus('piStatus', 'Saving to the ERP...');
     var overrides = Object.keys(state.reasons).map(function (code) {
       return { code: code, reason: state.reasons[code] };
     });
     var result = await api('/receiving/document-sets/' + state.setId + '/post', {
       method: 'POST', body: { context: postContext(), overrides: overrides },
     });
-    setStatus('previewStatus',
-      'Posted. GRN ' + result.grn.voucherNo + ', purchase invoice ' + result.pi.voucherNo + '.', 'ok');
+    posted = true;
+    $('saveErpBtn').textContent = 'Saved to ERP';
+    setStatus('piStatus',
+      'Saved. GRN ' + result.grn.voucherNo + ', purchase invoice ' + result.pi.voucherNo + '.', 'ok');
     await loadHistory();
   } catch (err) {
     var detail = err.payload && err.payload.checks
-      ? ' - ' + err.payload.checks.map(function (c) { return c.code; }).join(', ')
+      ? ' (' + err.payload.checks.map(function (c) { return c.code + (c.lineNo ? ' line ' + c.lineNo : ''); }).join(', ') + ')'
       : '';
-    setStatus('previewStatus', err.message + detail, 'error');
-    $('postBtn').disabled = false;
+    setStatus('piStatus', err.message + detail, 'error');
+  } finally {
+    // Once written, the button stays off: a second click would only be refused as already posted.
+    $('saveErpBtn').disabled = posted;
   }
 }
 
@@ -3277,7 +3271,7 @@ async function deleteDrafts() {
     if (fileErrors) msg += ' ' + fileErrors + ' file(s) could not be removed.';
     setStatus('historyStatus', msg, fileErrors ? 'warn' : 'ok');
 
-    ['reviewPanel', 'matchPanel', 'grnPanel', 'piPanel', 'previewPanel'].forEach(hide);
+    ['reviewPanel', 'matchPanel', 'grnPanel', 'piPanel'].forEach(hide);
     state.setId = null;
     state.documentSet = null;
   } catch (err) {
@@ -3296,18 +3290,17 @@ $('signOutBtn').addEventListener('click', signOut);
 $('extractBtn').addEventListener('click', extract);
 $('matchBtn').addEventListener('click', match);
 $('rematchBtn').addEventListener('click', function () {
-  hide('previewPanel');
   runMatch('matchStatus').catch(function (err) { setStatus('matchStatus', err.message, 'error'); });
 });
-$('previewBtn').addEventListener('click', preview);
+$('saveErpBtn').addEventListener('click', saveToErp);
 $('startManualBtn').addEventListener('click', startManual);
 // History's purchase invoice screen is a copy of step 5's, ids prefixed "gp".
 $('gpScreenHost').innerHTML = $('piScreen').outerHTML.replace(/\bid="/g, 'id="gp');
 watchTables();
-$('roundOffAmount').addEventListener('input', function () { state.roundOffDirty = $('roundOffAmount').value !== ''; hide('previewPanel'); renderPiTotals(); });
+$('roundOffAmount').addEventListener('input', function () { state.roundOffDirty = $('roundOffAmount').value !== ''; renderPiTotals(); });
 $('addChargeBtn').addEventListener('click', function () {
   state.charges = state.charges || [];
-  addCharge('', state.charges, function () { hide('previewPanel'); renderPiTotals(); });
+  addCharge('', state.charges, function () { renderPiTotals(); });
 });
 $('billNo').addEventListener('input', function () { state.billNoDirty = true; });
 // A D.N. no. typed by hand is the bill no. too, until the bill no. is changed.
@@ -3326,7 +3319,6 @@ $('gpSaveBtn').addEventListener('click', saveGrnPi);
 $('gpCloseBtn').addEventListener('click', function () { hide('grnPiPanel'); state.gp = null; });
 $('geMakePiBtn').addEventListener('click', function () { openGrnPi(state.grn.transactionId); });
 window.addEventListener('resize', sizePendingBox);
-$('postBtn').addEventListener('click', post);
 $('refreshHistory').addEventListener('click', loadHistory);
 $('deleteDraftsBtn').addEventListener('click', deleteDrafts);
 $('supplierSearch').addEventListener('input', onSupplierInput);

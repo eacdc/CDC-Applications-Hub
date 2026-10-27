@@ -551,35 +551,6 @@ table.lines tr.unmatched:hover td { background: var(--block-soft); }
 .check .ignore-actions button:not(.link) { padding: 6px 13px; font-size: 12.5px; }
 .check .ignore-actions .status { margin: 0; }
 
-/* ── preview ──────────────────────────────────────────────────────────── */
-
-.voucher-nos { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
-
-.voucher-no {
-  flex: 1 1 200px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  font-family: var(--mono);
-  font-size: 19px;
-  font-weight: 600;
-  letter-spacing: -.01em;
-  padding: 14px 18px;
-  border-radius: var(--radius-sm);
-  background: var(--ok-soft);
-  border: 1px solid var(--ok-line);
-  color: var(--ok);
-}
-.voucher-no.bad { background: var(--block-soft); border-color: var(--block-line); color: var(--block); }
-.voucher-no small {
-  font-family: inherit;
-  font-size: 10px;
-  font-weight: 650;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--ink-3);
-}
-
 pre {
   margin: 0;
   padding: 14px 16px;
@@ -602,7 +573,6 @@ pre {
   padding-top: 20px;
   border-top: 1px solid var(--line);
 }
-#postNote { font-size: 12.5px; max-width: 60ch; }
 
 /* ── receive against POs ──────────────────────────────────────────────── */
 
@@ -1156,7 +1126,7 @@ table.charges-table select.cell-select { font-size: 12px; }
   .pi-sums, .pi-sums.grid-3 { grid-template-columns: 1fr 1fr; }
   .pi-sums label:nth-child(n) { min-width: 0; }
   .post-row, .history-actions { flex-wrap: wrap; }
-  .post-row button, #matchBtn, #previewBtn { min-height: 44px; }
+  .post-row button, #matchBtn, #saveErpBtn { min-height: 44px; }
   .grid-head { flex-wrap: wrap; gap: 6px 12px; }
   .app-tabs .tab { padding: 10px 14px; }
 }
