@@ -522,7 +522,6 @@ table.lines tr.unmatched:hover td { background: var(--block-soft); }
   font-size: 13px;
   line-height: 1.5;
 }
-.check-pass { border-color: var(--ok-line); border-left-color: var(--ok); background: var(--ok-soft); }
 .check-warn { border-color: var(--warn-line); border-left-color: var(--warn); background: var(--warn-soft); }
 .check-block { border-color: var(--block-line); border-left-color: var(--block); background: var(--block-soft); }
 

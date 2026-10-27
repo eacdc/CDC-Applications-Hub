@@ -1761,36 +1761,6 @@ async function removeLine(lineNo) {
 // -- checks -----------------------------------------------------------------
 
 /**
- * The checks, in a section that folds away. The count in its heading stays
- * visible when it is folded, coloured by the worst result, so a blocking
- * failure cannot hide.
- */
-/** What a check confirms when it passes; its message says what failed. */
-var CHECK_PASSED = {
-  INV001: 'Not posted before - no GRN in the ERP has this invoice no. from this supplier',
-  INV002: 'Every line is on an open PO of this supplier',
-  INV003: 'No line receives more than 10% over what is still pending on its PO',
-  INV004: 'Sheets and kg agree within 1%',
-  INV005: 'Every rate, after any discount, matches its PO rate',
-  INV006: 'Every line amount equals quantity x rate',
-  INV007: 'The lines add up to the invoice subtotal',
-  INV008: 'Taxable value equals the goods after discount + freight',
-  INV009: 'GST equals taxable value x rate',
-  INV010: 'Grand total equals taxable + tax + round off',
-  INV011: 'Round off is within ±₹1',
-  INV012: 'Tax type (CGST + SGST, or IGST) fits the supplier and plant states',
-  INV013: "Billed to CDC's GSTIN",
-  INV014: 'E-way bill given where the amount needs one',
-  INV015: 'Invoice date is not in the future',
-  INV016: 'Invoice date is within the last 90 days',
-  INV017: "HSN matches the item's HSN",
-  INV018: 'Freight, if any, has a ledger',
-  INV019: 'None of the POs is already fully received',
-  INV020: 'Every discount works out: amount less discount is the value after it',
-  INV021: 'No discount was left unread - the figures add up as read',
-};
-
-/**
  * Blocks that cannot be ignored, and what to do instead. The server's list
  * (services/check-overrides.js) is the one that counts; this only keeps an
  * Ignore button off a check the server would refuse to ignore.
@@ -1807,6 +1777,11 @@ function isIgnored(c) {
   return !c.passed && c.severity === 'BLOCK' && Boolean(c.overrideReason);
 }
 
+/**
+ * The checks, in a section that folds away. Only the failures are listed;
+ * the count in its heading stays visible when it is folded, coloured by the
+ * worst result, so a blocking failure cannot hide.
+ */
 function renderChecks(result) {
   var host = $('checksList');
   host.innerHTML = '';
@@ -1832,26 +1807,24 @@ function renderChecks(result) {
     $('checksBox').open = outcome === 'failed';
   }
 
-  // Failures first - a passing check is evidence, not news.
-  state.checks.slice().sort(function (a, b) {
-    return (a.passed ? 1 : 0) - (b.passed ? 1 : 0);
-  }).forEach(function (c) {
-    var kind = c.passed ? 'check-pass'
-      : isIgnored(c) ? 'check-ignored'
-        : (c.severity === 'BLOCK' ? 'check-block' : 'check-warn');
+  // Only what failed - a passing check needs nothing from anyone.
+  if (state.checks.length && !failed.length) {
+    host.appendChild(el('p', 'muted', 'All ' + state.checks.length + ' checks passed.'));
+  }
+  failed.forEach(function (c) {
+    var kind = isIgnored(c) ? 'check-ignored'
+      : (c.severity === 'BLOCK' ? 'check-block' : 'check-warn');
     var box = el('div', 'check ' + kind);
 
     var line = el('div');
     line.appendChild(el('code', null, c.code + (c.lineNo ? ' - line ' + c.lineNo : '')));
-    line.appendChild(document.createTextNode(c.passed ? (CHECK_PASSED[c.code] || c.message) : c.message));
-    if (!c.passed) {
-      line.appendChild(el('span', 'check-sev', isIgnored(c) ? 'ignored'
-        : c.severity === 'BLOCK' ? 'blocks posting' : 'needs a reason'));
-    }
+    line.appendChild(document.createTextNode(c.message));
+    line.appendChild(el('span', 'check-sev', isIgnored(c) ? 'ignored'
+      : c.severity === 'BLOCK' ? 'blocks posting' : 'needs a reason'));
     box.appendChild(line);
 
     // A warning posts only with a typed reason, stored on the voucher.
-    if (!c.passed && c.severity === 'WARN') {
+    if (c.severity === 'WARN') {
       var label = el('label', 'reason', 'Reason (required)');
       var input = el('input');
       input.placeholder = 'Why is this acceptable?';
@@ -1863,12 +1836,12 @@ function renderChecks(result) {
     }
     // A block posts only once someone ignores it, with a reason the server
     // stores against their name. Undo puts it back.
-    if (!c.passed && c.severity === 'BLOCK') renderIgnore(box, c);
+    if (c.severity === 'BLOCK') renderIgnore(box, c);
     host.appendChild(box);
   });
 
   setStatus('matchStatus', result && result.isBlocked
-    ? 'Blocking checks failed - the preview and the post are both refused until they are resolved or ignored.'
+    ? 'Blocking checks failed - Save to ERP is refused until they are resolved or ignored.'
     : '', result && result.isBlocked ? 'warn' : null);
 }
 
