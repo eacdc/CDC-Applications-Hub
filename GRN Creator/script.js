@@ -2563,7 +2563,6 @@ function renderRegister() {
     ? (shown.length === grns.length ? '' : shown.length + ' of ')
       + grns.length + ' GRN' + (grns.length === 1 ? '' : 's') + (reg.truncated ? ' (the newest 500 - narrow the dates for the rest)' : '')
       + ' - ' + issued + ' issued from, ' + noPi + ' without a purchase invoice.'
-      + (reg.canEdit ? '' : ' You can view them; editing is for the people named in SP_GRN_EDITORS.')
     : '';
 
   if (!shown.length) {
@@ -2664,8 +2663,7 @@ function renderGrnEdit() {
     notes.push('Purchase invoice ' + g.purchaseInvoices.map(function (p) { return p.voucherNo; }).join(', ')
       + ' is made from it, so its quantities stay as they are until that is deleted in the ERP. The header can still change.');
   }
-  if (!editable) notes.push('You can view this GRN; editing is for the people named in SP_GRN_EDITORS.');
-  else if (!g.writesEnabled) notes.push('ERP writes are off: Check changes shows exactly what would change, and nothing is saved.');
+  if (!g.writesEnabled) notes.push('ERP writes are off: Check changes shows exactly what would change, and nothing is saved.');
   $('grnEditNote').textContent = notes.join(' ');
 
   var h = g.header;
