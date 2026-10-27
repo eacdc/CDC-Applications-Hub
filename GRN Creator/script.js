@@ -838,7 +838,9 @@ var HEADER_FIELDS = [
 ];
 
 var LINE_FIELDS = [
-  ['description', 'Description', false], ['hsn', 'HSN', false],
+  // GSM and size are what match a paper line to its PO line - shown so a
+  // misreading can be corrected here.
+  ['description', 'Description', false], ['gsm', 'GSM', true], ['size', 'Size', false], ['hsn', 'HSN', false],
   ['qty', 'Qty', true], ['uom', 'Unit', false],
   ['rate', 'Rate', true], ['amount', 'Amount', true],
   ['poRef', 'PO ref', false],
@@ -3127,6 +3129,12 @@ document.addEventListener('click', function (e) {
   closePop();
 });
 document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePop(); });
+// A mouse wheel over a focused number box steps its value: scrolling the page
+// would quietly change a quantity. Let go of the box instead, so the page scrolls.
+document.addEventListener('wheel', function (e) {
+  var t = e.target;
+  if (t && t.type === 'number' && t === document.activeElement) t.blur();
+}, { passive: true });
 $('regSearch').addEventListener('keydown', function (e) { if (e.key === 'Enter') loadRegister(); });
 $('geCheckBtn').addEventListener('click', checkGrnEdit);
 $('geSaveBtn').addEventListener('click', saveGrnEdit);
