@@ -1014,7 +1014,13 @@ async function runMatch(statusId) {
 function applyMatchResult(result) {
   state.documentSet = result.documentSet;
   state.checks = result.checks || [];
-  state.reasons = {};
+  // Saving runs the checks again; a reason typed for a warning that still
+  // fails must survive that, or it never reaches the post.
+  var kept = {};
+  state.checks.forEach(function (c) {
+    if (!c.passed && c.severity === 'WARN' && state.reasons[c.code]) kept[c.code] = state.reasons[c.code];
+  });
+  state.reasons = kept;
   var h = state.documentSet.extractedHeader || {};
   // In AI mode these mirror the invoice; in manual mode they are the person's
   // own, possibly unsaved, typing - leave them be.
@@ -2560,6 +2566,15 @@ async function saveToErp() {
     });
     // Gate entry or e-way bill can change what the checks say.
     await runMatch('piStatus');
+    var unexplained = state.checks.filter(function (c) {
+      return !c.passed && c.severity === 'WARN' && !String(state.reasons[c.code] || '').trim();
+    });
+    if (unexplained.length) {
+      $('checksBox').open = true;
+      setStatus('piStatus', 'Type a reason under ' + unexplained.map(function (c) { return c.code; }).join(', ')
+        + ' in Checks, then save. Nothing has been written.', 'error');
+      return;
+    }
 
     setStatus('piStatus', 'Checking the vouchers before writing them...');
     var dry = await api('/receiving/document-sets/' + state.setId + '/post?dryRun=true', {
