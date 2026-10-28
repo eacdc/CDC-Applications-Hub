@@ -2558,14 +2558,22 @@ async function saveToErp() {
   }
   $('saveErpBtn').disabled = true;
   var posted = false;
+  // How long each server step took, shown with the outcome: a slow save
+  // then says which step was slow.
+  var took = [];
+  var since = Date.now();
+  var lap = function (name) { took.push(name + ' ' + ((Date.now() - since) / 1000).toFixed(1) + ' s'); since = Date.now(); };
+  var tookText = function () { return took.length ? ' (' + took.join(', ') + ')' : ''; };
   try {
     setStatus('piStatus', 'Saving the GRN details...');
     await api('/receiving/document-sets/' + state.setId, {
       method: 'PATCH',
       body: { extractedHeader: grnHeader(), context: postContext(), reason: 'GRN details and ledgers' },
     });
+    lap('details');
     // Gate entry or e-way bill can change what the checks say.
     await runMatch('piStatus');
+    lap('checks');
     var unexplained = state.checks.filter(function (c) {
       return !c.passed && c.severity === 'WARN' && !String(state.reasons[c.code] || '').trim();
     });
@@ -2580,6 +2588,7 @@ async function saveToErp() {
     var dry = await api('/receiving/document-sets/' + state.setId + '/post?dryRun=true', {
       method: 'POST', body: { context: postContext(), dryRun: true },
     });
+    lap('voucher check');
     state.erpWritesEnabled = Boolean(dry.erpWritesEnabled);
     if (!state.erpWritesEnabled) {
       show('writeBadge');
@@ -2608,22 +2617,25 @@ async function saveToErp() {
     if (!ok) { setStatus('piStatus', 'Not saved.', null); return; }
 
     setStatus('piStatus', 'Saving to the ERP...');
+    since = Date.now();
     var overrides = Object.keys(state.reasons).map(function (code) {
       return { code: code, reason: state.reasons[code] };
     });
     var result = await api('/receiving/document-sets/' + state.setId + '/post', {
       method: 'POST', body: { context: postContext(), overrides: overrides },
     });
+    lap('ERP write');
     posted = true;
     $('saveErpBtn').textContent = 'Saved to ERP';
     setStatus('piStatus',
-      'Saved. GRN ' + result.grn.voucherNo + ', purchase invoice ' + result.pi.voucherNo + '.', 'ok');
+      'Saved. GRN ' + result.grn.voucherNo + ', purchase invoice ' + result.pi.voucherNo + '.' + tookText(), 'ok');
     await loadHistory();
   } catch (err) {
     var detail = err.payload && err.payload.checks
       ? ' (' + err.payload.checks.map(function (c) { return c.code + (c.lineNo ? ' line ' + c.lineNo : ''); }).join(', ') + ')'
       : '';
-    setStatus('piStatus', err.message + detail, 'error');
+    lap('failed step');
+    setStatus('piStatus', err.message + detail + tookText(), 'error');
   } finally {
     // Once written, the button stays off: a second click would only be refused as already posted.
     $('saveErpBtn').disabled = posted;
