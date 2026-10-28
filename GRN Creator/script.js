@@ -33,7 +33,8 @@ var state = {
   view: 'lines',          // Receipt lines | Pending POs
   poLines: [],            // the Pending POs tab
   filters: {},            // column key -> search text, Pending POs tab
-  defaultWarehouseId: null,
+  defaultWarehouseId: null,      // what a line with no warehouse of its own is saved to
+  defaultWarehouseSource: '',
   entryMode: 'ai',        // 'ai': read an invoice; 'manual': pick PO lines, as on the ERP
 };
 
@@ -331,25 +332,27 @@ async function loadReference() {
     function (r) { return r.LedgerName + (r.Designation ? ' - ' + r.Designation : ''); },
     state.context.employeeLedgerId, 'Choose...');
 
-  fillSelect('defaultWarehouse', state.reference.warehouses, 'WarehouseID',
-    warehouseLabel, state.context.warehouseId, 'Choose...');
-
   fillSelect('purchaseLedgerId', state.reference.purchaseLedgers, 'LedgerID',
     function (r) { return r.LedgerName; }, null, 'Choose...');
 
   fillChargeSelect('freightLedgerId', null);
 
-  state.defaultWarehouseId = num($('defaultWarehouse').value);
-  paintDefaultWarehouse();
+  resetSuggestedWarehouse();
+}
+
+/**
+ * The warehouse a line without one is shown with, and saved to: there is no
+ * GRN-wide warehouse - the ERP keeps it on each line. Your session's own,
+ * until the supplier's last GRN says otherwise (loadDefaults).
+ */
+function resetSuggestedWarehouse() {
+  state.defaultWarehouseId = num(state.context.warehouseId);
+  state.defaultWarehouseSource = state.defaultWarehouseId ? 'your sign-in' : '';
 }
 
 function warehouseName(id) {
   var w = (state.reference.warehouses || []).filter(function (r) { return String(r.WarehouseID) === String(id); })[0];
   return w ? warehouseLabel(w) : null;
-}
-
-function paintDefaultWarehouse() {
-  $('defaultWarehouseName').textContent = warehouseName(state.defaultWarehouseId) || 'not chosen yet';
 }
 
 // -- supplier picker --------------------------------------------------------
@@ -521,7 +524,7 @@ function paintSupplier() {
 
 /** Fields still showing a default, rather than a person's choice. */
 var DEFAULTED = [
-  ['receivedBy', 'receivedByHint'], ['defaultWarehouse', 'warehouseHint'],
+  ['receivedBy', 'receivedByHint'],
   ['purchaseLedgerId', 'purchaseLedgerHint'], ['freightLedgerId', 'freightLedgerHint'],
 ];
 
@@ -552,6 +555,7 @@ async function changeSupplier(id) {
     DEFAULTED.forEach(function (pair) {
       if ($(pair[1]).textContent) { $(pair[0]).value = ''; $(pair[1]).textContent = ''; }
     });
+    resetSuggestedWarehouse();
     await loadDefaults();
 
     paintSupplier();
@@ -822,7 +826,10 @@ async function loadDefaults() {
   try {
     var d = await api('/receiving/document-sets/' + state.setId + '/defaults');
     setDefault('receivedBy', 'receivedByHint', d.receivedBy);
-    setDefault('defaultWarehouse', 'warehouseHint', d.warehouse);
+    if (d.warehouse) {
+      state.defaultWarehouseId = d.warehouse.warehouseId;
+      state.defaultWarehouseSource = d.warehouse.source;
+    }
     setDefault('purchaseLedgerId', 'purchaseLedgerHint', d.purchaseLedger);
     setDefault('freightLedgerId', 'freightLedgerHint', d.freightLedger);
     if ($('freightLedgerHint').textContent) $('freightLedgerHint').textContent += freightShare(d);
@@ -830,8 +837,6 @@ async function loadDefaults() {
     renderPiTotals();
     // Defaults that arrive after Match was pressed: INV018 must see the ledger.
     syncFreightLedger();
-    state.defaultWarehouseId = num($('defaultWarehouse').value);
-    paintDefaultWarehouse();
     if (state.documentSet && state.documentSet.extractedLines) renderReceipt();
   } catch (err) {
     /* Defaults are a convenience; every field can still be chosen by hand. */
@@ -1164,6 +1169,7 @@ function renderReceipt() {
       var blank = el('option', null, 'Choose...'); blank.value = ''; blank.selected = true;
       select.insertBefore(blank, select.firstChild);
     }
+    if (!line.warehouseId && current) select.title = 'From ' + state.defaultWarehouseSource + '. Change it if the goods went elsewhere.';
     select.addEventListener('change', function () { setLineWarehouse(line.lineNo, select.value); });
     whCell.appendChild(select);
 
@@ -1431,11 +1437,10 @@ function watchTables() {
 var FLAG_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">'
   + '<path d="M5 22V3h12.5l-2 4 2 4H7v11z" fill="currentColor"/></svg>';
 /** Step 4's own inputs for header fields shown there. */
-var FLAG_STEP4 = { invoiceNo: 'dnNo', invoiceDate: 'dnDate', eWayBillNo: 'eWayBillNo', gateEntryNo: 'gateEntryNo',
-  gateEntryDate: 'gateEntryDate', vehicleNo: 'vehicleNo' };
+var FLAG_STEP4 = { invoiceNo: 'dnNo', invoiceDate: 'dnDate', gateEntryNo: 'gateEntryNo',
+  gateEntryDate: 'gateEntryDate' };
 /** Names for the fields step 2 does not show: they live on step 4's form. */
-var FLAG_STEP4_LABELS = { eWayBillNo: 'E-way bill', gateEntryNo: 'Gate entry no.',
-  gateEntryDate: 'Gate entry date', vehicleNo: 'Vehicle no.' };
+var FLAG_STEP4_LABELS = { gateEntryNo: 'Gate entry no.', gateEntryDate: 'Gate entry date' };
 
 /** What a flagged field is called, as the summary line names it. */
 function flagLabel(field) {
@@ -1448,11 +1453,17 @@ function flagLabel(field) {
   return (line ? line[1] : 'Qty, rate and amount') + ' on line ' + m[1];
 }
 
+/**
+ * Never flagged: CDC does not hold a GRN over the e-way bill, the vehicle
+ * number or a line's HSN. An invoice read before that may still carry one.
+ */
+var NOT_FLAGGED = /^(eWayBillNo|vehicleNo|lines\.\d+\.hsn)$/;
+
 /** Open flags, less the ones a person has already changed on the page. */
 function openFieldFlags() {
   var edited = state.flagEdited || {};
   return ((state.documentSet && state.documentSet.fieldFlags) || []).filter(function (f) {
-    return !f.resolved && !edited[f.field];
+    return !f.resolved && !edited[f.field] && !NOT_FLAGGED.test(f.field);
   });
 }
 
@@ -2007,7 +2018,8 @@ function grnHeader() {
 function postContext() {
   var out = freightContext();
   out.employeeLedgerId = num($('receivedBy').value);
-  out.warehouseId = num($('defaultWarehouse').value);
+  // For a line nobody chose a warehouse for: the one its picker shows.
+  out.warehouseId = state.defaultWarehouseId || null;
   out.purchaseLedgerId = num($('purchaseLedgerId').value);
   return out;
 }
@@ -2525,7 +2537,9 @@ function missingForPost() {
   var noQty = lines.filter(function (l) { return !(num(l.qty) > 0); }).map(function (l) { return l.lineNo; });
   if (noQty.length) missing.push('the quantity received on line ' + lineNoList(noQty));
   if (!$('receivedBy').value) missing.push('received by');
-  if (!$('defaultWarehouse').value) missing.push('warehouse');
+  var noWh = lines.filter(function (l) { return !num(l.warehouseId) && !state.defaultWarehouseId; })
+    .map(function (l) { return l.lineNo; });
+  if (noWh.length) missing.push('the warehouse on line ' + lineNoList(noWh));
   if (!$('purchaseLedgerId').value) missing.push('purchase ledger');
   if ((state.charges || []).some(function (c) { return num(c.amount) > 0 && !num(c.ledgerId); })) missing.push('a ledger on every freight row');
   if ((state.charges || []).some(function (c) { return num(c.ledgerId) && !(num(c.amount) > 0); })) missing.push('the amount on every freight row');
@@ -3324,12 +3338,6 @@ $('deleteDraftsBtn').addEventListener('click', deleteDrafts);
 $('supplierSearch').addEventListener('input', onSupplierInput);
 attachSupplierSuggest($('supplierSearch'));
 attachSupplierSuggest($('regSupplier'));
-$('defaultWarehouse').addEventListener('change', function () {
-  state.defaultWarehouseId = num($('defaultWarehouse').value);
-  $('warehouseHint').textContent = '';
-  paintDefaultWarehouse();
-  if (state.documentSet) renderReceipt();
-});
 // A person's choice replaces the "From ..." note: it is no longer a default.
 [['receivedBy', 'receivedByHint'], ['purchaseLedgerId', 'purchaseLedgerHint'],
   ['freightLedgerId', 'freightLedgerHint']].forEach(function (pair) {
