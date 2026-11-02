@@ -27,7 +27,8 @@
   };
   var DEFAULTS = {
     preset: '100x75', width: 100, height: 75, font: 10, barHeight: 16,
-    module: 3, margin: 3, offsetX: 0, offsetY: 0, dpi: 203
+    module: 3, margin: 3, offsetX: 0, offsetY: 0, dpi: 203,
+    rotate: 1 // the roll feeds the label tall, so the layout is printed turned 90° like the old exe
   };
 
   /* Code 39, digits and the start/stop '*'. 1 = wide element; bar, space, bar ... */
@@ -130,7 +131,7 @@
   var SETTING_INPUTS = {
     preset: 'set-preset', width: 'set-width', height: 'set-height', font: 'set-font',
     barHeight: 'set-bar-height', module: 'set-module', margin: 'set-margin',
-    offsetX: 'set-offset-x', offsetY: 'set-offset-y', dpi: 'set-dpi'
+    offsetX: 'set-offset-x', offsetY: 'set-offset-y', dpi: 'set-dpi', rotate: 'set-rotate'
   };
 
   function fillSettingsForm() {
@@ -163,8 +164,10 @@
 
   function applyPageSize() {
     var s = state.settings;
+    var w = s.rotate ? s.height : s.width;
+    var h = s.rotate ? s.width : s.height;
     $('page-style').textContent =
-      '@page { size: ' + s.width + 'mm ' + s.height + 'mm; margin: 0; }';
+      '@page { size: ' + w + 'mm ' + h + 'mm; margin: 0; }';
   }
 
   /* ---------------- barcode + label ---------------- */
@@ -201,10 +204,20 @@
     var line = function (label, value, wrap) {
       return '<div class="label-line' + (wrap ? ' wrap' : '') + '">' + label + ' : ' + esc(value) + '</div>';
     };
-    return '<div class="label" style="width:' + s.width + 'mm;height:' + s.height + 'mm;font-size:' + s.font + 'pt">' +
+    // Sideways: the page is height x width, and the layout is turned 90° clockwise
+    // so the text runs down the right side and the barcode sits on the left.
+    var page = s.rotate
+      ? 'width:' + s.height + 'mm;height:' + s.width + 'mm'
+      : 'width:' + s.width + 'mm;height:' + s.height + 'mm';
+    var turn = s.rotate
+      ? 'position:absolute;left:0;top:0;width:' + s.width + 'mm;height:' + s.height + 'mm;' +
+        'transform-origin:0 0;transform:translateX(' + s.height + 'mm) rotate(90deg)'
+      : 'position:absolute;inset:0';
+    return '<div class="label" style="' + page + ';font-size:' + s.font + 'pt">' +
+      '<div style="' + turn + '">' +
       '<div class="label-inner" style="left:' + (s.margin + s.offsetX) + 'mm;top:' + (s.margin + s.offsetY) + 'mm;' +
       'width:' + (s.width - 2 * s.margin) + 'mm;height:' + (s.height - 2 * s.margin) + 'mm">' +
-      line('Client Name', data.clientName) +
+      line('Client Name', data.clientName, true) +
       line('PWO NO', data.jobBookingNo) +
       line('Product Code', data.productCode) +
       line('Product Name', data.jobName, true) +
@@ -213,7 +226,7 @@
       line('Packing Date', data.packedDate) +
       '<div class="label-barcode" style="align-self:center">' + bar.svg + '</div>' +
       '<div class="label-number" style="align-self:center">' + code + '</div>' +
-      '</div>' +
+      '</div></div>' +
       (overlay ? '<div class="label-dry">' + esc(overlay) + '</div>' : '') +
       '</div>';
   }

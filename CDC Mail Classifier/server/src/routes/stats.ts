@@ -39,11 +39,11 @@ router.get('/', async (_req: Request, res: Response) => {
       if (row._id) byMailType[row._id] = row.count;
     }
 
-    let nano = 0;
-    let mini = 0;
+    let cheap = 0;
+    let strong = 0;
     for (const row of classifierAgg) {
-      if (row._id === config.models.cheap) nano = row.count;
-      else if (row._id === config.models.strong) mini = row.count;
+      if (row._id === config.models.cheap) cheap = row.count;
+      else if (row._id === config.models.strong) strong = row.count;
     }
 
     const stats: StatsResponse = {
@@ -52,7 +52,7 @@ router.get('/', async (_req: Request, res: Response) => {
       byDepartment,
       byMailType,
       reviewPercent: totalAll > 0 ? Math.round((needsReview / totalAll) * 1000) / 10 : 0,
-      classifierSplit: { nano, mini },
+      classifierSplit: { cheap, strong },
     };
 
     res.json(stats);

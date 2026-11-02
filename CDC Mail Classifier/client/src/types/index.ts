@@ -67,7 +67,7 @@ export interface StatsResponse {
   byDepartment: Record<string, number>;
   byMailType: Record<string, number>;
   reviewPercent: number;
-  classifierSplit: { nano: number; mini: number };
+  classifierSplit: { cheap: number; strong: number };
 }
 
 export interface InboxRecord {

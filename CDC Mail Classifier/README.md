@@ -1,6 +1,6 @@
 # CDC Mail Classifier
 
-Self-hosted web app that polls Gmail inboxes, classifies incoming mail with OpenAI, and presents a review dashboard for CDC Printers staff.
+Self-hosted web app that polls Gmail inboxes, classifies incoming mail with Claude, and presents a review dashboard for CDC Printers staff.
 
 Replaces an n8n workflow for sorting prepress, production, and packaging email.
 
@@ -12,7 +12,7 @@ Replaces an n8n workflow for sorting prepress, production, and packaging email.
 | Frontend | React, Vite, TypeScript, Tailwind |
 | Database | MongoDB (Mongoose) |
 | Gmail | Gmail API via `googleapis` (OAuth2 refresh tokens) |
-| LLM | OpenAI Chat Completions (two-tier: cheap → strong) |
+| LLM | Claude Messages API (two-tier: Haiku → Sonnet) |
 | Polling | `node-cron` every minute |
 
 ## Project layout
@@ -29,7 +29,7 @@ CDC Mail Classifier/
 - Node.js 20+
 - MongoDB Atlas cluster (or local MongoDB)
 - Google Cloud project with Gmail API enabled
-- OpenAI API key with access to configured models
+- Anthropic API key (console.anthropic.com)
 
 ## Environment variables
 
@@ -38,7 +38,7 @@ Copy `server/.env.example` to `server/.env` and fill in:
 | Variable | Description |
 |----------|-------------|
 | `MONGODB_URI` | MongoDB connection string |
-| `OPENAI_API_KEY` | OpenAI API key |
+| `ANTHROPIC_API_KEY` | Anthropic API key |
 | `GOOGLE_CLIENT_ID` | OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | OAuth client secret |
 | `GOOGLE_REDIRECT_URI` | Must match Google Cloud console (default `http://localhost:3002/api/auth/google/callback`) |
@@ -52,7 +52,7 @@ Generate an encryption key:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-**Model names** are in `server/src/config.ts` (`gpt-5-nano`, `gpt-5.4-mini`). Verify these are enabled on your OpenAI account before running.
+**Model names** default to `claude-haiku-5-5` and `claude-sonnet-5-5` (`server/src/config.ts`); override with `CLAUDE_MODEL_CHEAP` / `CLAUDE_MODEL_STRONG`.
 
 ## MongoDB Atlas setup
 
@@ -136,7 +136,7 @@ http://localhost:3002/api/auth/google?label=prepress&emailAddress=prepress@yourd
 1. **Poll** — every minute, fetch **Gmail INBOX only** (`in:inbox`) from the last 5 minutes per connected account.
 2. **Dedupe** — upsert on `messageId` (unique index). Overlapping poll windows may list the same Gmail ID again, but already-classified mail is skipped (no re-fetch, no re-classify).
 3. **Normalize** — decode body, strip HTML/quotes, cap at 8000 chars.
-4. **Classify** — `gpt-5-nano` first; escalate to `gpt-5.4-mini` if confidence &lt; 0.6 or parse failure.
+4. **Classify** — `claude-haiku-5-5` first; escalate to `claude-sonnet-5-5` if confidence &lt; 0.6 or parse failure.
 5. **Store** — persist metadata + classification; flag `needsReview` when confidence &lt; 0.7.
 6. **Agent logs** — each model call saves full prompt input + raw/parsed output in `ClassificationStepLog`; MongoDB TTL auto-deletes after 30 days (`AGENT_LOG_RETENTION_DAYS`).
 

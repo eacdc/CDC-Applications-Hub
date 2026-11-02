@@ -189,6 +189,13 @@
               <span>Printer resolution (DPI)</span>
               <input id="set-dpi" type="number" min="150" max="600" step="1" />
             </label>
+            <label class="field">
+              <span>Print direction</span>
+              <select id="set-rotate">
+                <option value="1">Sideways (label fed tall, like the old exe)</option>
+                <option value="0">Upright</option>
+              </select>
+            </label>
           </form>
           <p id="settings-warning" class="warn" hidden></p>
           <div class="form-row">

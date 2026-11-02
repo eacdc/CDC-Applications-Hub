@@ -79,8 +79,8 @@ export default function DashboardPage() {
         <StatCard
           icon={Brain}
           label="Classifier split"
-          value={`${stats?.classifierSplit.nano ?? 0} / ${stats?.classifierSplit.mini ?? 0}`}
-          sub="nano vs mini"
+          value={`${stats?.classifierSplit.cheap ?? 0} / ${stats?.classifierSplit.strong ?? 0}`}
+          sub="haiku vs sonnet"
         />
         <StatCard
           icon={TrendingUp}

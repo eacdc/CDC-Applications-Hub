@@ -37,6 +37,10 @@ export function formatDateCompact(value?: string): string {
 
 export function shortModelName(classifier?: string): string {
   if (!classifier) return '—';
+  if (classifier.includes('haiku')) return 'haiku';
+  if (classifier.includes('sonnet')) return 'sonnet';
+  if (classifier.includes('opus')) return 'opus';
+  // Mail classified before the move to Claude
   if (classifier.includes('nano')) return 'nano';
   if (classifier.includes('mini')) return 'mini';
   return classifier;

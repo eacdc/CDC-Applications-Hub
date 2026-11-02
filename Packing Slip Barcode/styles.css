@@ -166,8 +166,10 @@ td.wrap { white-space: normal; min-width: 200px; }
 .label-line { white-space: nowrap; overflow: hidden; text-overflow: clip; }
 .label-line.wrap {
   white-space: normal;
+  overflow-wrap: anywhere;
+  flex-shrink: 0;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
 }
 .label-barcode { margin-top: auto; }

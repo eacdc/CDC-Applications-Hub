@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import { config } from '../config.js';
 import {
   CLASSIFIER_SYSTEM_PROMPT,
@@ -13,7 +13,8 @@ import type {
   ThreadMessageContext,
 } from '../types/index.js';
 
-const openai = new OpenAI({ apiKey: config.openaiApiKey });
+// The SDK retries rate limits, overloads, 5xx and dropped connections itself.
+const anthropic = new Anthropic({ apiKey: config.anthropicApiKey, maxRetries: 3 });
 
 export interface ClassifyOptions {
   trigger?: AgentStepTrigger;
@@ -40,42 +41,47 @@ const EMPTY_CLASSIFICATION: ClassificationResult = {
   type_specific: {},
 };
 
-function isTransientError(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  const msg = err.message.toLowerCase();
-  return (
-    msg.includes('econnreset') ||
-    msg.includes('etimedout') ||
-    msg.includes('rate limit') ||
-    msg.includes('429') ||
-    msg.includes('503') ||
-    msg.includes('500') ||
-    msg.includes('overloaded')
-  );
+/**
+ * The JSON object in a reply. The prompt asks for JSON only, but a stray
+ * markdown fence or a sentence before the object is not worth a failed
+ * classification.
+ */
+function extractJson(raw: string): string {
+  const t = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+  const start = t.indexOf('{');
+  const end = t.lastIndexOf('}');
+  return start >= 0 && end > start ? t.slice(start, end + 1) : t;
 }
 
-async function withRetry<T>(fn: () => Promise<T>, label: string, maxAttempts = 3): Promise<T> {
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastError = err;
-      if (attempt < maxAttempts && isTransientError(err)) {
-        const delay = attempt * 1500;
-        console.warn(`[OpenAI] ${label} attempt ${attempt} failed, retrying in ${delay}ms`);
-        await new Promise((r) => setTimeout(r, delay));
-        continue;
-      }
-      throw err;
-    }
-  }
-  throw lastError;
+/**
+ * One classification call. `type_specific` is a free-form object, which
+ * structured outputs cannot express, so the shape is held by the prompt and
+ * checked by parseClassification.
+ */
+async function callClaude(model: string, input: AgentStepInput): Promise<string> {
+  const message = await anthropic.messages
+    .stream({
+      model,
+      max_tokens: 8000,
+      // The escalation exists for the hard mails, so it gets to think harder.
+      output_config: { effort: model === config.models.strong ? 'medium' : 'low' },
+      system: input.systemPrompt,
+      messages: [{ role: 'user', content: input.userPrompt }],
+    })
+    .finalMessage();
+
+  if (message.stop_reason === 'refusal') throw new Error(`${model} declined to classify this mail`);
+  if (message.stop_reason === 'max_tokens') throw new Error(`${model} reply was cut off at max_tokens`);
+
+  return message.content
+    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+    .map((block) => block.text)
+    .join('');
 }
 
 function parseClassification(raw: string): ClassificationResult | null {
   try {
-    const parsed = JSON.parse(raw) as Partial<ClassificationResult>;
+    const parsed = JSON.parse(extractJson(raw)) as Partial<ClassificationResult>;
     return {
       department: parsed.department ?? '',
       mail_type: parsed.mail_type ?? '',
@@ -172,19 +178,7 @@ async function runAgentStep(
   let error: string | undefined;
 
   try {
-    const response = await withRetry(
-      () =>
-        openai.chat.completions.create({
-          model,
-          response_format: { type: 'json_object' },
-          messages: [
-            { role: 'system', content: input.systemPrompt },
-            { role: 'user', content: input.userPrompt },
-          ],
-        }),
-      `chat.completions(${model})`,
-    );
-    raw = response.choices[0]?.message?.content ?? '';
+    raw = await callClaude(model, input);
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }

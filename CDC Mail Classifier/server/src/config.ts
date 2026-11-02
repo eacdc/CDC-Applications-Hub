@@ -13,16 +13,16 @@ function requireEnv(name: string): string {
 export const config = {
   port: Number(process.env.PORT ?? 3002),
   mongodbUri: requireEnv('MONGODB_URI'),
-  openaiApiKey: requireEnv('OPENAI_API_KEY'),
+  anthropicApiKey: requireEnv('ANTHROPIC_API_KEY'),
   googleClientId: requireEnv('GOOGLE_CLIENT_ID'),
   googleClientSecret: requireEnv('GOOGLE_CLIENT_SECRET'),
   googleRedirectUri: requireEnv('GOOGLE_REDIRECT_URI'),
   encryptionKey: requireEnv('ENCRYPTION_KEY'),
   clientUrl: process.env.CLIENT_URL ?? 'http://localhost:5175',
-  /** Verify these model names are enabled on your OpenAI account. */
+  /** Claude models: every mail goes to `cheap`; low confidence or a failure escalates to `strong`. */
   models: {
-    cheap: 'gpt-5-nano',
-    strong: 'gpt-5.4-mini',
+    cheap: process.env.CLAUDE_MODEL_CHEAP ?? 'claude-haiku-5-5',
+    strong: process.env.CLAUDE_MODEL_STRONG ?? 'claude-sonnet-5-5',
   },
   poll: {
     cronExpression: '* * * * *',
