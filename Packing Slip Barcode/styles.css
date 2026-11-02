@@ -172,9 +172,11 @@ td.wrap { white-space: normal; min-width: 200px; }
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
 }
-.label-barcode { margin-top: auto; }
+/* The bars shrink when the text runs long, so the number under them always stays on the label. */
+.label-barcode { margin-top: auto; min-height: 6mm; flex-shrink: 1; overflow: hidden; }
 .label-barcode svg { display: block; }
-.label-number { letter-spacing: .08em; }
+.label-line, .label-number { flex-shrink: 0; }
+.label-number { letter-spacing: .15em; font-family: "Courier New", monospace; font-size: 1.4em; line-height: 1.1; }
 .label-dry {
   position: absolute;
   inset: 0;

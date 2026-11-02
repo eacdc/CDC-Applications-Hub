@@ -28,7 +28,7 @@
   var DEFAULTS = {
     preset: '100x75', width: 100, height: 75, font: 10, barHeight: 16,
     module: 3, margin: 3, offsetX: 0, offsetY: 0, dpi: 203,
-    rotate: 1 // the roll feeds the label tall, so the layout is printed turned 90° like the old exe
+    rotate: 0 // text runs across the roll, like the old exe; 1 turns the layout 90°
   };
 
   /* Code 39, digits and the start/stop '*'. 1 = wide element; bar, space, bar ... */
