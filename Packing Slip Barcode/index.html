@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Packing Slip Barcode</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%231f4e79' width='32' height='32' rx='6'/%3E%3Cpath fill='%23fff' d='M7 8h2v16H7zm4 0h1v16h-1zm3 0h3v16h-3zm5 0h1v16h-1zm3 0h3v16h-3z'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+  <style id="page-style"></style>
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="topbar">
+      <div class="brand">
+        <h1>Packing Slip Barcode</h1>
+        <p>Carton labels for finished goods</p>
+      </div>
+      <div class="topbar-controls">
+        <span id="mode-badge" class="badge" hidden></span>
+        <label class="inline-field">
+          <span>Plant</span>
+          <select id="database">
+            <option value="KOL">Kolkata</option>
+            <option value="AHM">Ahmedabad</option>
+          </select>
+        </label>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="Views">
+      <button type="button" class="tab is-active" data-view="print">Print labels</button>
+      <button type="button" class="tab" data-view="reprint">Reprint</button>
+      <button type="button" class="tab" data-view="ranges">Barcode ranges</button>
+      <button type="button" class="tab" data-view="settings">Label size</button>
+    </nav>
+
+    <p id="status" class="status" role="status" hidden></p>
+
+    <!-- Print labels -->
+    <section class="view" data-view="print">
+      <div class="card">
+        <label class="field grow">
+          <span>Find PWO (PWO no, job name or client)</span>
+          <input id="job-search" type="search" placeholder="e.g. 0882" autocomplete="off" />
+        </label>
+        <div id="job-results" class="results" hidden></div>
+      </div>
+
+      <div id="job-panel" class="card" hidden>
+        <div class="job-head">
+          <div>
+            <div class="job-no" id="job-no"></div>
+            <div class="job-name" id="job-name"></div>
+          </div>
+          <button type="button" id="job-clear" class="btn-link">Change PWO</button>
+        </div>
+        <dl class="facts">
+          <div><dt>Client</dt><dd id="job-client"></dd></div>
+          <div><dt>Product code</dt><dd id="job-code"></dd></div>
+          <div><dt>Order qty</dt><dd id="job-order"></dd></div>
+          <div><dt>Labels printed</dt><dd id="job-slips"></dd></div>
+          <div><dt>Qty on labels</dt><dd id="job-slipqty"></dd></div>
+        </dl>
+
+        <form id="generate-form" class="form-row">
+          <label class="field">
+            <span>Quantity per box *</span>
+            <input id="qty-per-box" type="number" min="1" step="1" required />
+          </label>
+          <label class="field">
+            <span>Net wt (kg)</span>
+            <input id="net-wt" type="number" min="0" step="0.01" />
+          </label>
+          <label class="field">
+            <span>Gross wt (kg)</span>
+            <input id="gross-wt" type="number" min="0" step="0.01" />
+          </label>
+          <label class="field">
+            <span>Number of labels *</span>
+            <input id="copies" type="number" min="1" step="1" value="1" required />
+          </label>
+          <button type="submit" id="btn-generate" class="btn-primary">Create &amp; print</button>
+        </form>
+
+        <div id="last-run" class="last-run" hidden></div>
+
+        <h3 class="sub">Labels already printed for this PWO</h3>
+        <div id="job-ranges" class="table-wrap"></div>
+      </div>
+    </section>
+
+    <!-- Reprint -->
+    <section class="view" data-view="reprint" hidden>
+      <div class="card">
+        <p class="hint">Reprints use the numbers already saved. No new barcode is created.</p>
+        <form id="reprint-form" class="form-row">
+          <label class="field">
+            <span>From barcode</span>
+            <input id="reprint-from" type="number" min="1" required />
+          </label>
+          <label class="field">
+            <span>To barcode (optional)</span>
+            <input id="reprint-to" type="number" min="1" />
+          </label>
+          <button type="submit" class="btn-secondary">Find</button>
+        </form>
+        <div id="reprint-result"></div>
+      </div>
+    </section>
+
+    <!-- Ranges -->
+    <section class="view" data-view="ranges" hidden>
+      <div class="card">
+        <form id="ranges-form" class="form-row">
+          <label class="field">
+            <span>From date</span>
+            <input id="ranges-from" type="date" required />
+          </label>
+          <label class="field">
+            <span>To date</span>
+            <input id="ranges-to" type="date" required />
+          </label>
+          <button type="submit" class="btn-secondary">Show</button>
+          <button type="button" id="ranges-export" class="btn-secondary" disabled>Download Excel (CSV)</button>
+        </form>
+        <div id="ranges-result" class="table-wrap"></div>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section class="view" data-view="settings" hidden>
+      <div class="settings-grid">
+        <div class="card">
+          <p class="hint">
+            Use the size of one label on the roll. Set the same paper size in the printer's
+            Windows settings (Printers &amp; scanners &rarr; TVS LP 46 NEO &rarr; Printing preferences).
+            These settings are saved in this browser only.
+          </p>
+          <form id="settings-form" class="settings-form">
+            <label class="field">
+              <span>Label size</span>
+              <select id="set-preset">
+                <option value="100x75">100 &times; 75 mm</option>
+                <option value="100x50">100 &times; 50 mm</option>
+                <option value="100x100">100 &times; 100 mm</option>
+                <option value="100x150">100 &times; 150 mm</option>
+                <option value="75x50">75 &times; 50 mm</option>
+                <option value="50x25">50 &times; 25 mm</option>
+                <option value="custom">Custom size</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Width (mm)</span>
+              <input id="set-width" type="number" min="20" max="110" step="0.5" />
+            </label>
+            <label class="field">
+              <span>Height (mm)</span>
+              <input id="set-height" type="number" min="15" max="300" step="0.5" />
+            </label>
+            <label class="field">
+              <span>Text size (pt)</span>
+              <input id="set-font" type="number" min="5" max="20" step="0.5" />
+            </label>
+            <label class="field">
+              <span>Barcode height (mm)</span>
+              <input id="set-bar-height" type="number" min="5" max="80" step="1" />
+            </label>
+            <label class="field">
+              <span>Bar thickness (printer dots)</span>
+              <select id="set-module">
+                <option value="2">2 dots &mdash; narrow</option>
+                <option value="3">3 dots &mdash; normal</option>
+                <option value="4">4 dots &mdash; wide</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Margin (mm)</span>
+              <input id="set-margin" type="number" min="0" max="10" step="0.5" />
+            </label>
+            <label class="field">
+              <span>Shift right (mm)</span>
+              <input id="set-offset-x" type="number" min="-10" max="10" step="0.5" />
+            </label>
+            <label class="field">
+              <span>Shift down (mm)</span>
+              <input id="set-offset-y" type="number" min="-10" max="10" step="0.5" />
+            </label>
+            <label class="field">
+              <span>Printer resolution (DPI)</span>
+              <input id="set-dpi" type="number" min="150" max="600" step="1" />
+            </label>
+          </form>
+          <p id="settings-warning" class="warn" hidden></p>
+          <div class="form-row">
+            <button type="button" id="btn-test-print" class="btn-secondary">Print test label</button>
+            <button type="button" id="btn-reset-settings" class="btn-link">Reset to defaults</button>
+          </div>
+        </div>
+        <div class="card preview-card">
+          <h3 class="sub">Preview (actual size)</h3>
+          <div id="label-preview" class="preview"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="print-area" class="print-area" aria-hidden="true"></div>
+
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
