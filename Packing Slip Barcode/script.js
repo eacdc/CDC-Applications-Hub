@@ -164,10 +164,8 @@
 
   function applyPageSize() {
     var s = state.settings;
-    var w = s.rotate ? s.height : s.width;
-    var h = s.rotate ? s.width : s.height;
     $('page-style').textContent =
-      '@page { size: ' + w + 'mm ' + h + 'mm; margin: 0; }';
+      '@page { size: ' + s.width + 'mm ' + s.height + 'mm; margin: 0; }';
   }
 
   /* ---------------- barcode + label ---------------- */
@@ -204,19 +202,19 @@
     var line = function (label, value, wrap) {
       return '<div class="label-line' + (wrap ? ' wrap' : '') + '">' + label + ' : ' + esc(value) + '</div>';
     };
-    // Sideways: the page is height x width, and the layout is turned 90° clockwise
-    // so the text runs down the right side and the barcode sits on the left.
-    var page = s.rotate
-      ? 'width:' + s.height + 'mm;height:' + s.width + 'mm'
-      : 'width:' + s.width + 'mm;height:' + s.height + 'mm';
+    // Width x height is the physical label (across the roll x along the feed).
+    // Sideways: the layout box is height x width, turned 90° clockwise, so the
+    // text runs along the feed and the barcode sits on the left, as the old exe did.
+    var bw = s.rotate ? s.height : s.width;
+    var bh = s.rotate ? s.width : s.height;
     var turn = s.rotate
-      ? 'position:absolute;left:0;top:0;width:' + s.width + 'mm;height:' + s.height + 'mm;' +
-        'transform-origin:0 0;transform:translateX(' + s.height + 'mm) rotate(90deg)'
+      ? 'position:absolute;left:0;top:0;width:' + bw + 'mm;height:' + bh + 'mm;' +
+        'transform-origin:0 0;transform:translateX(' + s.width + 'mm) rotate(90deg)'
       : 'position:absolute;inset:0';
-    return '<div class="label" style="' + page + ';font-size:' + s.font + 'pt">' +
+    return '<div class="label" style="width:' + s.width + 'mm;height:' + s.height + 'mm;font-size:' + s.font + 'pt">' +
       '<div style="' + turn + '">' +
       '<div class="label-inner" style="left:' + (s.margin + s.offsetX) + 'mm;top:' + (s.margin + s.offsetY) + 'mm;' +
-      'width:' + (s.width - 2 * s.margin) + 'mm;height:' + (s.height - 2 * s.margin) + 'mm">' +
+      'width:' + (bw - 2 * s.margin) + 'mm;height:' + (bh - 2 * s.margin) + 'mm">' +
       line('Client Name', data.clientName, true) +
       line('PWO NO', data.jobBookingNo) +
       line('Product Code', data.productCode) +
