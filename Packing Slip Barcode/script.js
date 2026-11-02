@@ -18,7 +18,7 @@
 
   /* Starting points per label size; every value can be changed afterwards. */
   var PRESETS = {
-    '100x75': { width: 100, height: 75, font: 10, barHeight: 16, module: 3, margin: 3 },
+    '100x75': { width: 100, height: 75, font: 10, barHeight: 26, module: 3, margin: 3 },
     '100x50': { width: 100, height: 50, font: 8, barHeight: 10, module: 3, margin: 3 },
     '100x100': { width: 100, height: 100, font: 11, barHeight: 22, module: 3, margin: 3 },
     '100x150': { width: 100, height: 150, font: 13, barHeight: 30, module: 4, margin: 4 },
@@ -26,7 +26,7 @@
     '50x25': { width: 50, height: 25, font: 4, barHeight: 5, module: 2, margin: 1.5 }
   };
   var DEFAULTS = {
-    preset: '100x75', width: 100, height: 75, font: 10, barHeight: 16,
+    preset: '100x75', width: 100, height: 75, font: 10, barHeight: 26,
     module: 3, margin: 3, offsetX: 0, offsetY: 0, dpi: 203,
     rotate: 0 // text runs across the roll, like the old exe; 1 turns the layout 90°
   };
