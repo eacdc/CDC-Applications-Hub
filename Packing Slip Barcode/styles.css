@@ -173,10 +173,13 @@ td.wrap { white-space: normal; min-width: 200px; }
   -webkit-box-orient: vertical;
 }
 /* The bars shrink when the text runs long, so the number under them always stays on the label. */
-.label-barcode { margin-top: auto; min-height: 6mm; flex-shrink: 1; overflow: hidden; }
+/* Like the old exe: barcode just under the text, left-aligned, number centred under the bars.
+   The bars shrink when the text runs long, so the number always stays on the label. */
+.label-code { display: flex; flex-direction: column; align-items: center; align-self: flex-start; margin-top: 2mm; min-height: 0; flex-shrink: 1; }
+.label-barcode { min-height: 6mm; flex-shrink: 1; overflow: hidden; }
 .label-barcode svg { display: block; }
 .label-line, .label-number { flex-shrink: 0; }
-.label-number { letter-spacing: .15em; font-family: "Courier New", monospace; font-size: 1.7em; line-height: 1.1; }
+.label-number { letter-spacing: .1em; font-family: "Courier New", monospace; font-weight: 700; font-size: 1.9em; line-height: 1.1; margin-top: .5mm; }
 .label-dry {
   position: absolute;
   inset: 0;
