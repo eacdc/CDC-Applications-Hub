@@ -2859,8 +2859,9 @@ function renderRegister() {
         if (reg.canEdit) {
           var del = el('button', 'link danger-link', 'Delete');
           del.type = 'button';
-          var why = g.piVoucherNo ? 'Purchase invoice ' + g.piVoucherNo + ' is made from it. Delete that in the ERP first.'
-            : g.issued !== 'none' ? 'Stock has been issued from it. Delete those issue lines first.' : '';
+          // A purchase invoice is deleted with it; the server checks the rest.
+          var why = g.issued !== 'none' ? 'Stock has been issued from it. Delete those issue lines first.' : '';
+          if (!why && g.piVoucherNo) del.title = 'Deletes purchase invoice ' + g.piVoucherNo + ', then ' + g.voucherNo + '.';
           if (why) { del.disabled = true; del.title = why; }
           del.addEventListener('click', function () { removeGrn(g.transactionId, g.voucherNo); });
           cell.appendChild(del);
@@ -2921,7 +2922,8 @@ function renderGrnEdit() {
   notes.push('Made in ' + g.madeIn + ', ' + displayDate(g.voucherDate) + '.');
   if (g.purchaseInvoices.length) {
     notes.push('Purchase invoice ' + g.purchaseInvoices.map(function (p) { return p.voucherNo; }).join(', ')
-      + ' is made from it, so its quantities stay as they are until that is deleted in the ERP. The header can still change.');
+      + ' is made from it, so its quantities stay as they are until that is deleted in the ERP. The header can still change.'
+      + ' Delete removes the invoice and the GRN together.');
   }
   if (!g.writesEnabled) notes.push('ERP writes are off: Check changes shows exactly what would change, and nothing is saved.');
   $('grnEditNote').textContent = notes.join(' ');
@@ -3117,26 +3119,40 @@ async function saveGrnEdit() {
   }
 }
 
-/** Delete a GRN: the server checks first (dry run), then asks, then deletes. */
+/**
+ * Delete a GRN, and its purchase invoice first if it has one: the server
+ * checks first (dry run), then this asks - warning about an invoice already in
+ * Tally - then both are deleted in one go.
+ */
 async function removeGrn(transactionId, voucherNo) {
   var status = state.grn && state.grn.transactionId === transactionId ? 'grnEditStatus' : 'registerStatus';
   setStatus(status, 'Checking whether ' + voucherNo + ' can be deleted...');
   try {
     var dry = await api('/receiving/grns/' + transactionId + '/delete?dryRun=true', { method: 'POST', body: {} });
-    var warn = (dry.notes || []).length ? '\n\n' + dry.notes.join('\n') : '';
+    var invoices = dry.invoices || [];
+    var piNames = invoices.map(function (p) { return p.voucherNo; }).join(', ');
+    var what = (piNames ? 'purchase invoice ' + piNames + ', then ' : '') + voucherNo
+      + ' (' + dry.lines + ' line' + (dry.lines === 1 ? '' : 's') + ')';
+    var inTally = invoices.filter(function (p) { return p.postedInTally; }).map(function (p) { return p.voucherNo; });
+    var tallyWarn = inTally.length
+      ? 'WARNING: ' + inTally.join(', ') + ' is already posted in Tally. Deleting it here does not remove it from Tally - reverse it there too.'
+      : '';
+    var warn = (tallyWarn ? '\n\n' + tallyWarn : '') + ((dry.notes || []).length ? '\n\n' + dry.notes.join('\n') : '');
     if (!dry.writesEnabled) {
-      setStatus(status, voucherNo + ' could be deleted (' + dry.lines + ' line' + (dry.lines === 1 ? '' : 's')
-        + '), but ERP writes are off, so nothing has been deleted.' + (warn ? ' ' + dry.notes.join(' ') : ''), 'warn');
+      setStatus(status, 'This would delete ' + what + ', but ERP writes are off, so nothing has been deleted. '
+        + [tallyWarn].concat(dry.notes || []).join(' '), 'warn');
       return;
     }
-    if (!window.confirm('Delete ' + voucherNo + ' and its ' + dry.lines + ' line(s) in the ERP?' + warn)) {
+    if (!window.confirm('Delete ' + what + ' in the ERP?' + warn)) {
       setStatus(status, '', null);
       return;
     }
     var expected = state.grn && state.grn.transactionId === transactionId ? state.grn.modifiedDate : undefined;
-    await api('/receiving/grns/' + transactionId + '/delete', { method: 'POST', body: { expectedModifiedDate: expected } });
+    var done = await api('/receiving/grns/' + transactionId + '/delete', { method: 'POST', body: { expectedModifiedDate: expected } });
     if (state.grn && state.grn.transactionId === transactionId) { hide('grnEditPanel'); state.grn = null; }
-    setStatus('registerStatus', voucherNo + ' deleted.', 'ok');
+    var gone = (done.invoices || []).map(function (p) { return p.voucherNo; });
+    setStatus('registerStatus', (gone.length ? 'Purchase invoice ' + gone.join(', ') + ' and ' : '') + voucherNo + ' deleted.'
+      + (inTally.length ? ' Remember to reverse ' + inTally.join(', ') + ' in Tally.' : ''), inTally.length ? 'warn' : 'ok');
     loadRegister();
   } catch (err) {
     setStatus(status, err.message, 'error');
