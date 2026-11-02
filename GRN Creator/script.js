@@ -2551,6 +2551,8 @@ function missingForPost() {
 function resetSaveButton() {
   $('saveErpBtn').disabled = false;
   $('saveErpBtn').textContent = 'Save to ERP';
+  $('piPrint').innerHTML = '';
+  hide('piPrint');
 }
 
 /**
@@ -2643,6 +2645,11 @@ async function saveToErp() {
     $('saveErpBtn').textContent = 'Saved to ERP';
     setStatus('piStatus',
       'Saved. GRN ' + result.grn.voucherNo + ', purchase invoice ' + result.pi.voucherNo + '.' + tookText(), 'ok');
+    var printRow = $('piPrint');
+    printRow.innerHTML = '';
+    printRow.appendChild(el('span', 'muted', 'Purchase invoice ' + result.pi.voucherNo + ':'));
+    printRow.appendChild(piPrintButtons(result.pi.voucherNo));
+    show('piPrint');
     await loadHistory();
   } catch (err) {
     var detail = err.payload && err.payload.checks
@@ -2838,6 +2845,11 @@ function renderRegister() {
         make.title = 'Make the purchase invoice for ' + g.voucherNo;
         make.addEventListener('click', function () { openGrnPi(g.transactionId); });
         cell.appendChild(make);
+      } else if (col.key === 'piVoucherNo') {
+        cell.className = 'pi-cell';
+        cell.title = shownText;
+        cell.appendChild(el('span', null, shownText));
+        cell.appendChild(piPrintButtons(g.piVoucherNo, true));
       } else if (col.key === 'actions') {
         cell.className = 'row-actions';
         var open = el('button', 'link', reg.canEdit ? 'Edit' : 'View');
@@ -3245,6 +3257,230 @@ async function saveGrnPi() {
   } catch (err) {
     setStatus('gpStatus', err.message, 'error');
   }
+}
+
+// -- purchase invoice print ------------------------------------------------
+
+/**
+ * The purchase invoice as the ERP prints it ("Item Purchase Invoice (GRN)"),
+ * for printing or saving as a PDF. The server lays out the data; this draws it.
+ * Every rule is scoped to .pi-sheet, so the same markup can sit in this page
+ * while the PDF is made.
+ */
+var PI_SHEET_CSS = [
+  '.pi-sheet{width:277mm;box-sizing:border-box;background:#fff;color:#000;font:10px Arial,Helvetica,sans-serif;border:1px solid #000}',
+  '.pi-sheet *{box-sizing:border-box}',
+  '.pi-sheet table{width:100%;border-collapse:collapse}',
+  '.pi-sheet td,.pi-sheet th{padding:3px 4px;vertical-align:top}',
+  '.pi-sheet .pi-head{display:flex;align-items:center;gap:24px;padding:6px 10px;border-bottom:1px solid #000}',
+  '.pi-sheet .pi-head img{width:120px;height:auto}',
+  '.pi-sheet .pi-co{font-size:15px;font-weight:bold;margin-bottom:4px}',
+  '.pi-sheet .pi-lh td{padding:1px 0;font-size:11.5px}',
+  '.pi-sheet .pi-lh td:first-child{font-weight:bold;white-space:nowrap;padding-right:28px}',
+  '.pi-sheet .pi-title{text-align:center;font-size:20px;font-weight:bold;padding:5px;border-bottom:1px solid #000}',
+  '.pi-sheet .pi-parties{display:flex;border-bottom:1px solid #000;min-height:210px}',
+  '.pi-sheet .pi-party{flex:1;padding:4px 6px;display:flex;flex-direction:column}',
+  '.pi-sheet .pi-party+.pi-party{border-left:1px solid #000}',
+  '.pi-sheet .pi-party h3{margin:0 0 6px;text-align:center;font-size:12.5px}',
+  '.pi-sheet .pi-kv td{padding:2px;font-size:9.5px}',
+  '.pi-sheet .pi-kv td.k{font-weight:bold;white-space:nowrap;width:1%;font-size:10px}',
+  '.pi-sheet .pi-kv td.c{width:1%;padding:2px 3px}',
+  '.pi-sheet .pi-kv td.nw{white-space:nowrap}',
+  '.pi-sheet .pi-gst{margin-top:auto}',
+  '.pi-sheet .pi-lines th,.pi-sheet .pi-lines td{border:1px solid #000;text-align:center;font-size:9.5px;vertical-align:middle}',
+  '.pi-sheet .pi-lines td.l{text-align:left}',
+  '.pi-sheet .pi-lines td.b{font-weight:bold}',
+  '.pi-sheet .pi-lines tr:first-child th{border-top:0}',
+  '.pi-sheet .pi-lines tr th:first-child,.pi-sheet .pi-lines tr td:first-child{border-left:0}',
+  '.pi-sheet .pi-lines tr th:last-child,.pi-sheet .pi-lines tr td:last-child{border-right:0}',
+  '.pi-sheet .pi-foot td{border:1px solid #000;border-left:0;border-right:0;border-top:0;font-size:9.5px}',
+  '.pi-sheet .pi-foot td+td{border-left:1px solid #000}',
+  '.pi-sheet .pi-foot .r{text-align:right}',
+  '.pi-sheet .pi-foot .b{font-weight:bold}',
+  '.pi-sheet .pi-foot .serif{font-family:"Times New Roman",serif;font-weight:bold;font-size:10.5px}',
+  '.pi-sheet .pi-gap{height:70px;border-bottom:1px solid #000}',
+  '.pi-sheet .pi-sign{display:flex;justify-content:space-between;padding:8px 140px 0 40px}',
+  '.pi-sheet .pi-sign b{font-size:11px}',
+  '.pi-sheet .pi-by{padding:14px 40px 4px;font-size:9.5px}',
+  '.pi-sheet .pi-at{padding:6px 4px 10px;font-weight:bold;font-size:10.5px}',
+].join('\n');
+
+function esc(v) {
+  return text(v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; });
+}
+
+/** Figures as the ERP prints them: no grouping, up to two decimals. */
+function piFig(v) {
+  var n = num(v);
+  return n === null ? '' : String(Math.round(n * 100) / 100);
+}
+
+function piPrintedAt(d) {
+  var h = d.getHours();
+  return displayDate(d) + ' ' + String(h % 12 || 12).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')
+    + ' ' + (h < 12 ? 'AM' : 'PM');
+}
+
+function piSheetHtml(inv) {
+  var kv = function (rows) {
+    return '<table class="pi-kv">' + rows.map(function (r) {
+      return '<tr>' + r.map(function (pair) {
+        // Two to a row (bill no. and date) stay on one line each.
+        return '<td class="k">' + esc(pair[0]) + '</td><td class="c">:</td><td' + (r.length > 1 ? ' class="nw"' : '') + '>' + pair[1] + '</td>';
+      }).join('') + '</tr>';
+    }).join('') + '</table>';
+  };
+  var party = function (title, rows, gstLabel, gstin) {
+    return '<div class="pi-party"><h3>' + esc(title) + '</h3>' + kv(rows)
+      + '<div class="pi-gst">' + kv([[[gstLabel, esc(gstin)]]]) + '</div></div>';
+  };
+  var lh = inv.letterhead || { name: '', lines: [] };
+  var lines = inv.lines || [];
+
+  var head = '<div class="pi-head"><img src="' + esc(new URL('cdc-logo.png', location.href).href) + '" alt="CDC Printers">'
+    + '<div><div class="pi-co">' + esc(lh.name) + '</div><table class="pi-lh">'
+    + lh.lines.map(function (l) {
+      return '<tr><td>' + (l.length > 1 ? esc(l[0]) + ' -' : '') + '</td><td>' + esc(l[l.length - 1]) + '</td></tr>';
+    }).join('')
+    + '</table></div></div>';
+
+  var parties = '<div class="pi-parties">'
+    + party('Supplier Details', [
+      [['Bill No.', esc(inv.billNo)], ['Bill Date', esc(displayDate(inv.billDate))]],
+      [['Voucher No', esc(inv.voucherNo)], ['Voucher Date', esc(displayDate(inv.voucherDate))]],
+      [['Name', esc(inv.supplier.name)]],
+      [['Address', (inv.supplier.address || []).map(esc).join('<br>')]],
+    ], 'GSTNo', inv.supplier.gstin)
+    + party('Billing Details', [[['Name', esc(inv.billing.name)]], [['Address', esc(inv.billing.address).replace(/\n/g, '<br>')]]],
+      'GSTIN', inv.billing.gstin)
+    + party('Delivery Details', [[['Name', esc(inv.delivery.name)]], [['Address', esc(inv.delivery.address)]]],
+      'GSTIN', inv.delivery.gstin)
+    + '</div>';
+
+  var table = '<table class="pi-lines"><tr>'
+    + '<th rowspan="2">S.<br>No</th><th rowspan="2">Item<br>Code</th><th rowspan="2">PO No.</th><th rowspan="2" style="width:22%">ItemName</th>'
+    + '<th rowspan="2">Purchase<br>Unit<br>(PU)</th><th rowspan="2">Receipt<br>Qty<br>(PU)</th><th rowspan="2">Stock<br>Unit<br>(SU)</th>'
+    + '<th rowspan="2">Receipt<br>Qty<br>(SU)</th><th rowspan="2">Rate</th><th rowspan="2">Total<br>Amount</th>'
+    + '<th colspan="2">CGST</th><th colspan="2">SGST</th><th colspan="2">IGST</th><th rowspan="2">Gross<br>Amount</th></tr>'
+    + '<tr><th>Rate</th><th>Amt.</th><th>Rate</th><th>Amt.</th><th>Rate</th><th>Amt.</th></tr>'
+    + lines.map(function (l) {
+      return '<tr><td>' + l.sNo + '</td><td>' + esc(l.itemCode) + '</td><td>' + esc(l.poNo) + '</td><td class="l">' + esc(l.itemName)
+        + '</td><td>' + esc(l.purchaseUnit) + '</td><td>' + piFig(l.qtyPu) + '</td><td>' + esc(l.stockUnit) + '</td><td>' + piFig(l.qtySu)
+        + '</td><td>' + piFig(l.rate) + '</td><td>' + piFig(l.amount) + '</td><td>' + piFig(l.cgstRate) + '</td><td>' + piFig(l.cgstAmount)
+        + '</td><td>' + piFig(l.sgstRate) + '</td><td>' + piFig(l.sgstAmount) + '</td><td>' + piFig(l.igstRate) + '</td><td>' + piFig(l.igstAmount)
+        + '</td><td class="b">' + piFig(l.gross) + '</td></tr>';
+    }).join('')
+    + '</table>';
+
+  var foot = '<table class="pi-foot"><colgroup><col style="width:72%"><col style="width:7%"><col style="width:6%"><col></colgroup>'
+    + '<tr><td class="serif">Tax Ledger</td><td class="b r">Total</td><td class="b">INR</td><td class="r">' + piFig(inv.totalBasic) + '</td></tr>'
+    + (inv.taxes || []).map(function (t) {
+      return '<tr><td>' + esc(t.ledger) + '</td><td colspan="3" class="r">' + piFig(t.amount) + '</td></tr>';
+    }).join('')
+    + '</table>'
+    + '<table class="pi-foot"><colgroup><col style="width:12%"><col style="width:52%"><col style="width:17%"><col style="width:4%"><col></colgroup>'
+    + '<tr><td class="b">Amount In Words :-</td><td>' + esc(inv.amountInWords) + '</td><td class="serif">Grand Total (Inclusive Of GST) :</td>'
+    + '<td class="b">INR :</td><td class="r">' + piFig(inv.netAmount) + '</td></tr>'
+    + '<tr><td class="b">Remark&nbsp;&nbsp;&nbsp;&nbsp;:</td><td colspan="4">' + esc(inv.remark) + '</td></tr>'
+    + '</table>';
+
+  return '<div class="pi-sheet">' + head + '<div class="pi-title">Item Purchase Invoice (GRN)</div>' + parties + table + foot
+    + '<div class="pi-gap"></div>'
+    + '<div class="pi-sign"><b>Prepared By</b><b>Approved By</b></div>'
+    + '<div class="pi-by">' + esc(inv.preparedBy) + '</div>'
+    + '<div class="pi-at">Print Date and Time: ' + esc(piPrintedAt(new Date())) + '</div>'
+    + '</div>';
+}
+
+function loadPurchaseInvoice(voucherNo) {
+  return api('/receiving/purchase-invoices/' + encodeURIComponent(voucherNo) + '/print');
+}
+
+/**
+ * Print: the invoice on its own page, A4 landscape, with the browser's print
+ * dialog (which also offers Save as PDF). The window is opened on the click
+ * itself - opened after the fetch, a phone would block it as a pop-up.
+ */
+async function printPurchaseInvoice(voucherNo) {
+  var win = window.open('', '_blank');
+  if (!win) { window.alert('Allow pop-ups for this site to print.'); return; }
+  win.document.write('<p style="font:14px Arial;padding:20px">Loading ' + esc(voucherNo) + '...</p>');
+  try {
+    var inv = await loadPurchaseInvoice(voucherNo);
+    win.document.open();
+    win.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + esc(inv.voucherNo) + '</title>'
+      + '<meta name="viewport" content="width=device-width, initial-scale=1">'
+      + '<style>@page{size:A4 landscape;margin:8mm}body{margin:0;padding:8px;background:#fff}'
+      + '@media print{body{padding:0}}' + PI_SHEET_CSS + '</style></head><body>' + piSheetHtml(inv) + '</body></html>');
+    win.document.close();
+    var img = win.document.querySelector('img');
+    var go = function () { win.focus(); win.print(); };
+    if (img && !img.complete) { img.onload = go; img.onerror = go; } else go();
+  } catch (err) {
+    win.document.body.innerHTML = '<p style="font:14px Arial;padding:20px;color:#b00">' + esc(err.message) + '</p>';
+  }
+}
+
+var HTML2PDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+var html2pdfLoading = null;
+
+/** html2pdf is only needed for a download, so it is fetched on the first one. */
+function loadHtml2pdf() {
+  if (window.html2pdf) return Promise.resolve(window.html2pdf);
+  html2pdfLoading = html2pdfLoading || new Promise(function (resolve, reject) {
+    var s = document.createElement('script');
+    s.src = HTML2PDF_URL;
+    s.onload = function () { resolve(window.html2pdf); };
+    s.onerror = function () { html2pdfLoading = null; reject(new Error('Could not load the PDF maker. Use Print, then Save as PDF.')); };
+    document.head.appendChild(s);
+  });
+  return html2pdfLoading;
+}
+
+/** Download: the same sheet, saved straight to a PDF named after the voucher. */
+async function downloadPurchaseInvoice(voucherNo, button) {
+  var label = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Making PDF...';
+  var host = null;
+  try {
+    var results = await Promise.all([loadPurchaseInvoice(voucherNo), loadHtml2pdf()]);
+    var inv = results[0];
+    host = el('div');
+    // Absolute, not fixed: a fixed box is cut off at the window's height.
+    host.style.cssText = 'position:absolute;left:-10000px;top:0';
+    host.innerHTML = '<style>' + PI_SHEET_CSS + '</style>' + piSheetHtml(inv);
+    document.body.appendChild(host);
+    await results[1]().set({
+      margin: 8,
+      filename: inv.voucherNo + '.pdf',
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 2, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+    }).from(host.querySelector('.pi-sheet')).save();
+  } catch (err) {
+    window.alert(err.message);
+  } finally {
+    if (host) host.remove();
+    button.disabled = false;
+    button.textContent = label;
+  }
+}
+
+/** The Print and Download PDF buttons for one purchase invoice; short labels in the register. */
+function piPrintButtons(voucherNo, compact) {
+  var wrap = el('span', 'print-btns');
+  var print = el('button', 'link', 'Print');
+  print.type = 'button';
+  print.title = 'Print ' + voucherNo;
+  print.addEventListener('click', function () { printPurchaseInvoice(voucherNo); });
+  var pdf = el('button', 'link', compact ? 'PDF' : 'Download PDF');
+  pdf.type = 'button';
+  pdf.title = 'Save ' + voucherNo + ' as a PDF';
+  pdf.addEventListener('click', function () { downloadPurchaseInvoice(voucherNo, pdf); });
+  wrap.appendChild(print);
+  wrap.appendChild(pdf);
+  return wrap;
 }
 
 // -- testing cleanup --------------------------------------------------------
