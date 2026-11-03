@@ -130,6 +130,13 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .last-run { margin-top: 12px; padding: 10px 12px; border-radius: 6px; background: var(--ok-bg); color: var(--ok); display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .last-run.dry { background: var(--warn-bg); color: var(--warn); }
 
+.mode-switch { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 12px; }
+.mode-switch label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+#mixed-panel[data-weight="box"] .wt-job { display: none; }
+#mixed-panel[data-weight="job"] .wt-box { display: none; }
+#mixed-rows input { width: 110px; }
+#mixed-rows td.wrap { min-width: 180px; }
+
 .sub { font-size: 14px; margin: 16px 0 8px; }
 .hint { color: var(--muted); margin: 0 0 4px; }
 .warn { color: var(--warn); background: var(--warn-bg); padding: 8px 10px; border-radius: 6px; }
@@ -172,7 +179,9 @@ td.wrap { white-space: normal; min-width: 200px; }
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
 }
-/* The bars shrink when the text runs long, so the number under them always stays on the label. */
+/* Mixed box: every line wraps in full; the text size is fitted to the label instead. */
+.label-line.full { -webkit-line-clamp: unset; display: block; }
+.label-measure { position: fixed; left: -10000px; top: 0; visibility: hidden; }
 /* Like the old exe: barcode just under the text, left-aligned, number centred under the bars.
    The bars shrink when the text runs long, so the number always stays on the label. */
 .label-code { display: flex; flex-direction: column; align-items: center; align-self: flex-start; margin-top: 2mm; min-height: 0; flex-shrink: 1; }

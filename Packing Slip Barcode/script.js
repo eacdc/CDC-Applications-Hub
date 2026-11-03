@@ -42,7 +42,9 @@
     db: 'KOL',
     writesAllowed: false,
     maxCopies: 500,
+    mode: 'single', // 'mixed': several PWOs of one client under one barcode
     job: null,
+    mixed: [], // { job, qty, netWt, grossWt }
     lastLabels: null,
     lastDryRun: false,
     reprintLabels: null,
@@ -195,12 +197,21 @@
     };
   }
 
+  /* Smallest text a mixed-box label is shrunk to before it stops fitting. */
+  var MIN_FONT_PT = 4;
+
   function labelHtml(data, overlay) {
     var s = state.settings;
     var code = padBarcode(data.barcodeNo);
     var bar = code39Svg(code, s.barHeight);
+    // A mixed box lists every PWO, comma separated, with every line wrapped in
+    // full. fitMixedLabels then shrinks the text until it all fits, so the more
+    // PWOs in the box, the smaller the text.
+    var mixed = (data.jobCount || 1) > 1;
+    var font = s.font;
     var line = function (label, value, wrap) {
-      return '<div class="label-line' + (wrap ? ' wrap' : '') + '">' + label + ' : ' + esc(value) + '</div>';
+      var cls = mixed ? ' wrap full' : (wrap ? ' wrap' : '');
+      return '<div class="label-line' + cls + '">' + label + ' : ' + esc(value) + '</div>';
     };
     // Width x height is the physical label (across the roll x along the feed).
     // Sideways: the layout box is height x width, turned 90° clockwise, so the
@@ -211,7 +222,8 @@
       ? 'position:absolute;left:0;top:0;width:' + bw + 'mm;height:' + bh + 'mm;' +
         'transform-origin:0 0;transform:translateX(' + s.width + 'mm) rotate(90deg)'
       : 'position:absolute;inset:0';
-    return '<div class="label" style="width:' + s.width + 'mm;height:' + s.height + 'mm;font-size:' + s.font + 'pt">' +
+    return '<div class="label"' + (mixed ? ' data-mixed="1"' : '') +
+      ' style="width:' + s.width + 'mm;height:' + s.height + 'mm;font-size:' + font.toFixed(2) + 'pt">' +
       '<div style="' + turn + '">' +
       '<div class="label-inner" style="left:' + (s.margin + s.offsetX) + 'mm;top:' + (s.margin + s.offsetY) + 'mm;' +
       'width:' + (bw - 2 * s.margin) + 'mm;height:' + (bh - 2 * s.margin) + 'mm">' +
@@ -255,6 +267,56 @@
     qtyPerBox: 3000, batchNo: '', packedDate: fmtDate(new Date()), barcodeNo: 1234567
   };
 
+  /* Shrink each mixed-box label's text until the full barcode and its number fit. */
+  function fitMixedLabels(root) {
+    root.querySelectorAll('.label[data-mixed]').forEach(function (label) {
+      var inner = label.querySelector('.label-inner');
+      var barBox = label.querySelector('.label-barcode');
+      var svg = barBox.querySelector('svg');
+      var size = parseFloat(label.style.fontSize);
+      var overflowing = function () {
+        return inner.scrollHeight > inner.clientHeight + 1 ||
+          barBox.getBoundingClientRect().height < svg.getBoundingClientRect().height - 0.5;
+      };
+      while (size > MIN_FONT_PT && overflowing()) {
+        size = Math.max(MIN_FONT_PT, size - 0.25);
+        label.style.fontSize = size + 'pt';
+      }
+    });
+  }
+
+  /* Mixed labels are fitted off-screen first: the print area is hidden on screen. */
+  function fittedLabelsHtml(html) {
+    if (html.indexOf('data-mixed') === -1) return html;
+    var box = document.createElement('div');
+    box.className = 'label-measure';
+    box.innerHTML = html;
+    document.body.appendChild(box);
+    fitMixedLabels(box);
+    var out = box.innerHTML;
+    box.remove();
+    return out;
+  }
+
+  /* One label object for a box holding several PWOs; values are comma separated. */
+  function mixedLabel(lines, barcodeNo, packedDate) {
+    var join = function (key) {
+      return lines.map(function (l) { return l[key] == null || l[key] === '' ? '-' : l[key]; }).join(', ');
+    };
+    var batches = lines.map(function (l) { return l.batchNo; }).filter(Boolean);
+    return {
+      clientName: lines[0].clientName,
+      jobBookingNo: join('jobBookingNo'),
+      productCode: join('productCode'),
+      jobName: join('jobName'),
+      qtyPerBox: join('qtyPerBox'),
+      batchNo: batches.join(', '),
+      packedDate: packedDate,
+      barcodeNo: barcodeNo,
+      jobCount: lines.length
+    };
+  }
+
   function renderPreview() {
     $('label-preview').innerHTML = labelHtml(SAMPLE);
     var w = fitWarnings();
@@ -265,7 +327,7 @@
   function printLabels(labels, overlay) {
     if (!labels || !labels.length) return;
     applyPageSize();
-    $('print-area').innerHTML = labels.map(function (l) { return labelHtml(l, overlay); }).join('');
+    $('print-area').innerHTML = fittedLabelsHtml(labels.map(function (l) { return labelHtml(l, overlay); }).join(''));
     // Let the browser lay the labels out before the print dialog snapshots them.
     requestAnimationFrame(function () {
       requestAnimationFrame(function () { window.print(); });
@@ -423,8 +485,8 @@
     });
   }
 
-  function renderLastRun(data) {
-    var box = $('last-run');
+  function renderLastRun(data, box) {
+    box = box || $('last-run');
     var first = data.barcodes[0];
     var last = data.barcodes[data.barcodes.length - 1];
     var range = padBarcode(first) + (last !== first ? ' to ' + padBarcode(last) : '');
@@ -436,13 +498,144 @@
     box.hidden = false;
   }
 
+  /* ---------------- mixed box ---------------- */
+
+  function setMode(mode) {
+    state.mode = mode;
+    var mixed = mode === 'mixed';
+    $('job-search-label').textContent = mixed
+      ? 'Add a PWO to the box (PWO no, job name or client)'
+      : 'Find PWO (PWO no, job name or client)';
+    $('job-panel').hidden = mixed || !state.job;
+    $('mixed-panel').hidden = !mixed;
+    $('job-results').hidden = true;
+    $('job-search').value = '';
+    showStatus('');
+    if (mixed) renderMixed();
+    $('job-search').focus();
+  }
+
+  function addMixedJob(jobBookingId) {
+    showStatus('');
+    return api('/jobs/' + jobBookingId).then(function (data) {
+      var job = data.job;
+      $('job-results').hidden = true;
+      $('job-search').value = '';
+      if (state.mixed.some(function (m) { return m.job.jobBookingId === job.jobBookingId; })) {
+        showStatus(job.jobBookingNo + ' is already in the box.', 'error');
+        return;
+      }
+      if (state.mixed.length && state.mixed[0].job.ledgerId !== job.ledgerId) {
+        showStatus('A box can only hold PWOs of one client. ' + job.jobBookingNo + ' is for ' + job.clientName +
+          ', the box is for ' + state.mixed[0].job.clientName + '.', 'error');
+        return;
+      }
+      state.mixed.push({ job: job, qty: '', netWt: '', grossWt: '' });
+      renderMixed();
+      var inputs = $('mixed-rows').querySelectorAll('input[data-field="qty"]');
+      if (inputs.length) inputs[inputs.length - 1].focus();
+    }).catch(function (err) { showStatus(err.message, 'error'); });
+  }
+
+  function renderMixed() {
+    var rows = state.mixed;
+    $('mixed-client').textContent = rows.length
+      ? rows[0].job.clientName + ' · ' + rows.length + ' PWO' + (rows.length === 1 ? '' : 's') + ' in this box'
+      : 'Search above and pick each PWO that goes in this box.';
+    var input = function (i, field, value, step) {
+      return '<input type="number" min="0" step="' + step + '" data-i="' + i + '" data-field="' + field +
+        '" value="' + esc(value) + '" />';
+    };
+    $('mixed-rows').innerHTML = rows.length
+      ? rows.map(function (m, i) {
+        return '<tr><td>' + esc(m.job.jobBookingNo) + '</td><td class="wrap">' + esc(m.job.jobName) + '</td>' +
+          '<td class="num">' + fmtNum(m.job.orderQuantity) + '</td>' +
+          '<td>' + input(i, 'qty', m.qty, 1) + '</td>' +
+          '<td class="wt-job">' + input(i, 'netWt', m.netWt, 0.01) + '</td>' +
+          '<td class="wt-job">' + input(i, 'grossWt', m.grossWt, 0.01) + '</td>' +
+          '<td><button type="button" class="btn-link" data-remove="' + i + '">Remove</button></td></tr>';
+      }).join('')
+      : '<tr><td colspan="7" class="empty">No PWO in the box yet.</td></tr>';
+  }
+
+  function onMixedGenerate(event) {
+    event.preventDefault();
+    var rows = state.mixed;
+    var copies = Number($('mixed-copies').value);
+    var weightMode = $('mixed-weight-mode').value;
+    if (rows.length < 2) { showStatus('Add at least two PWOs to a mixed box.', 'error'); return; }
+    var missing = rows.filter(function (m) { return !Number.isInteger(Number(m.qty)) || Number(m.qty) < 1; });
+    if (missing.length) { showStatus('Enter the quantity in the box for ' + missing[0].job.jobBookingNo + '.', 'error'); return; }
+    if (!Number.isInteger(copies) || copies < 1 || copies > state.maxCopies) {
+      showStatus('Number of labels must be between 1 and ' + state.maxCopies + '.', 'error');
+      return;
+    }
+    if (copies > window.AppConfig.confirmAbove &&
+      !window.confirm('Create ' + copies + ' new mixed-box barcodes with ' + rows.length + ' PWOs each?')) {
+      return;
+    }
+
+    var btn = $('btn-mixed-generate');
+    btn.disabled = true;
+    btn.textContent = 'Creating…';
+    showStatus('');
+    api('/generate-mixed', {
+      method: 'POST',
+      body: {
+        items: rows.map(function (m) {
+          return { jobBookingId: m.job.jobBookingId, qty: Number(m.qty), netWt: m.netWt, grossWt: m.grossWt };
+        }),
+        weightMode: weightMode,
+        boxNetWt: $('mixed-net').value,
+        boxGrossWt: $('mixed-gross').value,
+        copies: copies
+      }
+    }).then(function (data) {
+      var lines = data.lines.map(function (j) {
+        return {
+          clientName: j.clientName, jobBookingNo: j.jobBookingNo, productCode: j.productCode,
+          jobName: j.jobName, qtyPerBox: j.qtyPerBox, batchNo: ''
+        };
+      });
+      var packed = fmtDate(data.packedAt);
+      state.lastDryRun = !!data.dryRun;
+      state.lastLabels = data.barcodes.map(function (n) { return mixedLabel(lines, n, packed); });
+      renderLastRun(data, $('mixed-last-run'));
+      printLabels(state.lastLabels, state.lastDryRun ? 'TEST - NOT SAVED' : null);
+      if (!data.dryRun) {
+        state.mixed = [];
+        renderMixed();
+      }
+    }).catch(function (err) {
+      showStatus(err.message, 'error');
+    }).then(function () {
+      btn.disabled = false;
+      btn.textContent = 'Create & print';
+    });
+  }
+
   /* ---------------- reprint ---------------- */
+
+  /* Rows come one per PWO; a mixed box has several rows under one barcode. */
+  function groupByBarcode(rows) {
+    var labels = [];
+    var byNo = {};
+    rows.forEach(function (r) {
+      r.packedDate = fmtDbDate(r.packedAt);
+      if (!byNo[r.barcodeNo]) { byNo[r.barcodeNo] = []; labels.push(byNo[r.barcodeNo]); }
+      byNo[r.barcodeNo].push(r);
+    });
+    return labels.map(function (group) {
+      return group.length === 1 ? group[0] : mixedLabel(group, group[0].barcodeNo, group[0].packedDate);
+    });
+  }
 
   function loadReprint(from, to) {
     showStatus('');
     var q = '/barcodes?from=' + encodeURIComponent(from) + (to ? '&to=' + encodeURIComponent(to) : '');
     return api(q).then(function (data) {
-      data.labels.forEach(function (l) { l.packedDate = fmtDbDate(l.packedAt); });
+      var rows = data.labels;
+      data.labels = groupByBarcode(rows);
       state.reprintLabels = data.labels;
       var box = $('reprint-result');
       if (!data.labels.length) {
@@ -450,7 +643,7 @@
         return data.labels;
       }
       var jobs = {};
-      data.labels.forEach(function (l) { jobs[l.jobBookingNo] = (jobs[l.jobBookingNo] || 0) + 1; });
+      rows.forEach(function (l) { jobs[l.jobBookingNo] = (jobs[l.jobBookingNo] || 0) + 1; });
       box.innerHTML = '<table><thead><tr><th>PWO</th><th class="num">Labels</th></tr></thead><tbody>' +
         Object.keys(jobs).map(function (k) {
           return '<tr><td>' + esc(k) + '</td><td class="num">' + jobs[k] + '</td></tr>';
@@ -479,6 +672,7 @@
         ? '<p class="hint">Showing the first ' + PREVIEW_LIMIT + ' of ' + labels.length + ' labels.</p>'
         : '');
     box.hidden = false;
+    fitMixedLabels(box);
     btn.textContent = 'Hide preview';
   }
 
@@ -559,13 +753,44 @@
       state.db = $('database').value;
       try { localStorage.setItem(DB_KEY, state.db); } catch (e) { /* ignore */ }
       clearJob();
+      state.mixed = [];
+      renderMixed();
       $('job-results').hidden = true;
     });
 
     $('job-search').addEventListener('input', onSearchInput);
     $('job-results').addEventListener('click', function (e) {
       var btn = e.target.closest('.result');
-      if (btn) selectJob(btn.dataset.id);
+      if (!btn) return;
+      if (state.mode === 'mixed') addMixedJob(btn.dataset.id);
+      else selectJob(btn.dataset.id);
+    });
+    document.querySelectorAll('input[name="box-mode"]').forEach(function (r) {
+      r.addEventListener('change', function () { if (r.checked) setMode(r.value); });
+    });
+    $('mixed-rows').addEventListener('input', function (e) {
+      var i = e.target.dataset.i;
+      if (i != null) state.mixed[Number(i)][e.target.dataset.field] = e.target.value;
+    });
+    $('mixed-rows').addEventListener('click', function (e) {
+      var i = e.target.dataset.remove;
+      if (i == null) return;
+      state.mixed.splice(Number(i), 1);
+      renderMixed();
+    });
+    $('mixed-clear').addEventListener('click', function () {
+      state.mixed = [];
+      $('mixed-last-run').hidden = true;
+      renderMixed();
+    });
+    $('mixed-weight-mode').addEventListener('change', function () {
+      $('mixed-panel').dataset.weight = $('mixed-weight-mode').value;
+    });
+    $('mixed-form').addEventListener('submit', onMixedGenerate);
+    $('mixed-last-run').addEventListener('click', function (e) {
+      if (e.target.id === 'btn-print-again') {
+        printLabels(state.lastLabels, state.lastDryRun ? 'TEST - NOT SAVED' : null);
+      }
     });
     $('job-clear').addEventListener('click', clearJob);
     $('generate-form').addEventListener('submit', onGenerate);

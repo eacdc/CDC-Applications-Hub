@@ -39,8 +39,12 @@
     <!-- Print labels -->
     <section class="view" data-view="print">
       <div class="card">
+        <div class="mode-switch" role="radiogroup" aria-label="Box type">
+          <label><input type="radio" name="box-mode" value="single" checked /> One PWO per box</label>
+          <label><input type="radio" name="box-mode" value="mixed" /> Mixed box (several PWOs, same client)</label>
+        </div>
         <label class="field grow">
-          <span>Find PWO (PWO no, job name or client)</span>
+          <span id="job-search-label">Find PWO (PWO no, job name or client)</span>
           <input id="job-search" type="search" placeholder="e.g. 0882" autocomplete="off" />
         </label>
         <div id="job-results" class="results" hidden></div>
@@ -86,6 +90,53 @@
 
         <h3 class="sub">Labels already printed for this PWO</h3>
         <div id="job-ranges" class="table-wrap"></div>
+      </div>
+
+      <div id="mixed-panel" class="card" data-weight="box" hidden>
+        <div class="job-head">
+          <div>
+            <div class="job-no">Mixed box</div>
+            <div class="job-name" id="mixed-client">Search above and pick each PWO that goes in this box.</div>
+          </div>
+          <button type="button" id="mixed-clear" class="btn-link">Empty the box</button>
+        </div>
+        <form id="mixed-form">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>PWO</th><th>Product</th><th class="num">Order qty</th><th>Qty in box *</th>
+                  <th class="wt-job">Net wt (kg)</th><th class="wt-job">Gross wt (kg)</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="mixed-rows"></tbody>
+            </table>
+          </div>
+          <div class="form-row">
+            <label class="field">
+              <span>Weight</span>
+              <select id="mixed-weight-mode">
+                <option value="box">For the whole box</option>
+                <option value="job">For each PWO</option>
+              </select>
+            </label>
+            <label class="field wt-box">
+              <span>Box net wt (kg)</span>
+              <input id="mixed-net" type="number" min="0" step="0.01" />
+            </label>
+            <label class="field wt-box">
+              <span>Box gross wt (kg)</span>
+              <input id="mixed-gross" type="number" min="0" step="0.01" />
+            </label>
+            <label class="field">
+              <span>Number of labels *</span>
+              <input id="mixed-copies" type="number" min="1" step="1" value="1" required />
+            </label>
+            <button type="submit" id="btn-mixed-generate" class="btn-primary">Create &amp; print</button>
+          </div>
+        </form>
+        <p class="hint">Each label is one box with all the PWOs above. More labels = more identical boxes.</p>
+        <div id="mixed-last-run" class="last-run" hidden></div>
       </div>
     </section>
 
