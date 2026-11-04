@@ -125,6 +125,14 @@ function displayDate(value) {
   return String(d.getDate()).padStart(2, '0') + '-' + MONTHS[d.getMonth()] + '-' + d.getFullYear();
 }
 
+// The ERP stores times as India's wall clock, which reads back as UTC.
+function erpDateTime(value) {
+  var d = new Date(value);
+  if (isNaN(d.getTime())) return '';
+  return String(d.getUTCDate()).padStart(2, '0') + '-' + MONTHS[d.getUTCMonth()] + '-' + d.getUTCFullYear()
+    + ' ' + String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0');
+}
+
 function el(tag, className, content) {
   var node = document.createElement(tag);
   if (className) node.className = className;
@@ -2725,7 +2733,8 @@ var REGISTER_COLUMNS = [
   { key: 'stockQty', label: 'Qty (S.U.)', cls: 'c-q num', value: function (g) { return qtyText(g.stockQty) + (g.stockUnit ? ' ' + g.stockUnit : ''); } },
   { key: 'issued', label: 'Issued', cls: 'c-iss', options: ['None', 'Part', 'Full'], value: function (g) { return g.issued === 'none' ? 'None' : g.issued === 'full' ? 'Full' : 'Part'; } },
   { key: 'piVoucherNo', label: 'Purchase invoice', cls: 'c-pi', value: function (g) {
-    return g.piVoucherNo ? g.piVoucherNo + (g.purchaseInvoices > 1 ? ' +' + (g.purchaseInvoices - 1) : '') : 'Not made';
+    if (g.piVoucherNo) return g.piVoucherNo + (g.purchaseInvoices > 1 ? ' +' + (g.purchaseInvoices - 1) : '');
+    return g.piDeleted ? 'PI deleted' : 'Not made';
   } },
   { key: 'madeIn', label: 'Made in', cls: 'c-made', options: ['ERP', 'GRN Creator'] },
   { key: 'entry', label: 'Entry', cls: 'c-entry', options: ['AI', 'Manual'] },
@@ -2843,7 +2852,11 @@ function renderRegister() {
       } else if (col.key === 'piVoucherNo' && !g.piVoucherNo) {
         var make = el('button', 'badge state-nopi badge-btn', shownText);
         make.type = 'button';
-        make.title = 'Make the purchase invoice for ' + g.voucherNo;
+        make.title = g.piDeleted
+          ? g.piDeleted.voucherNo + ' was deleted' + (g.piDeleted.deletedBy ? ' by ' + g.piDeleted.deletedBy : '')
+            + (g.piDeleted.deletedDate ? ' on ' + erpDateTime(g.piDeleted.deletedDate) : '')
+            + '. Make a new purchase invoice for ' + g.voucherNo
+          : 'Make the purchase invoice for ' + g.voucherNo;
         make.addEventListener('click', function () { openGrnPi(g.transactionId); });
         cell.appendChild(make);
       } else if (col.key === 'piVoucherNo') {
