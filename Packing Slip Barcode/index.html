@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Packing Slip Barcode</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%231f4e79' width='32' height='32' rx='6'/%3E%3Cpath fill='%23fff' d='M7 8h2v16H7zm4 0h1v16h-1zm3 0h3v16h-3zm5 0h1v16h-1zm3 0h3v16h-3z'/%3E%3C/svg%3E" />
+  <script>
+    // Apply the saved theme before the page paints, so it doesn't flash light first.
+    try {
+      var t = localStorage.getItem('packingSlip.theme');
+      if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t;
+    } catch (e) { /* ignore */ }
+  </script>
   <link rel="stylesheet" href="styles.css" />
   <style id="page-style"></style>
 </head>
@@ -24,6 +31,7 @@
             <option value="AHM">Ahmedabad</option>
           </select>
         </label>
+        <button type="button" id="theme-toggle" class="theme-toggle" aria-pressed="false">Dark mode</button>
       </div>
     </header>
 

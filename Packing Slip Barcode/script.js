@@ -13,6 +13,7 @@
   var API = window.AppConfig.apiBaseUrl + '/packing-slip';
   var SETTINGS_KEY = 'packingSlip.labelSettings.v2'; // v2: new TVS defaults, older saved settings are dropped
   var DB_KEY = 'packingSlip.database';
+  var THEME_KEY = 'packingSlip.theme'; // also read by the inline script in index.html
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var BARCODE_DIGITS = 7;
 
@@ -733,6 +734,29 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
   }
 
+  /* ---------------- theme ---------------- */
+
+  var darkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+  function isDark() {
+    var t = document.documentElement.dataset.theme;
+    if (t) return t === 'dark';
+    return !!(darkQuery && darkQuery.matches);
+  }
+
+  function renderThemeToggle() {
+    var dark = isDark();
+    $('theme-toggle').textContent = dark ? 'Light mode' : 'Dark mode';
+    $('theme-toggle').setAttribute('aria-pressed', String(dark));
+  }
+
+  function toggleTheme() {
+    var next = isDark() ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* ignore */ }
+    renderThemeToggle();
+  }
+
   /* ---------------- wiring ---------------- */
 
   function init() {
@@ -744,6 +768,10 @@
     $('ranges-to').value = todayIso(0);
     fillSettingsForm();
     applyPageSize();
+
+    renderThemeToggle();
+    $('theme-toggle').addEventListener('click', toggleTheme);
+    if (darkQuery && darkQuery.addEventListener) darkQuery.addEventListener('change', renderThemeToggle);
 
     document.querySelectorAll('.tab').forEach(function (t) {
       t.addEventListener('click', function () { switchView(t.dataset.view); });
