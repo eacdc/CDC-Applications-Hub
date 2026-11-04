@@ -2728,6 +2728,7 @@ var REGISTER_COLUMNS = [
     return g.piVoucherNo ? g.piVoucherNo + (g.purchaseInvoices > 1 ? ' +' + (g.purchaseInvoices - 1) : '') : 'Not made';
   } },
   { key: 'madeIn', label: 'Made in', cls: 'c-made', options: ['ERP', 'GRN Creator'] },
+  { key: 'entry', label: 'Entry', cls: 'c-entry', options: ['AI', 'Manual'] },
   { key: 'createdByName', label: 'Created by', cls: 'c-by' },
   { key: 'actions', label: '', cls: 'c-act', noFilter: true },
 ];
@@ -2919,7 +2920,8 @@ function renderGrnEdit() {
   $('grnEditTitle').textContent = g.voucherNo + ' - ' + text(g.supplierName);
 
   var notes = [];
-  notes.push('Made in ' + g.madeIn + ', ' + displayDate(g.voucherDate) + '.');
+  notes.push('Made in ' + g.madeIn + (g.madeIn === 'GRN Creator' ? (g.entry === 'AI' ? ', read from the invoice by AI' : ', entered by hand') : '')
+    + ', ' + displayDate(g.voucherDate) + '.');
   if (g.purchaseInvoices.length) {
     notes.push('Purchase invoice ' + g.purchaseInvoices.map(function (p) { return p.voucherNo; }).join(', ')
       + ' is made from it, so its quantities stay as they are until that is deleted in the ERP. The header can still change.'

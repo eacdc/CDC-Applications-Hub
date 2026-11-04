@@ -809,15 +809,16 @@ small.source.bad { color: var(--block); }
 #registerTable { table-layout: fixed; width: 100%; }
 #registerTable th { white-space: normal; vertical-align: bottom; }
 #registerTable td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px; padding: 8px 8px; }
-#registerTable .c-grn { width: 10%; }
+#registerTable .c-grn { width: 9%; }
 #registerTable .c-date { width: 8%; }
 #registerTable .c-sup { width: 11%; }
-#registerTable .c-dn { width: 9%; }
+#registerTable .c-dn { width: 8%; }
 #registerTable .c-n { width: 4%; }
-#registerTable .c-q { width: 8%; }
-#registerTable .c-iss { width: 9%; }
-#registerTable .c-pi { width: 11%; }
+#registerTable .c-q { width: 7%; }
+#registerTable .c-iss { width: 7%; }
+#registerTable .c-pi { width: 10%; }
 #registerTable .c-made { width: 6%; }
+#registerTable .c-entry { width: 6%; }
 #registerTable .c-by { width: 8%; }
 #registerTable .c-act { width: 8%; }
 #registerTable td.row-actions { overflow: visible; }
