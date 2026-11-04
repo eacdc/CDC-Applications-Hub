@@ -29,7 +29,11 @@
   var DEFAULTS = {
     preset: '100x75', width: 100, height: 75, font: 12, barHeight: 12,
     module: 4, margin: 4, offsetX: 4, offsetY: 0, dpi: 203,
-    rotate: 0 // text runs across the roll, like the old exe; 1 turns the layout 90°
+    rotate: 0, // text runs across the roll, like the old exe; 1 turns the layout 90°
+    // 1: don't tell Chrome the page size. A 100 x 75 page makes Chrome ask for
+    // landscape, which the SNBC / Seagull driver prints turned 90° and cut off;
+    // left out, Chrome uses the driver's own label size, upright.
+    printerPaper: 0
   };
 
   /* Code 39, digits and the start/stop '*'. 1 = wide element; bar, space, bar ... */
@@ -134,7 +138,8 @@
   var SETTING_INPUTS = {
     preset: 'set-preset', width: 'set-width', height: 'set-height', font: 'set-font',
     barHeight: 'set-bar-height', module: 'set-module', margin: 'set-margin',
-    offsetX: 'set-offset-x', offsetY: 'set-offset-y', dpi: 'set-dpi', rotate: 'set-rotate'
+    offsetX: 'set-offset-x', offsetY: 'set-offset-y', dpi: 'set-dpi', rotate: 'set-rotate',
+    printerPaper: 'set-printer-paper'
   };
 
   function fillSettingsForm() {
@@ -167,8 +172,9 @@
 
   function applyPageSize() {
     var s = state.settings;
-    $('page-style').textContent =
-      '@page { size: ' + s.width + 'mm ' + s.height + 'mm; margin: 0; }';
+    $('page-style').textContent = s.printerPaper
+      ? '@page { margin: 0; }'
+      : '@page { size: ' + s.width + 'mm ' + s.height + 'mm; margin: 0; }';
   }
 
   /* ---------------- barcode + label ---------------- */
@@ -408,15 +414,15 @@
       $('job-order').textContent = fmtNum(data.job.orderQuantity);
       $('job-slips').textContent = fmtNum(data.job.slips);
       $('job-slipqty').textContent = fmtNum(data.job.slipQty);
-      // A new PWO starts from its ERP name and an empty batch; the same PWO
+      // A new PWO starts from its ERP name and the PWO no as batch; the same PWO
       // reloaded after printing keeps what was typed.
       if (!sameJob) {
         $('label-job-name').value = data.job.jobName || '';
-        $('batch-no').value = '';
+        $('batch-no').value = data.job.jobBookingNo;
       }
       $('label-job-name').placeholder = data.job.jobName || '';
-      fillBatchList($('batch-list'), data.batches);
-      $('batch-no').placeholder = batchPlaceholder(data.batches);
+      fillBatchList($('batch-list'), batchChoices(data.job, data.batches));
+      $('batch-no').placeholder = data.job.jobBookingNo;
       $('batch-hint').textContent = batchHint(data.batches);
       $('batch-hint').classList.toggle('warn-text', !data.batches);
       renderJobRanges(data.ranges);
@@ -431,15 +437,18 @@
     }).join('');
   }
 
-  /* No `batches` at all means the backend predates the batch list. */
-  function batchHint(batches) {
-    if (!batches) return 'ERP batch list not available: the backend needs restarting with the new code.';
-    if (!batches.length) return 'No batches entered in the ERP for this PWO. Type it.';
-    return 'Click to pick one of ' + batches.length + ' ERP batch' + (batches.length === 1 ? '' : 'es') + ', or type.';
+  /* The ERP uses the PWO no as the batch no (every GPN line carries it), so it
+     is the default and the first choice; batches entered for the job follow. */
+  function batchChoices(job, batches) {
+    return [job.jobBookingNo].concat((batches || []).filter(function (b) { return b !== job.jobBookingNo; }));
   }
 
-  function batchPlaceholder(batches) {
-    return batches && batches.length ? 'Pick or type (' + batches.length + ' in ERP)' : 'Type batch no';
+  /* No `batches` at all means the backend predates the batch list. */
+  function batchHint(batches) {
+    if (!batches) return 'PWO no by default. ERP batch list not available: the backend needs restarting.';
+    if (!batches.length) return 'PWO no by default, as in the ERP. Change it if the client gave a batch.';
+    return 'PWO no by default. Click to pick one of ' + batches.length + ' batch' +
+      (batches.length === 1 ? '' : 'es') + ' entered in the ERP, or type.';
   }
 
   /* Open the batch suggestions on click, like a drop-down, instead of only while typing. */
@@ -578,7 +587,7 @@
       }
       state.mixed.push({
         job: job, qty: '', netWt: '', grossWt: '',
-        labelName: job.jobName || '', batchNo: '', batches: data.batches
+        labelName: job.jobName || '', batchNo: job.jobBookingNo, batches: data.batches
       });
       renderMixed();
       var inputs = $('mixed-rows').querySelectorAll('input[data-field="qty"]');
@@ -606,7 +615,7 @@
           '<td class="wrap">' + text(i, 'labelName', m.labelName,
             ' class="wide" maxlength="500" placeholder="' + esc(m.job.jobName) + '"') + '</td>' +
           '<td>' + text(i, 'batchNo', m.batchNo, ' maxlength="100" list="' + listId + '"' +
-            ' placeholder="' + esc(batchPlaceholder(m.batches)) + '" title="' + esc(batchHint(m.batches)) + '"') +
+            ' placeholder="' + esc(m.job.jobBookingNo) + '" title="' + esc(batchHint(m.batches)) + '"') +
           '<datalist id="' + listId + '"></datalist></td>' +
           '<td class="num">' + fmtNum(m.job.orderQuantity) + '</td>' +
           '<td>' + input(i, 'qty', m.qty, 1) + '</td>' +
@@ -615,7 +624,7 @@
           '<td><button type="button" class="btn-link" data-remove="' + i + '">Remove</button></td></tr>';
       }).join('')
       : '<tr><td colspan="9" class="empty">No PWO in the box yet.</td></tr>';
-    rows.forEach(function (m, i) { fillBatchList($('mixed-batches-' + i), m.batches); });
+    rows.forEach(function (m, i) { fillBatchList($('mixed-batches-' + i), batchChoices(m.job, m.batches)); });
   }
 
   function onMixedGenerate(event) {
@@ -686,6 +695,8 @@
     var byNo = {};
     rows.forEach(function (r) {
       r.packedDate = fmtDbDate(r.packedAt);
+      // Batches are not saved (except by the ERP's own slip), so reprints default to the PWO no.
+      r.batchNo = r.batchNo || r.jobBookingNo;
       if (!byNo[r.barcodeNo]) { byNo[r.barcodeNo] = []; labels.push(byNo[r.barcodeNo]); }
       byNo[r.barcodeNo].push(r);
     });
