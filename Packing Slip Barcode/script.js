@@ -36,6 +36,29 @@
     printerPaper: 0
   };
 
+  /*
+   * Small stickers: the exe's "Small Size - Only Barcode" print, the barcode and
+   * its number on an A4 sticker sheet, printed on an office printer. Defaults
+   * are the Novajet A4 48-up sheet CDC uses, as measured on the sheet: 5 mm
+   * margins all round, 4 x 12 stickers, 4 mm gap between columns, none between
+   * rows (5 + 4 x 47 + 3 x 4 + 5 = 210; 5 + 12 x 23.9 + 5 = 297). Every value
+   * can be changed to match another sheet.
+   *
+   * Top and height are set for CDC's office printer, not the sheet: printed at
+   * 5 / 23.9 it came out 2 mm higher and about 1.3% shorter down the page (top
+   * margin 3 mm, bottom 11 mm). 6.5 / 24.1 lands within about 0.5-2 mm of the
+   * stickers after that shrink and still fits on the page.
+   */
+  var SHEET_KEY = 'packingSlip.sheetSettings.v4'; // v4: corrected for the office printer; earlier saved values are dropped
+  var A4 = { width: 210, height: 297 };
+  var SHEET_DEFAULTS = {
+    cols: 4, rows: 12, width: 47, height: 24.1,
+    top: 6.5, left: 5, gapX: 4, gapY: 0,
+    barHeight: 13, module: 6, dpi: 600, font: 9
+  };
+  /* Barcode 0 is never issued (numbers start at 100001), so a test sheet can't be mistaken for a carton. */
+  var TEST_STICKER = { barcodeNo: 0 };
+
   /* Code 39, digits and the start/stop '*'. 1 = wide element; bar, space, bar ... */
   var CODE39 = {
     '0': '000110100', '1': '100100001', '2': '001100001', '3': '101100000', '4': '000110001',
@@ -54,7 +77,8 @@
     lastDryRun: false,
     reprintLabels: null,
     rangeRows: [],
-    settings: loadSettings()
+    settings: loadSettings(),
+    sheet: loadSheet()
   };
 
   var $ = function (id) { return document.getElementById(id); };
@@ -135,6 +159,41 @@
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); } catch (e) { /* ignore */ }
   }
 
+  function loadSheet() {
+    try {
+      var saved = JSON.parse(localStorage.getItem(SHEET_KEY) || 'null');
+      if (saved && typeof saved === 'object') return Object.assign({}, SHEET_DEFAULTS, saved);
+    } catch (e) { /* storage blocked or corrupt: use defaults */ }
+    return Object.assign({}, SHEET_DEFAULTS);
+  }
+
+  function saveSheet() {
+    try { localStorage.setItem(SHEET_KEY, JSON.stringify(state.sheet)); } catch (e) { /* ignore */ }
+  }
+
+  var SHEET_INPUTS = {
+    cols: 'sheet-cols', rows: 'sheet-rows', width: 'sheet-width', height: 'sheet-height',
+    top: 'sheet-top', left: 'sheet-left', gapX: 'sheet-gap-x', gapY: 'sheet-gap-y',
+    barHeight: 'sheet-bar-height', module: 'sheet-module', font: 'sheet-font'
+  };
+
+  function fillSheetForm() {
+    Object.keys(SHEET_INPUTS).forEach(function (key) {
+      $(SHEET_INPUTS[key]).value = state.sheet[key];
+    });
+  }
+
+  function readSheetForm() {
+    Object.keys(SHEET_INPUTS).forEach(function (key) {
+      var n = Number($(SHEET_INPUTS[key]).value);
+      if (Number.isFinite(n) && n >= 0) state.sheet[key] = n;
+    });
+    state.sheet.cols = Math.max(1, Math.round(state.sheet.cols));
+    state.sheet.rows = Math.max(1, Math.round(state.sheet.rows));
+    saveSheet();
+    renderSheetPreview();
+  }
+
   var SETTING_INPUTS = {
     preset: 'set-preset', width: 'set-width', height: 'set-height', font: 'set-font',
     barHeight: 'set-bar-height', module: 'set-module', margin: 'set-margin',
@@ -179,10 +238,12 @@
 
   /* ---------------- barcode + label ---------------- */
 
-  function dotsToMm(dots) { return dots * 25.4 / state.settings.dpi; }
+  function dotsToMm(dots, dpi) { return dots * 25.4 / (dpi || state.settings.dpi); }
 
-  function code39Svg(text, heightMm) {
-    var narrow = Math.max(1, Math.round(state.settings.module));
+  /* Bars are whole printer dots: `module` narrow dots at `dpi` (default: the label printer's). */
+  function code39Svg(text, heightMm, module, dpi) {
+    dpi = dpi || state.settings.dpi;
+    var narrow = Math.max(1, Math.round(module == null ? state.settings.module : module));
     var wide = Math.round(narrow * 2.5);
     var chars = ('*' + text + '*').split('');
     var x = 0;
@@ -197,9 +258,9 @@
       if (ci < chars.length - 1) x += narrow; // inter-character gap
     });
     return {
-      widthMm: dotsToMm(x),
+      widthMm: dotsToMm(x, dpi),
       svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + x + ' 100" preserveAspectRatio="none"' +
-        ' width="' + dotsToMm(x).toFixed(3) + 'mm" height="' + heightMm + 'mm" shape-rendering="crispEdges">' +
+        ' width="' + dotsToMm(x, dpi).toFixed(3) + 'mm" height="' + heightMm + 'mm" shape-rendering="crispEdges">' +
         '<g fill="#000">' + rects.join('') + '</g></svg>'
     };
   }
@@ -341,6 +402,108 @@
     });
   }
 
+  /* ---------------- small stickers (A4 sheet) ---------------- */
+
+  function stickersPerSheet() { return state.sheet.cols * state.sheet.rows; }
+
+  function stickerHtml(data, x, y, overlay) {
+    var sh = state.sheet;
+    var code = padBarcode(data.barcodeNo);
+    var bar = code39Svg(code, sh.barHeight, sh.module, sh.dpi);
+    return '<div class="sticker" style="left:' + x.toFixed(2) + 'mm;top:' + y.toFixed(2) + 'mm;' +
+      'width:' + sh.width + 'mm;height:' + sh.height + 'mm;font-size:' + sh.font + 'pt">' +
+      '<div class="sticker-bar">' + bar.svg + '</div>' +
+      '<div class="sticker-number">' + code + '</div>' +
+      (overlay ? '<div class="sticker-dry">' + esc(overlay) + '</div>' : '') +
+      '</div>';
+  }
+
+  /*
+   * A4 pages of stickers, left to right then down, like the exe's sheets. The
+   * first `start - 1` stickers of the first page are left empty, so a partly
+   * used sheet can go back in the printer.
+   */
+  /*
+   * Test sheet only: a 100 mm line across and down (a ruler shows whether the
+   * printer shrinks or stretches the page).
+   */
+  // The across line runs along the border between sticker rows 6 and 7; the down line in the left margin.
+  var SHEET_GUIDES =
+    '<div class="sheet-ruler" style="left:55mm;top:148.25mm;width:100mm;height:.3mm"></div>' +
+    '<div class="sheet-ruler-text" style="left:56mm;top:149mm">100 mm across (measure this line)</div>' +
+    '<div class="sheet-ruler" style="left:2.5mm;top:98.5mm;width:.3mm;height:100mm"></div>' +
+    '<div class="sheet-ruler-text vertical" style="left:3.2mm;top:98.5mm">100 mm down</div>';
+
+  function sheetsHtml(labels, start, overlay, guides) {
+    var sh = state.sheet;
+    var per = stickersPerSheet();
+    var skip = Math.min(Math.max(1, Math.round(start || 1)), per) - 1;
+    var pages = [];
+    labels.forEach(function (l, i) {
+      var slot = skip + i;
+      var page = Math.floor(slot / per);
+      var pos = slot % per;
+      var col = pos % sh.cols;
+      var row = Math.floor(pos / sh.cols);
+      (pages[page] = pages[page] || []).push(stickerHtml(l,
+        sh.left + col * (sh.width + sh.gapX), sh.top + row * (sh.height + sh.gapY), overlay));
+    });
+    // A hair under A4 so rounding never pushes a sheet onto a second, blank page.
+    return pages.map(function (stickers) {
+      return '<div class="sheet' + (guides ? ' guides' : '') + '" style="width:' + A4.width + 'mm;height:' + (A4.height - 1) + 'mm">' +
+        (guides ? SHEET_GUIDES : '') + stickers.join('') + '</div>';
+    }).join('');
+  }
+
+  function sheetWarnings() {
+    var sh = state.sheet;
+    var warnings = [];
+    var right = sh.left + sh.cols * sh.width + (sh.cols - 1) * sh.gapX;
+    var bottom = sh.top + sh.rows * sh.height + (sh.rows - 1) * sh.gapY;
+    if (right > A4.width + 0.5) warnings.push('The stickers run ' + (right - A4.width).toFixed(1) + ' mm past the right edge of A4.');
+    if (bottom > A4.height + 0.5) warnings.push('The stickers run ' + (bottom - A4.height).toFixed(1) + ' mm past the bottom of A4.');
+    var bar = code39Svg(padBarcode(1234567), sh.barHeight, sh.module, sh.dpi);
+    if (bar.widthMm > sh.width - 2) {
+      warnings.push('The barcode (' + bar.widthMm.toFixed(1) + ' mm) is wider than the sticker. Use thinner bars.');
+    }
+    if (sh.barHeight + sh.font * 0.3528 * 1.3 > sh.height - 1) {
+      warnings.push('The barcode and number are taller than the sticker. Lower the barcode height or number size.');
+    }
+    return warnings;
+  }
+
+  function renderSheetPreview() {
+    var per = stickersPerSheet();
+    var sample = [];
+    for (var i = 0; i < per; i += 1) sample.push(TEST_STICKER);
+    $('sheet-preview').innerHTML = sheetsHtml(sample, 1);
+    $('sheet-count').textContent = state.sheet.cols + ' across x ' + state.sheet.rows + ' down = ' + per + ' stickers per sheet.';
+    var w = sheetWarnings();
+    $('sheet-warning').hidden = !w.length;
+    $('sheet-warning').textContent = w.join(' ');
+  }
+
+  /* The sticker to start from, read from the input next to the button. */
+  function stickerStart(input) {
+    var n = Math.round(Number(input && input.value));
+    return n >= 1 && n <= stickersPerSheet() ? n : 1;
+  }
+
+  function stickerStartHtml(id) {
+    return '<label class="inline-field sticker-start-field">Start at sticker <input type="number" class="sticker-start"' +
+      (id ? ' id="' + id + '"' : '') + ' min="1" max="' + stickersPerSheet() + '" value="1" /></label>';
+  }
+
+  function printSheets(labels, start, overlay, guides) {
+    if (!labels || !labels.length) return;
+    // A4 for this print only; the next carton label print sets the label size again.
+    $('page-style').textContent = '@page { size: A4 portrait; margin: 0; }';
+    $('print-area').innerHTML = sheetsHtml(labels, start, overlay, guides);
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { window.print(); });
+    });
+  }
+
   /* ---------------- views ---------------- */
 
   function switchView(name) {
@@ -351,7 +514,7 @@
       v.hidden = v.dataset.view !== name;
     });
     showStatus('');
-    if (name === 'settings') renderPreview();
+    if (name === 'settings') { renderPreview(); renderSheetPreview(); }
   }
 
   function renderMode() {
@@ -548,8 +711,21 @@
       ? 'Test mode: ' + data.barcodes.length + ' labels previewed (' + range + '). Nothing was saved.'
       : 'Created ' + data.barcodes.length + ' labels: ' + range + '.') +
       (data.batchNote ? ' ' + esc(data.batchNote) : '') + '</span>' +
-      '<button type="button" class="btn-secondary" id="btn-print-again">Print again</button>';
+      '<button type="button" class="btn-secondary" id="btn-print-again">Print again</button>' +
+      '<span class="small-print">' + stickerStartHtml() +
+      '<button type="button" class="btn-secondary" data-print-small="1">Print small stickers (A4)</button></span>';
     box.hidden = false;
+  }
+
+  /* "Print small stickers" in a last-run box: the labels just made, from the start sticker typed there. */
+  function onLastRunClick(e) {
+    if (e.target.id === 'btn-print-again') {
+      printLabels(state.lastLabels, state.lastDryRun ? 'TEST - NOT SAVED' : null);
+    }
+    if (e.target.dataset.printSmall) {
+      printSheets(state.lastLabels, stickerStart(e.currentTarget.querySelector('.sticker-start')),
+        state.lastDryRun ? 'TEST' : null);
+    }
   }
 
   /*
@@ -763,7 +939,10 @@
           : '') +
         '<div class="form-row"><button type="button" class="btn-primary" id="btn-reprint-print">Print ' +
         data.labels.length + ' label' + (data.labels.length === 1 ? '' : 's') + '</button>' +
-        '<button type="button" class="btn-secondary" id="btn-reprint-preview">Show actual size</button></div>' +
+        '<button type="button" class="btn-secondary" id="btn-reprint-preview">Show actual size</button>' +
+        '<span class="small-print">' + stickerStartHtml('reprint-sticker-start') +
+        '<button type="button" class="btn-secondary" id="btn-reprint-small">Print ' + data.labels.length +
+        ' small sticker' + (data.labels.length === 1 ? '' : 's') + ' (A4)</button></span></div>' +
         '<div id="reprint-preview" class="preview reprint-preview" hidden></div>';
       return data.labels;
     }).catch(function (err) { showStatus(err.message, 'error'); return null; });
@@ -899,9 +1078,11 @@
       state.db = window.AppConfig.defaultDatabase;
     }
     $('database').value = state.db;
+    if (window.AppConfig.portalUrl) $('back-to-portal').href = window.AppConfig.portalUrl;
     $('ranges-from').value = todayIso(-7);
     $('ranges-to').value = todayIso(0);
     fillSettingsForm();
+    fillSheetForm();
     applyPageSize();
 
     document.addEventListener('click', openSuggestions);
@@ -952,19 +1133,11 @@
       $('mixed-panel').dataset.weight = $('mixed-weight-mode').value;
     });
     $('mixed-form').addEventListener('submit', onMixedGenerate);
-    $('mixed-last-run').addEventListener('click', function (e) {
-      if (e.target.id === 'btn-print-again') {
-        printLabels(state.lastLabels, state.lastDryRun ? 'TEST - NOT SAVED' : null);
-      }
-    });
+    $('mixed-last-run').addEventListener('click', onLastRunClick);
     $('job-clear').addEventListener('click', clearJob);
     $('generate-form').addEventListener('submit', onGenerate);
 
-    $('last-run').addEventListener('click', function (e) {
-      if (e.target.id === 'btn-print-again') {
-        printLabels(state.lastLabels, state.lastDryRun ? 'TEST - NOT SAVED' : null);
-      }
-    });
+    $('last-run').addEventListener('click', onLastRunClick);
     $('job-ranges').addEventListener('click', function (e) {
       var btn = e.target.closest('[data-reprint-from]');
       if (btn) reprintRange(btn.dataset.reprintFrom, btn.dataset.reprintTo);
@@ -977,6 +1150,8 @@
     $('reprint-result').addEventListener('click', function (e) {
       if (e.target.id === 'btn-reprint-print') printLabels(reprintPrintable());
       if (e.target.id === 'btn-reprint-preview') toggleReprintPreview(e.target);
+      // Stickers carry only the barcode, so the product name / batch edits don't matter here.
+      if (e.target.id === 'btn-reprint-small') printSheets(state.reprintLabels, stickerStart($('reprint-sticker-start')));
     });
     $('reprint-result').addEventListener('input', function (e) {
       var preview = $('reprint-preview');
@@ -997,6 +1172,22 @@
       fillSettingsForm();
       applyPageSize();
       renderPreview();
+    });
+
+    $('sheet-form').addEventListener('change', readSheetForm);
+    $('sheet-form').addEventListener('input', function (e) {
+      if (e.target.tagName === 'INPUT') readSheetForm();
+    });
+    $('btn-test-sheet').addEventListener('click', function () {
+      var sample = [];
+      for (var i = 0; i < stickersPerSheet(); i += 1) sample.push(TEST_STICKER);
+      printSheets(sample, 1, 'TEST', true);
+    });
+    $('btn-reset-sheet').addEventListener('click', function () {
+      state.sheet = Object.assign({}, SHEET_DEFAULTS);
+      saveSheet();
+      fillSheetForm();
+      renderSheetPreview();
     });
 
     api('/config').then(function (cfg) {

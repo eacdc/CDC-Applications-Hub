@@ -19,6 +19,7 @@
   <div class="app" id="app">
     <header class="topbar">
       <div class="brand">
+        <a id="back-to-portal" class="back-link" href="https://cdc-grn-portal.onrender.com">&larr; Back to portal</a>
         <h1>Packing Slip Barcode</h1>
         <p>Carton labels for finished goods</p>
       </div>
@@ -289,6 +290,77 @@
         <div class="card preview-card">
           <h3 class="sub">Preview (actual size)</h3>
           <div id="label-preview" class="preview"></div>
+        </div>
+      </div>
+
+      <div class="settings-grid">
+        <div class="card">
+          <h3 class="sub">Small stickers (A4 sheet)</h3>
+          <p class="hint">
+            The barcode and its number only, like the old exe's "Small Size - Only Barcode". Printed on an
+            A4 sticker sheet on an office printer: in Chrome's print window pick that printer, paper A4,
+            margins None and scale 100%. Measure the sheet with a ruler if a test print is off.
+          </p>
+          <form id="sheet-form" class="settings-form">
+            <label class="field">
+              <span>Stickers across</span>
+              <input id="sheet-cols" type="number" min="1" max="10" step="1" />
+            </label>
+            <label class="field">
+              <span>Stickers down</span>
+              <input id="sheet-rows" type="number" min="1" max="30" step="1" />
+            </label>
+            <label class="field">
+              <span>Sticker width (mm)</span>
+              <input id="sheet-width" type="number" min="10" max="210" step="0.1" />
+            </label>
+            <label class="field">
+              <span>Sticker height (mm)</span>
+              <input id="sheet-height" type="number" min="10" max="297" step="0.1" />
+            </label>
+            <label class="field">
+              <span>Top margin (mm)</span>
+              <input id="sheet-top" type="number" min="0" max="100" step="0.1" />
+            </label>
+            <label class="field">
+              <span>Left margin (mm)</span>
+              <input id="sheet-left" type="number" min="0" max="100" step="0.1" />
+            </label>
+            <label class="field">
+              <span>Gap across (mm)</span>
+              <input id="sheet-gap-x" type="number" min="0" max="20" step="0.1" />
+            </label>
+            <label class="field">
+              <span>Gap down (mm)</span>
+              <input id="sheet-gap-y" type="number" min="0" max="20" step="0.1" />
+            </label>
+            <label class="field">
+              <span>Barcode height (mm)</span>
+              <input id="sheet-bar-height" type="number" min="4" max="60" step="0.5" />
+            </label>
+            <label class="field">
+              <span>Bar thickness</span>
+              <select id="sheet-module">
+                <option value="5">0.21 mm &mdash; narrow</option>
+                <option value="6">0.25 mm &mdash; normal</option>
+                <option value="7">0.30 mm &mdash; wide</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Number size (pt)</span>
+              <input id="sheet-font" type="number" min="5" max="20" step="0.5" />
+            </label>
+          </form>
+          <p id="sheet-count" class="hint sheet-count"></p>
+          <p id="sheet-warning" class="warn" hidden></p>
+          <div class="form-row">
+            <button type="button" id="btn-test-sheet" class="btn-secondary">Print test sheet</button>
+            <button type="button" id="btn-reset-sheet" class="btn-link">Reset to defaults</button>
+          </div>
+        </div>
+        <div class="card preview-card">
+          <h3 class="sub">Sheet preview (scaled down)</h3>
+          <div class="preview sheet-preview-wrap"><div id="sheet-preview" class="sheet-preview"></div></div>
         </div>
       </div>
     </section>

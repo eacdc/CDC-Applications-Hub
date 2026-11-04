@@ -25,5 +25,7 @@ window.AppConfig = window.AppConfig || {};
 
 /** The old tool was Kolkata-only; Ahmedabad uses the same tables. */
 window.AppConfig.defaultDatabase = window.AppConfig.defaultDatabase || 'KOL';
+/** The GRN Web UI's portal page, where the Back button goes (it reopens on the portal list when logged in). */
+window.AppConfig.portalUrl = window.AppConfig.portalUrl || 'https://cdc-grn-portal.onrender.com';
 /** Ask for confirmation before creating more labels than this in one go. */
 window.AppConfig.confirmAbove = window.AppConfig.confirmAbove || 20;

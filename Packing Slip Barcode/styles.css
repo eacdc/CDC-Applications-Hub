@@ -94,6 +94,8 @@ body {
   margin-bottom: 12px;
 }
 .brand h1 { margin: 0; font-size: 20px; }
+.back-link { display: inline-block; margin-bottom: 4px; font-size: 13px; color: var(--primary); text-decoration: none; }
+.back-link:hover { text-decoration: underline; }
 .brand p { margin: 2px 0 0; color: var(--muted); }
 .topbar-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 
@@ -279,12 +281,47 @@ td.wrap { white-space: normal; min-width: 200px; }
   pointer-events: none;
 }
 
+/* ---------- Small stickers on an A4 sheet ---------- */
+.small-print { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sticker-start-field { color: inherit; font-size: 13px; }
+.sticker-start { width: 70px; padding: 6px 8px; }
+.sheet-count { margin-top: 10px; }
+.sheet { position: relative; overflow: hidden; background: #fff; }
+.sticker {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #000;
+}
+.sticker-bar svg { display: block; }
+.sticker-number { font-family: Arial, Helvetica, sans-serif; line-height: 1.1; margin-top: .4mm; letter-spacing: .05em; }
+.sticker-dry {
+  position: absolute;
+  top: .5mm;
+  right: 1mm;
+  font: 700 7pt Arial, sans-serif;
+  color: #000;
+  opacity: .6;
+}
+/* Test sheet: measuring lines. */
+.sheet-ruler { position: absolute; background: #000; }
+.sheet-ruler-text { position: absolute; font: 7pt Arial, sans-serif; color: #000; white-space: nowrap; }
+.sheet-ruler-text.vertical { writing-mode: vertical-rl; }
+/* Preview only: a whole A4 sheet at 40%, sticker edges outlined (not printed). */
+.sheet-preview-wrap { display: flex; justify-content: center; }
+.sheet-preview { zoom: .4; }
+.sheet-preview .sheet { box-shadow: 0 1px 6px rgba(0,0,0,.25); }
+.sheet-preview .sticker { outline: 1px dashed #9aa7b5; }
+
 .print-area { display: none; }
 
 @media print {
   body { background: #fff; }
   .app { display: none !important; }
   .print-area { display: block; }
-  .print-area .label { page-break-after: always; break-after: page; }
-  .print-area .label:last-child { page-break-after: auto; break-after: auto; }
+  .print-area .label, .print-area .sheet { page-break-after: always; break-after: page; }
+  .print-area .label:last-child, .print-area .sheet:last-child { page-break-after: auto; break-after: auto; }
 }

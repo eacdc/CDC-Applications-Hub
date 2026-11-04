@@ -2402,18 +2402,9 @@
           // Add first row to table from SP output and form values
           if (deliveryTableBody) {
             const sp = data.sp || {};
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${data?.data?.barcode ?? session?.challanBarcode ?? ''}</td>
-              <td>${sp.cartonCount ?? '—'}</td>
-              <td>${sp.jobName ?? '—'}</td>
-              <td>${sp.orderQty ?? '—'}</td>
-              <td>${sp.gpnQty ?? '—'}</td>
-              <td>${sp.deliveredThisVoucher ?? '—'}</td>
-              <td>${sp.deliveredTotal ?? '—'}</td>
-            `;
             deliveryTableBody.innerHTML = '';
-            deliveryTableBody.appendChild(row);
+            deliveryScanRows(data?.data?.barcode ?? session?.challanBarcode ?? '', sp)
+              .forEach((r) => deliveryTableBody.appendChild(r));
             // Remember FGTransactionID for updates
             if (sp && sp.transactionId) {
               window.__lastFgTransactionId = sp.transactionId;
@@ -2467,17 +2458,7 @@
             const sp = data.sp || {};
   
             if (deliveryTableBody) {
-              const newRow = document.createElement('tr');
-              newRow.innerHTML = `
-                <td>${barcodeVal}</td>
-                <td>${sp.cartonCount ?? '—'}</td>
-                <td>${sp.jobName ?? '—'}</td>
-                <td>${sp.orderQty ?? '—'}</td>
-                <td>${sp.gpnQty ?? '—'}</td>
-                <td>${sp.deliveredThisVoucher ?? '—'}</td>
-                <td>${sp.deliveredTotal ?? '—'}</td>
-              `;
-              deliveryTableBody.insertBefore(newRow, deliveryTableBody.firstChild);
+              prependRows(deliveryTableBody, deliveryScanRows(barcodeVal, sp));
             }
   
             if (confBarcode) confBarcode.value = '';
@@ -2502,6 +2483,55 @@
       });
     }
   
+    /*
+     * Table rows for a scanned barcode. A mixed box (several PWOs on one barcode)
+     * comes back from the backend with `jobs`, one per PWO: each PWO gets its own
+     * row and its own quantities, and the barcode and carton count show once, on
+     * the first row. A one-PWO barcode keeps the single row from the save proc.
+     */
+    function scanCell(value) {
+      if (value == null) return '—';
+      return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function scanRow(cells, isSubRow) {
+      const tr = document.createElement('tr');
+      if (isSubRow) tr.className = 'scan-subrow';
+      tr.innerHTML = cells.map((c) => `<td>${scanCell(c)}</td>`).join('');
+      return tr;
+    }
+
+    function isMixedBox(jobs) {
+      return Array.isArray(jobs) && jobs.length > 1;
+    }
+
+    /* GPN columns: Bar Code, Count, Item Count, Order Qty, Count Total, Item Count Total, Job Number, Job Name */
+    function gpnScanRows(barcode, cartonQtyThisVoucher, singleCells, jobs) {
+      if (!isMixedBox(jobs)) return [scanRow([barcode, cartonQtyThisVoucher, ...singleCells])];
+      return jobs.map((j, i) => scanRow([
+        i === 0 ? barcode : '', i === 0 ? cartonQtyThisVoucher : '',
+        j.thisQty, j.orderQty, j.gpnCartons, j.gpnQty, j.jobBookingNo, j.jobName
+      ], i > 0));
+    }
+
+    /* Delivery-note columns: Barcode, Carton Count, Job Name, Ordered, GPN Qty, Delivered This Voucher, Delivered Total */
+    function deliveryScanRows(barcode, sp) {
+      if (!isMixedBox(sp.jobs)) {
+        return [scanRow([barcode, sp.cartonCount, sp.jobName, sp.orderQty, sp.gpnQty, sp.deliveredThisVoucher, sp.deliveredTotal])];
+      }
+      return sp.jobs.map((j, i) => scanRow([
+        i === 0 ? barcode : '', i === 0 ? sp.cartonCount : '',
+        `${j.jobBookingNo} - ${j.jobName}`, j.orderQty, j.gpnQty, j.thisQty, j.deliveredQty
+      ], i > 0));
+    }
+
+    /* Newest scan at the top, its PWO rows kept in order. */
+    function prependRows(tbody, rows) {
+      const frag = document.createDocumentFragment();
+      rows.forEach((r) => frag.appendChild(r));
+      tbody.insertBefore(frag, tbody.firstChild);
+    }
+
     // Initialize table with 10 empty rows
     function initializeTable() {
       if (deliveryTableBody) {
@@ -2717,7 +2747,6 @@
   
           // Populate first row in table
           if (gpnTableBody) {
-            const firstRow = document.createElement('tr');
             const orderQty = responseData.OrderQty || responseData.orderqty || 0;
             const packedQtyThisVoucher = responseData.PackedQtyThisVoucher || responseData.packedqtythisvoucher || responseData.PackagedQtyThisVoucher || 0;
             const packedQtyTotal = responseData.PackedQtyTotal || responseData.packedqtytotal || responseData.PackagedQtyTotal || 0;
@@ -2725,19 +2754,11 @@
             const cartonQtyTotal = responseData.CartonQtyTotal || responseData.cartonqtytotal || responseData.CartonQtyTotal || 0;
             const jobName = responseData.JobName || responseData.jobname || '—';
             const jobBookingNo = responseData.JobBookingNo || responseData.jobbookingno || responseData.JobBookingNumber || '—';
-            
-            firstRow.innerHTML = `
-              <td>${barcode}</td>
-              <td>${cartonQtyThisVoucher}</td>
-              <td>${packedQtyThisVoucher}</td>
-              <td>${orderQty}</td>
-              <td>${cartonQtyTotal}</td>
-              <td>${packedQtyTotal}</td>
-              <td>${jobBookingNo}</td>
-              <td>${jobName}</td>
-            `;
+
             gpnTableBody.innerHTML = '';
-            gpnTableBody.appendChild(firstRow);
+            gpnScanRows(barcode, cartonQtyThisVoucher,
+              [packedQtyThisVoucher, orderQty, cartonQtyTotal, packedQtyTotal, jobBookingNo, jobName], data.jobs)
+              .forEach((r) => gpnTableBody.appendChild(r));
           }
   
         // Navigate to confirmation screen
@@ -2838,19 +2859,9 @@
   
         // Add new row to table (always at the top, newest first)
         if (gpnTableBody) {
-          const newRow = document.createElement('tr');
-          newRow.innerHTML = `
-            <td>${barcodeVal}</td>
-            <td>${cartonQtyThisVoucher}</td>
-            <td>${packedQtyThisVoucher}</td>
-            <td>${orderQty}</td>
-            <td>${cartonQtyTotal}</td>
-            <td>${packedQtyTotal}</td>
-            <td>${jobBookingNo}</td>
-            <td>${jobName}</td>
-          `;
           // Insert at the top (prepend) - newest entries always at top
-          gpnTableBody.insertBefore(newRow, gpnTableBody.firstChild);
+          prependRows(gpnTableBody, gpnScanRows(barcodeVal, cartonQtyThisVoucher,
+            [packedQtyThisVoucher, orderQty, cartonQtyTotal, packedQtyTotal, jobBookingNo, jobName], data.jobs));
         }
   
         if (gpnConfBarcode) {
