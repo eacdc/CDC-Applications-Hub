@@ -416,6 +416,9 @@
       }
       $('label-job-name').placeholder = data.job.jobName || '';
       fillBatchList($('batch-list'), data.batches);
+      $('batch-no').placeholder = batchPlaceholder(data.batches);
+      $('batch-hint').textContent = batchHint(data.batches);
+      $('batch-hint').classList.toggle('warn-text', !data.batches);
       renderJobRanges(data.ranges);
       $('qty-per-box').focus();
     }).catch(function (err) { showStatus(err.message, 'error'); });
@@ -426,6 +429,24 @@
     list.innerHTML = (batches || []).map(function (b) {
       return '<option value="' + esc(b) + '"></option>';
     }).join('');
+  }
+
+  /* No `batches` at all means the backend predates the batch list. */
+  function batchHint(batches) {
+    if (!batches) return 'ERP batch list not available: the backend needs restarting with the new code.';
+    if (!batches.length) return 'No batches entered in the ERP for this PWO. Type it.';
+    return 'Click to pick one of ' + batches.length + ' ERP batch' + (batches.length === 1 ? '' : 'es') + ', or type.';
+  }
+
+  function batchPlaceholder(batches) {
+    return batches && batches.length ? 'Pick or type (' + batches.length + ' in ERP)' : 'Type batch no';
+  }
+
+  /* Open the batch suggestions on click, like a drop-down, instead of only while typing. */
+  function openSuggestions(e) {
+    var input = e.target;
+    if (!input.matches || !input.matches('input[list]') || !input.list || !input.list.options.length) return;
+    try { input.showPicker(); } catch (err) { /* not supported or not allowed: typing still filters */ }
   }
 
   /* What prints as Product Name: the edited name, or the ERP name if it was cleared. */
@@ -557,7 +578,7 @@
       }
       state.mixed.push({
         job: job, qty: '', netWt: '', grossWt: '',
-        labelName: job.jobName || '', batchNo: '', batches: data.batches || []
+        labelName: job.jobName || '', batchNo: '', batches: data.batches
       });
       renderMixed();
       var inputs = $('mixed-rows').querySelectorAll('input[data-field="qty"]');
@@ -584,7 +605,8 @@
         return '<tr><td>' + esc(m.job.jobBookingNo) + '</td>' +
           '<td class="wrap">' + text(i, 'labelName', m.labelName,
             ' class="wide" maxlength="500" placeholder="' + esc(m.job.jobName) + '"') + '</td>' +
-          '<td>' + text(i, 'batchNo', m.batchNo, ' maxlength="100" list="' + listId + '"') +
+          '<td>' + text(i, 'batchNo', m.batchNo, ' maxlength="100" list="' + listId + '"' +
+            ' placeholder="' + esc(batchPlaceholder(m.batches)) + '" title="' + esc(batchHint(m.batches)) + '"') +
           '<datalist id="' + listId + '"></datalist></td>' +
           '<td class="num">' + fmtNum(m.job.orderQuantity) + '</td>' +
           '<td>' + input(i, 'qty', m.qty, 1) + '</td>' +
@@ -844,6 +866,8 @@
     $('ranges-to').value = todayIso(0);
     fillSettingsForm();
     applyPageSize();
+
+    document.addEventListener('click', openSuggestions);
 
     renderThemeToggle();
     $('theme-toggle').addEventListener('click', toggleTheme);

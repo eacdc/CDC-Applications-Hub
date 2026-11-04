@@ -73,6 +73,8 @@
 }
 
 * { box-sizing: border-box; }
+/* Classes that set display (e.g. .last-run's flex) must not show hidden elements. */
+[hidden] { display: none !important; }
 
 body {
   margin: 0;
@@ -206,6 +208,8 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 #mixed-rows input.wide { width: 100%; min-width: 220px; }
 #mixed-rows td.wrap { min-width: 220px; }
 .label-only-hint { margin-top: 6px; font-size: 12px; }
+.field-hint { font-size: 11px; color: var(--muted); }
+.field-hint.warn-text { color: var(--warn); }
 
 .sub { font-size: 14px; margin: 16px 0 8px; }
 .hint { color: var(--muted); margin: 0 0 4px; }
