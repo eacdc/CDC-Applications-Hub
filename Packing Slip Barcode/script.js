@@ -45,7 +45,7 @@
     maxCopies: 500,
     mode: 'single', // 'mixed': several PWOs of one client under one barcode
     job: null,
-    mixed: [], // { job, qty, netWt, grossWt }
+    mixed: [], // { job, qty, netWt, grossWt, labelName, batchNo, batches }
     lastLabels: null,
     lastDryRun: false,
     reprintLabels: null,
@@ -304,14 +304,14 @@
     var join = function (key) {
       return lines.map(function (l) { return l[key] == null || l[key] === '' ? '-' : l[key]; }).join(', ');
     };
-    var batches = lines.map(function (l) { return l.batchNo; }).filter(Boolean);
+    var anyBatch = lines.some(function (l) { return l.batchNo; });
     return {
       clientName: lines[0].clientName,
       jobBookingNo: join('jobBookingNo'),
       productCode: join('productCode'),
       jobName: join('jobName'),
       qtyPerBox: join('qtyPerBox'),
-      batchNo: batches.join(', '),
+      batchNo: anyBatch ? join('batchNo') : '',
       packedDate: packedDate,
       barcodeNo: barcodeNo,
       jobCount: lines.length
@@ -396,6 +396,7 @@
   function selectJob(jobBookingId) {
     showStatus('');
     return api('/jobs/' + jobBookingId).then(function (data) {
+      var sameJob = !!state.job && state.job.jobBookingId === data.job.jobBookingId;
       state.job = data.job;
       $('job-results').hidden = true;
       $('job-search').value = data.job.jobBookingNo;
@@ -407,9 +408,30 @@
       $('job-order').textContent = fmtNum(data.job.orderQuantity);
       $('job-slips').textContent = fmtNum(data.job.slips);
       $('job-slipqty').textContent = fmtNum(data.job.slipQty);
+      // A new PWO starts from its ERP name and an empty batch; the same PWO
+      // reloaded after printing keeps what was typed.
+      if (!sameJob) {
+        $('label-job-name').value = data.job.jobName || '';
+        $('batch-no').value = '';
+      }
+      $('label-job-name').placeholder = data.job.jobName || '';
+      fillBatchList($('batch-list'), data.batches);
       renderJobRanges(data.ranges);
       $('qty-per-box').focus();
     }).catch(function (err) { showStatus(err.message, 'error'); });
+  }
+
+  /* The ERP's batches for a job, offered as suggestions; any batch can still be typed. */
+  function fillBatchList(list, batches) {
+    list.innerHTML = (batches || []).map(function (b) {
+      return '<option value="' + esc(b) + '"></option>';
+    }).join('');
+  }
+
+  /* What prints as Product Name: the edited name, or the ERP name if it was cleared. */
+  function labelName(typed, job) {
+    var name = String(typed == null ? '' : typed).trim();
+    return name || job.jobName;
   }
 
   function clearJob() {
@@ -467,11 +489,13 @@
       }
     }).then(function (data) {
       var job = data.job;
+      var name = labelName($('label-job-name').value, job);
+      var batchNo = $('batch-no').value.trim();
       state.lastDryRun = !!data.dryRun;
       state.lastLabels = data.barcodes.map(function (n) {
         return {
           clientName: job.clientName, jobBookingNo: job.jobBookingNo, productCode: job.productCode,
-          jobName: job.jobName, qtyPerBox: qty, batchNo: '', packedDate: fmtDate(data.packedAt), barcodeNo: n
+          jobName: name, qtyPerBox: qty, batchNo: batchNo, packedDate: fmtDate(data.packedAt), barcodeNo: n
         };
       });
       renderLastRun(data);
@@ -531,7 +555,10 @@
           ', the box is for ' + state.mixed[0].job.clientName + '.', 'error');
         return;
       }
-      state.mixed.push({ job: job, qty: '', netWt: '', grossWt: '' });
+      state.mixed.push({
+        job: job, qty: '', netWt: '', grossWt: '',
+        labelName: job.jobName || '', batchNo: '', batches: data.batches || []
+      });
       renderMixed();
       var inputs = $('mixed-rows').querySelectorAll('input[data-field="qty"]');
       if (inputs.length) inputs[inputs.length - 1].focus();
@@ -547,16 +574,26 @@
       return '<input type="number" min="0" step="' + step + '" data-i="' + i + '" data-field="' + field +
         '" value="' + esc(value) + '" />';
     };
+    var text = function (i, field, value, extra) {
+      return '<input type="text" data-i="' + i + '" data-field="' + field + '" value="' + esc(value) + '"' +
+        ' autocomplete="off"' + (extra || '') + ' />';
+    };
     $('mixed-rows').innerHTML = rows.length
       ? rows.map(function (m, i) {
-        return '<tr><td>' + esc(m.job.jobBookingNo) + '</td><td class="wrap">' + esc(m.job.jobName) + '</td>' +
+        var listId = 'mixed-batches-' + i;
+        return '<tr><td>' + esc(m.job.jobBookingNo) + '</td>' +
+          '<td class="wrap">' + text(i, 'labelName', m.labelName,
+            ' class="wide" maxlength="500" placeholder="' + esc(m.job.jobName) + '"') + '</td>' +
+          '<td>' + text(i, 'batchNo', m.batchNo, ' maxlength="100" list="' + listId + '"') +
+          '<datalist id="' + listId + '"></datalist></td>' +
           '<td class="num">' + fmtNum(m.job.orderQuantity) + '</td>' +
           '<td>' + input(i, 'qty', m.qty, 1) + '</td>' +
           '<td class="wt-job">' + input(i, 'netWt', m.netWt, 0.01) + '</td>' +
           '<td class="wt-job">' + input(i, 'grossWt', m.grossWt, 0.01) + '</td>' +
           '<td><button type="button" class="btn-link" data-remove="' + i + '">Remove</button></td></tr>';
       }).join('')
-      : '<tr><td colspan="7" class="empty">No PWO in the box yet.</td></tr>';
+      : '<tr><td colspan="9" class="empty">No PWO in the box yet.</td></tr>';
+    rows.forEach(function (m, i) { fillBatchList($('mixed-batches-' + i), m.batches); });
   }
 
   function onMixedGenerate(event) {
@@ -592,10 +629,14 @@
         copies: copies
       }
     }).then(function (data) {
+      // The server returns the PWOs sorted by job; match each back to its row for the typed name and batch.
+      var byJob = {};
+      rows.forEach(function (m) { byJob[m.job.jobBookingId] = m; });
       var lines = data.lines.map(function (j) {
+        var m = byJob[j.jobBookingId] || {};
         return {
           clientName: j.clientName, jobBookingNo: j.jobBookingNo, productCode: j.productCode,
-          jobName: j.jobName, qtyPerBox: j.qtyPerBox, batchNo: ''
+          jobName: labelName(m.labelName, j), qtyPerBox: j.qtyPerBox, batchNo: String(m.batchNo || '').trim()
         };
       });
       var packed = fmtDate(data.packedAt);
@@ -645,10 +686,22 @@
       }
       var jobs = {};
       rows.forEach(function (l) { jobs[l.jobBookingNo] = (jobs[l.jobBookingNo] || 0) + 1; });
+      // One PWO, no mixed boxes: the product name and batch can be changed for this print.
+      var single = Object.keys(jobs).length === 1 && data.labels.length === rows.length;
+      var savedBatches = rows.map(function (r) { return r.batchNo; })
+        .filter(function (b, i, all) { return all.indexOf(b) === i; });
       box.innerHTML = '<table><thead><tr><th>PWO</th><th class="num">Labels</th></tr></thead><tbody>' +
         Object.keys(jobs).map(function (k) {
           return '<tr><td>' + esc(k) + '</td><td class="num">' + jobs[k] + '</td></tr>';
         }).join('') + '</tbody></table>' +
+        (single
+          ? '<div class="form-row"><label class="field grow"><span>Product name on label</span>' +
+            '<input id="reprint-job-name" type="text" maxlength="500" autocomplete="off" value="' + esc(rows[0].jobName) +
+            '" placeholder="' + esc(rows[0].jobName) + '" /></label>' +
+            '<label class="field"><span>Batch No</span><input id="reprint-batch" type="text" maxlength="100" autocomplete="off" value="' +
+            esc(savedBatches.length === 1 ? savedBatches[0] : '') + '" /></label></div>' +
+            '<p class="hint label-only-hint">Printed on the label only. Not saved.</p>'
+          : '') +
         '<div class="form-row"><button type="button" class="btn-primary" id="btn-reprint-print">Print ' +
         data.labels.length + ' label' + (data.labels.length === 1 ? '' : 's') + '</button>' +
         '<button type="button" class="btn-secondary" id="btn-reprint-preview">Show actual size</button></div>' +
@@ -667,19 +720,42 @@
       btn.textContent = 'Show actual size';
       return;
     }
-    var labels = state.reprintLabels || [];
+    box.hidden = false;
+    renderReprintPreview();
+    btn.textContent = 'Hide preview';
+  }
+
+  function renderReprintPreview() {
+    var box = $('reprint-preview');
+    var labels = reprintPrintable();
     box.innerHTML = labels.slice(0, PREVIEW_LIMIT).map(function (l) { return labelHtml(l); }).join('') +
       (labels.length > PREVIEW_LIMIT
         ? '<p class="hint">Showing the first ' + PREVIEW_LIMIT + ' of ' + labels.length + ' labels.</p>'
         : '');
-    box.hidden = false;
     fitMixedLabels(box);
-    btn.textContent = 'Hide preview';
   }
 
+  /* Saved labels with the product name and batch typed for this print, if any. */
+  function withLabelEdits(labels, nameInput, batchInput) {
+    if (!nameInput) return labels;
+    return labels.map(function (l) {
+      var copy = Object.assign({}, l);
+      copy.jobName = labelName(nameInput.value, l);
+      copy.batchNo = batchInput.value.trim();
+      return copy;
+    });
+  }
+
+  function reprintPrintable() {
+    return withLabelEdits(state.reprintLabels || [], $('reprint-job-name'), $('reprint-batch'));
+  }
+
+  /* Reprint from the PWO panel: uses the product name and batch typed on that panel. */
   function reprintRange(from, to) {
     loadReprint(from, to).then(function (labels) {
-      if (labels && labels.length) printLabels(labels);
+      if (!labels || !labels.length) return;
+      var own = state.job && labels.every(function (l) { return l.jobBookingId === state.job.jobBookingId; });
+      printLabels(own ? withLabelEdits(labels, $('label-job-name'), $('batch-no')) : labels);
     });
   }
 
@@ -838,8 +914,12 @@
       loadReprint($('reprint-from').value, $('reprint-to').value);
     });
     $('reprint-result').addEventListener('click', function (e) {
-      if (e.target.id === 'btn-reprint-print') printLabels(state.reprintLabels);
+      if (e.target.id === 'btn-reprint-print') printLabels(reprintPrintable());
       if (e.target.id === 'btn-reprint-preview') toggleReprintPreview(e.target);
+    });
+    $('reprint-result').addEventListener('input', function (e) {
+      var preview = $('reprint-preview');
+      if (/^reprint-(job-name|batch)$/.test(e.target.id) && preview && !preview.hidden) renderReprintPreview();
     });
 
     $('ranges-form').addEventListener('submit', loadRanges);

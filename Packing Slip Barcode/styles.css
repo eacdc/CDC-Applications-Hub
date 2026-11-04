@@ -203,7 +203,9 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 #mixed-panel[data-weight="box"] .wt-job { display: none; }
 #mixed-panel[data-weight="job"] .wt-box { display: none; }
 #mixed-rows input { width: 110px; }
-#mixed-rows td.wrap { min-width: 180px; }
+#mixed-rows input.wide { width: 100%; min-width: 220px; }
+#mixed-rows td.wrap { min-width: 220px; }
+.label-only-hint { margin-top: 6px; font-size: 12px; }
 
 .sub { font-size: 14px; margin: 16px 0 8px; }
 .hint { color: var(--muted); margin: 0 0 4px; }

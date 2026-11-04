@@ -74,6 +74,19 @@
           <div><dt>Qty on labels</dt><dd id="job-slipqty"></dd></div>
         </dl>
 
+        <div class="form-row">
+          <label class="field grow">
+            <span>Product name on label</span>
+            <input id="label-job-name" type="text" maxlength="500" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>Batch No</span>
+            <input id="batch-no" type="text" list="batch-list" maxlength="100" autocomplete="off" />
+            <datalist id="batch-list"></datalist>
+          </label>
+        </div>
+        <p class="hint label-only-hint">Product name and Batch No are printed on the label only. They are not saved.</p>
+
         <form id="generate-form" class="form-row">
           <label class="field">
             <span>Quantity per box *</span>
@@ -113,7 +126,7 @@
             <table>
               <thead>
                 <tr>
-                  <th>PWO</th><th>Product</th><th class="num">Order qty</th><th>Qty in box *</th>
+                  <th>PWO</th><th>Product name on label</th><th>Batch No</th><th class="num">Order qty</th><th>Qty in box *</th>
                   <th class="wt-job">Net wt (kg)</th><th class="wt-job">Gross wt (kg)</th><th></th>
                 </tr>
               </thead>
@@ -143,7 +156,8 @@
             <button type="submit" id="btn-mixed-generate" class="btn-primary">Create &amp; print</button>
           </div>
         </form>
-        <p class="hint">Each label is one box with all the PWOs above. More labels = more identical boxes.</p>
+        <p class="hint">Each label is one box with all the PWOs above. More labels = more identical boxes.
+          Product name and Batch No are printed on the label only. They are not saved.</p>
         <div id="mixed-last-run" class="last-run" hidden></div>
       </div>
     </section>
