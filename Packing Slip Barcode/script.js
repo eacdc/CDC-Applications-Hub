@@ -414,15 +414,14 @@
       $('job-order').textContent = fmtNum(data.job.orderQuantity);
       $('job-slips').textContent = fmtNum(data.job.slips);
       $('job-slipqty').textContent = fmtNum(data.job.slipQty);
-      // A new PWO starts from its ERP name and the PWO no as batch; the same PWO
-      // reloaded after printing keeps what was typed.
+      // A new PWO starts from its ERP name and a blank batch, like the exe; the same
+      // PWO reloaded after printing keeps what was typed.
       if (!sameJob) {
         $('label-job-name').value = data.job.jobName || '';
-        $('batch-no').value = data.job.jobBookingNo;
+        $('batch-no').value = '';
       }
       $('label-job-name').placeholder = data.job.jobName || '';
-      fillBatchList($('batch-list'), batchChoices(data.job, data.batches));
-      $('batch-no').placeholder = data.job.jobBookingNo;
+      fillBatchList($('batch-list'), data.batches);
       $('batch-hint').textContent = batchHint(data.batches);
       $('batch-hint').classList.toggle('warn-text', !data.batches);
       renderJobRanges(data.ranges);
@@ -437,18 +436,11 @@
     }).join('');
   }
 
-  /* The ERP uses the PWO no as the batch no (every GPN line carries it), so it
-     is the default and the first choice; batches entered for the job follow. */
-  function batchChoices(job, batches) {
-    return [job.jobBookingNo].concat((batches || []).filter(function (b) { return b !== job.jobBookingNo; }));
-  }
-
   /* No `batches` at all means the backend predates the batch list. */
   function batchHint(batches) {
-    if (!batches) return 'PWO no by default. ERP batch list not available: the backend needs restarting.';
-    if (!batches.length) return 'PWO no by default, as in the ERP. Change it if the client gave a batch.';
-    return 'PWO no by default. Click to pick one of ' + batches.length + ' batch' +
-      (batches.length === 1 ? '' : 'es') + ' entered in the ERP, or type.';
+    if (!batches) return 'ERP batch list not available: the backend needs restarting with the new code.';
+    if (!batches.length) return 'No batches entered in the ERP for this PWO. Type it, or leave it blank.';
+    return 'Click to pick one of ' + batches.length + ' ERP batch' + (batches.length === 1 ? '' : 'es') + ', or type.';
   }
 
   /* Open the batch suggestions on click, like a drop-down, instead of only while typing. */
@@ -587,7 +579,7 @@
       }
       state.mixed.push({
         job: job, qty: '', netWt: '', grossWt: '',
-        labelName: job.jobName || '', batchNo: job.jobBookingNo, batches: data.batches
+        labelName: job.jobName || '', batchNo: '', batches: data.batches
       });
       renderMixed();
       var inputs = $('mixed-rows').querySelectorAll('input[data-field="qty"]');
@@ -615,7 +607,7 @@
           '<td class="wrap">' + text(i, 'labelName', m.labelName,
             ' class="wide" maxlength="500" placeholder="' + esc(m.job.jobName) + '"') + '</td>' +
           '<td>' + text(i, 'batchNo', m.batchNo, ' maxlength="100" list="' + listId + '"' +
-            ' placeholder="' + esc(m.job.jobBookingNo) + '" title="' + esc(batchHint(m.batches)) + '"') +
+            ' title="' + esc(batchHint(m.batches)) + '"') +
           '<datalist id="' + listId + '"></datalist></td>' +
           '<td class="num">' + fmtNum(m.job.orderQuantity) + '</td>' +
           '<td>' + input(i, 'qty', m.qty, 1) + '</td>' +
@@ -624,7 +616,7 @@
           '<td><button type="button" class="btn-link" data-remove="' + i + '">Remove</button></td></tr>';
       }).join('')
       : '<tr><td colspan="9" class="empty">No PWO in the box yet.</td></tr>';
-    rows.forEach(function (m, i) { fillBatchList($('mixed-batches-' + i), batchChoices(m.job, m.batches)); });
+    rows.forEach(function (m, i) { fillBatchList($('mixed-batches-' + i), m.batches); });
   }
 
   function onMixedGenerate(event) {
@@ -695,8 +687,6 @@
     var byNo = {};
     rows.forEach(function (r) {
       r.packedDate = fmtDbDate(r.packedAt);
-      // Batches are not saved (except by the ERP's own slip), so reprints default to the PWO no.
-      r.batchNo = r.batchNo || r.jobBookingNo;
       if (!byNo[r.barcodeNo]) { byNo[r.barcodeNo] = []; labels.push(byNo[r.barcodeNo]); }
       byNo[r.barcodeNo].push(r);
     });

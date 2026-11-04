@@ -148,6 +148,8 @@ input, select {
 input:focus, select:focus { outline: 2px solid var(--focus); border-color: var(--primary); }
 
 .form-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-top: 12px; }
+/* Batch No has a hint under it; line the boxes up by their tops so it doesn't sit higher. */
+.form-row.label-row { align-items: flex-start; }
 
 button { font: inherit; cursor: pointer; }
 .btn-primary, .btn-secondary {
