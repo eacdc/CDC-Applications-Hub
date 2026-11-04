@@ -439,8 +439,9 @@
   /* No `batches` at all means the backend predates the batch list. */
   function batchHint(batches) {
     if (!batches) return 'ERP batch list not available: the backend needs restarting with the new code.';
-    if (!batches.length) return 'No batches entered in the ERP for this PWO. Type it, or leave it blank.';
-    return 'Click to pick one of ' + batches.length + ' ERP batch' + (batches.length === 1 ? '' : 'es') + ', or type.';
+    if (!batches.length) return 'No batches entered in the ERP for this PWO. A typed batch is printed only.';
+    return 'Click to pick one of ' + batches.length + ' ERP batch' + (batches.length === 1 ? '' : 'es') +
+      ': it is saved with the labels. Other text is printed only.';
   }
 
   /* Open the batch suggestions on click, like a drop-down, instead of only while typing. */
@@ -507,12 +508,17 @@
         qtyPerBox: qty,
         netWt: $('net-wt').value,
         grossWt: $('gross-wt').value,
-        copies: copies
+        copies: copies,
+        batchNo: $('batch-no').value.trim()
       }
     }).then(function (data) {
       var job = data.job;
       var name = labelName($('label-job-name').value, job);
-      var batchNo = $('batch-no').value.trim();
+      var typed = $('batch-no').value.trim();
+      // A saved batch prints as the ERP has it, so a reprint shows the same text.
+      var batchNo = data.savedBatchNo || typed;
+      data.batchNote = batchNote([{ jobBookingNo: job.jobBookingNo, typed: typed, saved: data.savedBatchNo }],
+        data.batchSaveDeployed, data.dryRun);
       state.lastDryRun = !!data.dryRun;
       state.lastLabels = data.barcodes.map(function (n) {
         return {
@@ -540,9 +546,31 @@
     box.className = 'last-run' + (data.dryRun ? ' dry' : '');
     box.innerHTML = '<span>' + (data.dryRun
       ? 'Test mode: ' + data.barcodes.length + ' labels previewed (' + range + '). Nothing was saved.'
-      : 'Created ' + data.barcodes.length + ' labels: ' + range + '.') + '</span>' +
+      : 'Created ' + data.barcodes.length + ' labels: ' + range + '.') +
+      (data.batchNote ? ' ' + esc(data.batchNote) : '') + '</span>' +
       '<button type="button" class="btn-secondary" id="btn-print-again">Print again</button>';
     box.hidden = false;
+  }
+
+  /*
+   * What happened to each typed batch. The save procs keep a batch only when it
+   * is one of the PWO's ERP batches, as the ERP's packing slip does; the GPN and
+   * delivery-note scans then show it. lines: [{ jobBookingNo, typed, saved }].
+   */
+  function batchNote(lines, deployed, dryRun) {
+    var typed = lines.filter(function (l) { return l.typed; });
+    if (!typed.length) return '';
+    if (!deployed) return 'Batch No printed only: saving batches needs sql/packing-slip/006_save_batch_no.sql run in this plant.';
+    var saved = typed.filter(function (l) { return l.saved; });
+    var printed = typed.filter(function (l) { return !l.saved; });
+    var many = lines.length > 1;
+    var list = function (ls, field) {
+      return ls.map(function (l) { return (many ? l.jobBookingNo + ' ' : '') + l[field]; }).join(', ');
+    };
+    return (saved.length ? 'Batch ' + list(saved, 'saved') + (dryRun ? ' would be saved' : ' saved') + ' with the labels.' : '') +
+      (saved.length && printed.length ? ' ' : '') +
+      (printed.length ? 'Batch ' + list(printed, 'typed') + ' printed only: not one of the ERP batches for ' +
+        (many ? 'its PWO' : 'this PWO') + '.' : '');
   }
 
   /* ---------------- mixed box ---------------- */
@@ -644,7 +672,10 @@
       method: 'POST',
       body: {
         items: rows.map(function (m) {
-          return { jobBookingId: m.job.jobBookingId, qty: Number(m.qty), netWt: m.netWt, grossWt: m.grossWt };
+          return {
+            jobBookingId: m.job.jobBookingId, qty: Number(m.qty), netWt: m.netWt, grossWt: m.grossWt,
+            batchNo: String(m.batchNo || '').trim()
+          };
         }),
         weightMode: weightMode,
         boxNetWt: $('mixed-net').value,
@@ -659,9 +690,14 @@
         var m = byJob[j.jobBookingId] || {};
         return {
           clientName: j.clientName, jobBookingNo: j.jobBookingNo, productCode: j.productCode,
-          jobName: labelName(m.labelName, j), qtyPerBox: j.qtyPerBox, batchNo: String(m.batchNo || '').trim()
+          jobName: labelName(m.labelName, j), qtyPerBox: j.qtyPerBox,
+          batchNo: j.savedBatchNo || String(m.batchNo || '').trim()
         };
       });
+      data.batchNote = batchNote(data.lines.map(function (j) {
+        var m = byJob[j.jobBookingId] || {};
+        return { jobBookingNo: j.jobBookingNo, typed: String(m.batchNo || '').trim(), saved: j.savedBatchNo };
+      }), data.batchSaveDeployed, data.dryRun);
       var packed = fmtDate(data.packedAt);
       state.lastDryRun = !!data.dryRun;
       state.lastLabels = data.barcodes.map(function (n) { return mixedLabel(lines, n, packed); });
@@ -723,7 +759,7 @@
             '" placeholder="' + esc(rows[0].jobName) + '" /></label>' +
             '<label class="field"><span>Batch No</span><input id="reprint-batch" type="text" maxlength="100" autocomplete="off" value="' +
             esc(savedBatches.length === 1 ? savedBatches[0] : '') + '" /></label></div>' +
-            '<p class="hint label-only-hint">Printed on the label only. Not saved.</p>'
+            '<p class="hint label-only-hint">Changes here are printed only. The saved labels, and their batch, stay as they are.</p>'
           : '') +
         '<div class="form-row"><button type="button" class="btn-primary" id="btn-reprint-print">Print ' +
         data.labels.length + ' label' + (data.labels.length === 1 ? '' : 's') + '</button>' +
