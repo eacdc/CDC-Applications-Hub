@@ -481,6 +481,7 @@
     var w = sheetWarnings();
     $('sheet-warning').hidden = !w.length;
     $('sheet-warning').textContent = w.join(' ');
+    document.querySelectorAll('.sticker-start').forEach(function (input) { input.max = per; });
   }
 
   /* The sticker to start from, read from the input next to the button. */
@@ -492,6 +493,27 @@
   function stickerStartHtml(id) {
     return '<label class="inline-field sticker-start-field">Start at sticker <input type="number" class="sticker-start"' +
       (id ? ' id="' + id + '"' : '') + ' min="1" max="' + stickersPerSheet() + '" value="1" /></label>';
+  }
+
+  /* A Large or Small card: the size, what it is for, and its buttons. */
+  function printChoiceHtml(small, actions) {
+    return '<div class="print-choice"><div><div class="print-choice-title">' + (small ? 'Small sticker' : 'Large sticker') + '</div>' +
+      '<div class="print-choice-note">' + (small
+        ? 'Barcode and number only. Prints on an A4 sticker sheet.'
+        : 'Full carton label. Prints on the label printer.') + '</div></div>' +
+      '<div class="print-choice-actions">' + actions + '</div></div>';
+  }
+
+  /* The four ways to create labels. The size isn't saved: it only decides what prints. */
+  function createChoicesHtml() {
+    var buttons = function (size) {
+      return '<button type="button" class="btn-secondary" data-create="' + size + '">Create only</button>' +
+        '<button type="button" class="btn-primary" data-create="' + size + '" data-print="1">Create &amp; print</button>';
+    };
+    return '<div class="print-choices">' +
+      printChoiceHtml(false, buttons('large')) +
+      printChoiceHtml(true, stickerStartHtml() + buttons('small')) +
+      '</div><p class="hint label-only-hint">Create only saves the barcodes without printing. They can be printed later in either size.</p>';
   }
 
   function printSheets(labels, start, overlay, guides) {
@@ -631,23 +653,49 @@
 
   function renderJobRanges(ranges) {
     var box = $('job-ranges');
+    $('job-sticker-start-wrap').hidden = !ranges.length;
     if (!ranges.length) { box.innerHTML = '<div class="empty">None yet.</div>'; return; }
     box.innerHTML = '<table><thead><tr><th>From</th><th>To</th><th class="num">Labels</th>' +
-      '<th class="num">Qty</th><th>Printed</th><th></th></tr></thead><tbody>' +
+      '<th class="num">Qty</th><th>Printed</th><th>Reprint</th></tr></thead><tbody>' +
       ranges.map(function (r) {
         return '<tr><td>' + padBarcode(r.start) + '</td><td>' + padBarcode(r.end) + '</td>' +
           '<td class="num">' + fmtNum(r.labels) + '</td><td class="num">' + fmtNum(r.qty) + '</td>' +
           '<td>' + fmtDbDate(r.firstAt) + '</td>' +
-          '<td><button type="button" class="btn-link" data-reprint-from="' + r.start + '" data-reprint-to="' + r.end +
-          '">Reprint</button></td></tr>';
+          '<td class="reprint-cell">' + ['Large', 'Small'].map(function (size) {
+            return '<button type="button" class="btn-secondary btn-mini" data-reprint-from="' + r.start + '" data-reprint-to="' + r.end +
+              '" data-reprint-size="' + size.toLowerCase() + '">' + size + '</button>';
+          }).join('') + '</td></tr>';
       }).join('') + '</tbody></table>';
   }
 
   /* ---------------- generate ---------------- */
 
-  function onGenerate(event) {
-    event.preventDefault();
-    if (!state.job) return;
+  /* Lock a form's create buttons while the server works; returns the call that unlocks them. */
+  function lockCreateButtons(form, btn) {
+    var label = btn.textContent;
+    var buttons = form.querySelectorAll('[data-create]');
+    buttons.forEach(function (b) { b.disabled = true; });
+    btn.textContent = 'Creating…';
+    return function () {
+      buttons.forEach(function (b) { b.disabled = false; });
+      btn.textContent = label;
+    };
+  }
+
+  /* The labels just made, in either size. */
+  function printLastRun(small, startInput) {
+    if (small) printSheets(state.lastLabels, stickerStart(startInput), state.lastDryRun ? 'TEST' : null);
+    else printLabels(state.lastLabels, state.lastDryRun ? 'TEST - NOT SAVED' : null);
+  }
+
+  /* Print what the clicked create button asked for, if it asked to print. */
+  function printAfterCreate(btn, form) {
+    if (btn.dataset.print) printLastRun(btn.dataset.create === 'small', form.querySelector('.sticker-start'));
+  }
+
+  function onGenerate(btn) {
+    var form = $('generate-form');
+    if (!state.job || !form.reportValidity()) return;
     var qty = Number($('qty-per-box').value);
     var copies = Number($('copies').value);
     if (!Number.isInteger(qty) || qty < 1) { showStatus('Enter the quantity per box.', 'error'); return; }
@@ -660,9 +708,7 @@
       return;
     }
 
-    var btn = $('btn-generate');
-    btn.disabled = true;
-    btn.textContent = 'Creating…';
+    var unlock = lockCreateButtons(form, btn);
     showStatus('');
     api('/generate', {
       method: 'POST',
@@ -691,14 +737,11 @@
       });
       renderLastRun(data);
       if (data.partial) showStatus(data.error, 'error');
-      printLabels(state.lastLabels, state.lastDryRun ? 'TEST - NOT SAVED' : null);
+      printAfterCreate(btn, form);
       if (!data.dryRun) selectJob(job.jobBookingId);
     }).catch(function (err) {
       showStatus(err.message, 'error');
-    }).then(function () {
-      btn.disabled = false;
-      btn.textContent = 'Create & print';
-    });
+    }).then(unlock);
   }
 
   function renderLastRun(data, box) {
@@ -708,24 +751,19 @@
     var range = padBarcode(first) + (last !== first ? ' to ' + padBarcode(last) : '');
     box.className = 'last-run' + (data.dryRun ? ' dry' : '');
     box.innerHTML = '<span>' + (data.dryRun
-      ? 'Test mode: ' + data.barcodes.length + ' labels previewed (' + range + '). Nothing was saved.'
+      ? 'Test mode: ' + data.barcodes.length + ' labels (' + range + '). Nothing was saved.'
       : 'Created ' + data.barcodes.length + ' labels: ' + range + '.') +
       (data.batchNote ? ' ' + esc(data.batchNote) : '') + '</span>' +
-      '<button type="button" class="btn-secondary" id="btn-print-again">Print again</button>' +
+      '<button type="button" class="btn-secondary" data-print-large="1">Print large stickers</button>' +
       '<span class="small-print">' + stickerStartHtml() +
       '<button type="button" class="btn-secondary" data-print-small="1">Print small stickers (A4)</button></span>';
     box.hidden = false;
   }
 
-  /* "Print small stickers" in a last-run box: the labels just made, from the start sticker typed there. */
+  /* The print buttons in a last-run box: small stickers go from the start sticker typed there. */
   function onLastRunClick(e) {
-    if (e.target.id === 'btn-print-again') {
-      printLabels(state.lastLabels, state.lastDryRun ? 'TEST - NOT SAVED' : null);
-    }
-    if (e.target.dataset.printSmall) {
-      printSheets(state.lastLabels, stickerStart(e.currentTarget.querySelector('.sticker-start')),
-        state.lastDryRun ? 'TEST' : null);
-    }
+    if (e.target.dataset.printLarge) printLastRun(false);
+    if (e.target.dataset.printSmall) printLastRun(true, e.currentTarget.querySelector('.sticker-start'));
   }
 
   /*
@@ -823,8 +861,9 @@
     rows.forEach(function (m, i) { fillBatchList($('mixed-batches-' + i), m.batches); });
   }
 
-  function onMixedGenerate(event) {
-    event.preventDefault();
+  function onMixedGenerate(btn) {
+    var form = $('mixed-form');
+    if (!form.reportValidity()) return;
     var rows = state.mixed;
     var copies = Number($('mixed-copies').value);
     var weightMode = $('mixed-weight-mode').value;
@@ -840,9 +879,7 @@
       return;
     }
 
-    var btn = $('btn-mixed-generate');
-    btn.disabled = true;
-    btn.textContent = 'Creating…';
+    var unlock = lockCreateButtons(form, btn);
     showStatus('');
     api('/generate-mixed', {
       method: 'POST',
@@ -878,17 +915,14 @@
       state.lastDryRun = !!data.dryRun;
       state.lastLabels = data.barcodes.map(function (n) { return mixedLabel(lines, n, packed); });
       renderLastRun(data, $('mixed-last-run'));
-      printLabels(state.lastLabels, state.lastDryRun ? 'TEST - NOT SAVED' : null);
+      printAfterCreate(btn, form);
       if (!data.dryRun) {
         state.mixed = [];
         renderMixed();
       }
     }).catch(function (err) {
       showStatus(err.message, 'error');
-    }).then(function () {
-      btn.disabled = false;
-      btn.textContent = 'Create & print';
-    });
+    }).then(unlock);
   }
 
   /* ---------------- reprint ---------------- */
@@ -923,6 +957,7 @@
       rows.forEach(function (l) { jobs[l.jobBookingNo] = (jobs[l.jobBookingNo] || 0) + 1; });
       // One PWO, no mixed boxes: the product name and batch can be changed for this print.
       var single = Object.keys(jobs).length === 1 && data.labels.length === rows.length;
+      var count = data.labels.length + ' ' + (data.labels.length === 1 ? 'sticker' : 'stickers');
       var savedBatches = rows.map(function (r) { return r.batchNo; })
         .filter(function (b, i, all) { return all.indexOf(b) === i; });
       box.innerHTML = '<table><thead><tr><th>PWO</th><th class="num">Labels</th></tr></thead><tbody>' +
@@ -937,12 +972,12 @@
             esc(savedBatches.length === 1 ? savedBatches[0] : '') + '" /></label></div>' +
             '<p class="hint label-only-hint">Changes here are printed only. The saved labels, and their batch, stay as they are.</p>'
           : '') +
-        '<div class="form-row"><button type="button" class="btn-primary" id="btn-reprint-print">Print ' +
-        data.labels.length + ' label' + (data.labels.length === 1 ? '' : 's') + '</button>' +
-        '<button type="button" class="btn-secondary" id="btn-reprint-preview">Show actual size</button>' +
-        '<span class="small-print">' + stickerStartHtml('reprint-sticker-start') +
-        '<button type="button" class="btn-secondary" id="btn-reprint-small">Print ' + data.labels.length +
-        ' small sticker' + (data.labels.length === 1 ? '' : 's') + ' (A4)</button></span></div>' +
+        '<div class="print-choices">' +
+        printChoiceHtml(false, '<button type="button" class="btn-primary" id="btn-reprint-print">Print ' + count + '</button>' +
+          '<button type="button" class="btn-secondary" id="btn-reprint-preview">Show actual size</button>') +
+        printChoiceHtml(true, stickerStartHtml('reprint-sticker-start') +
+          '<button type="button" class="btn-primary" id="btn-reprint-small">Print ' + count + '</button>') +
+        '</div>' +
         '<div id="reprint-preview" class="preview reprint-preview" hidden></div>';
       return data.labels;
     }).catch(function (err) { showStatus(err.message, 'error'); return null; });
@@ -989,9 +1024,10 @@
   }
 
   /* Reprint from the PWO panel: uses the product name and batch typed on that panel. */
-  function reprintRange(from, to) {
+  function reprintRange(from, to, size) {
     loadReprint(from, to).then(function (labels) {
       if (!labels || !labels.length) return;
+      if (size === 'small') { printSheets(labels, stickerStart($('job-sticker-start'))); return; }
       var own = state.job && labels.every(function (l) { return l.jobBookingId === state.job.jobBookingId; });
       printLabels(own ? withLabelEdits(labels, $('label-job-name'), $('batch-no')) : labels);
     });
@@ -1132,15 +1168,24 @@
     $('mixed-weight-mode').addEventListener('change', function () {
       $('mixed-panel').dataset.weight = $('mixed-weight-mode').value;
     });
-    $('mixed-form').addEventListener('submit', onMixedGenerate);
+    $('mixed-create').innerHTML = createChoicesHtml();
+    $('mixed-form').addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-create]');
+      if (btn) onMixedGenerate(btn);
+    });
     $('mixed-last-run').addEventListener('click', onLastRunClick);
     $('job-clear').addEventListener('click', clearJob);
-    $('generate-form').addEventListener('submit', onGenerate);
+    $('job-create').innerHTML = createChoicesHtml();
+    $('generate-form').addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-create]');
+      if (btn) onGenerate(btn);
+    });
 
     $('last-run').addEventListener('click', onLastRunClick);
+    $('job-sticker-start-wrap').innerHTML = '<span>For small reprints:</span>' + stickerStartHtml('job-sticker-start');
     $('job-ranges').addEventListener('click', function (e) {
       var btn = e.target.closest('[data-reprint-from]');
-      if (btn) reprintRange(btn.dataset.reprintFrom, btn.dataset.reprintTo);
+      if (btn) reprintRange(btn.dataset.reprintFrom, btn.dataset.reprintTo, btn.dataset.reprintSize);
     });
 
     $('reprint-form').addEventListener('submit', function (e) {

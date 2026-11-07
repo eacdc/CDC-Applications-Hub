@@ -107,12 +107,15 @@
             <span>Number of labels *</span>
             <input id="copies" type="number" min="1" step="1" value="1" required />
           </label>
-          <button type="submit" id="btn-generate" class="btn-primary">Create &amp; print</button>
+          <div id="job-create" class="create-choices"></div>
         </form>
 
         <div id="last-run" class="last-run" hidden></div>
 
-        <h3 class="sub">Labels already printed for this PWO</h3>
+        <div class="sub-row">
+          <h3 class="sub">Labels already printed for this PWO</h3>
+          <div id="job-sticker-start-wrap" class="small-print" hidden></div>
+        </div>
         <div id="job-ranges" class="table-wrap"></div>
       </div>
 
@@ -156,8 +159,8 @@
               <span>Number of labels *</span>
               <input id="mixed-copies" type="number" min="1" step="1" value="1" required />
             </label>
-            <button type="submit" id="btn-mixed-generate" class="btn-primary">Create &amp; print</button>
           </div>
+          <div id="mixed-create" class="create-choices"></div>
         </form>
         <p class="hint">Each label is one box with all the PWOs above. More labels = more identical boxes.
           The product name is printed on the label only. A Batch No from the PWO's ERP list is saved with the labels.</p>

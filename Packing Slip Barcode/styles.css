@@ -285,6 +285,20 @@ td.wrap { white-space: normal; min-width: 200px; }
 .small-print { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .sticker-start-field { color: inherit; font-size: 13px; }
 .sticker-start { width: 70px; padding: 6px 8px; }
+
+/* Large / Small cards: create and reprint buttons for each size. */
+.create-choices { width: 100%; }
+.print-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 12px; margin-top: 12px; }
+.print-choice { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--head-bg); }
+.print-choice-title { font-weight: 600; }
+.print-choice-note { font-size: 12px; color: var(--muted); }
+.print-choice-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: auto; }
+.sub-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin: 16px 0 8px; }
+.sub-row .sub { margin: 0; }
+.sub-row .small-print { font-size: 13px; color: var(--muted); }
+.btn-mini { padding: 3px 12px; font-size: 13px; }
+.reprint-cell { white-space: nowrap; }
+.reprint-cell .btn-mini + .btn-mini { margin-left: 6px; }
 .sheet-count { margin-top: 10px; }
 .sheet { position: relative; overflow: hidden; background: #fff; }
 .sticker {
