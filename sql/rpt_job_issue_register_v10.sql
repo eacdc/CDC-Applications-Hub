@@ -31,6 +31,14 @@
   At 'QUALITY_GSM' with a GSM tolerance, a component can map an issued GSM to a
   different planned GSM than the job as a whole would. The backend uses 'JOB'.
 
+  @ItemLevel = 1 (added later; 0 = output unchanged)
+    Each row is further split by the ItemMaster item drawn: one row per
+    date + job + component + item, several issues of one item that day summed.
+    [Required as per Job] is still the component's, repeated; [Cumulative Issued]
+    runs item by item (date, then item name), so the component's last row of a
+    date carries the same Cumulative / Excess / Var % as the unsplit row did.
+    [Job *] columns stay per date, as above.
+
   Deploy: run this whole script once in IndusEnterprise (Kolkata) and once in
   IndusEnterprise2 (Ahmedabad). v9 is untouched. Then run
   rpt_job_issue_register_v10_compare.sql to check v10 against v9.
@@ -51,6 +59,7 @@ CREATE OR ALTER PROCEDURE dbo.rpt_job_issue_register_v10
     , @MaxItemNames     int           = 6          -- names listed before '(+n more)'
     , @CumulativeFromStart bit         = 1          -- 1 = carry pre-@FromDate issues into the cumulative
     , @ComponentLevel   bit           = 0          -- 1 = split every job by component
+    , @ItemLevel        bit           = 0          -- 1 = split every row by issued item
 )
 AS
 BEGIN
@@ -65,6 +74,7 @@ BEGIN
 
     IF ISNULL(@MaxItemNames,0) < 1 SET @MaxItemNames = 6;
     SET @ComponentLevel = ISNULL(@ComponentLevel,0);
+    SET @ItemLevel = ISNULL(@ItemLevel,0);
 
     DECLARE @ToExclusive datetime = CASE WHEN @ToDate IS NULL
                                          THEN NULL ELSE DATEADD(day,1,CAST(@ToDate AS datetime)) END;
@@ -388,6 +398,7 @@ BEGIN
             , ROW_NUMBER() OVER (ORDER BY I.JobBookingID, I.ContentsID, ISNULL(SM.MappedSpecKey, D.SpecKey), I.IssueDate, I.ItemID) AS LineSeq
             , ROW_NUMBER() OVER (PARTITION BY I.JobBookingID, I.ContentsID, ISNULL(SM.MappedSpecKey, D.SpecKey)
                                  ORDER BY I.IssueDate, I.ItemID)           AS SeqInJobSpec
+            , I.ItemID
         FROM #Issue I
         JOIN #Item     D  ON D.ItemID        = I.ItemID
         JOIN #JobScope JS ON JS.JobBookingID = I.JobBookingID
@@ -404,6 +415,7 @@ BEGIN
             , ISNULL(R.ReqKg,0)                                              AS ReqJobTotal
             , ISNULL(R.ReqSource,'(none)')                                   AS ReqSource
             , CASE WHEN R.SpecKey IS NULL THEN 1 ELSE 0 END                  AS IsUnplannedIssue
+            , L.ItemID
         FROM Lines L
         LEFT JOIN #ReqSpec R ON R.JobBookingID = L.JobBookingID AND R.ContentsID = L.ContentsID AND R.SpecKey = L.SpecKey
 
@@ -416,6 +428,7 @@ BEGIN
             , R.ItemGroupID, R.ItemGroupName, CAST('' AS nvarchar(50)), R.PlannedItemName
             , CAST(0 AS decimal(18,3)), CAST(0 AS decimal(18,3)), CAST(0 AS decimal(18,2))
             , R.ReqKg, R.ReqKg, R.ReqSource, 0
+            , CAST(NULL AS int)
         FROM #ReqSpec R
         WHERE @IncludeUnissued = 1
           AND NOT EXISTS (SELECT 1 FROM Lines L
@@ -427,10 +440,10 @@ BEGIN
     ItemNameRnk AS
     (
         SELECT
-              D.GrpSpec, D.GrpLineSeq, D.GrpDate, D.GrpJob, D.GrpComp, D.GrpInWin, D.ItemName
-            , ROW_NUMBER() OVER (PARTITION BY D.GrpSpec, D.GrpLineSeq, D.GrpDate, D.GrpJob, D.GrpComp, D.GrpInWin
+              D.GrpSpec, D.GrpLineSeq, D.GrpDate, D.GrpJob, D.GrpComp, D.GrpItem, D.GrpInWin, D.ItemName
+            , ROW_NUMBER() OVER (PARTITION BY D.GrpSpec, D.GrpLineSeq, D.GrpDate, D.GrpJob, D.GrpComp, D.GrpItem, D.GrpInWin
                                  ORDER BY D.ItemName)                        AS rn
-            , COUNT(*)    OVER (PARTITION BY D.GrpSpec, D.GrpLineSeq, D.GrpDate, D.GrpJob, D.GrpComp, D.GrpInWin) AS DistinctItems
+            , COUNT(*)    OVER (PARTITION BY D.GrpSpec, D.GrpLineSeq, D.GrpDate, D.GrpJob, D.GrpComp, D.GrpItem, D.GrpInWin) AS DistinctItems
         FROM
         (
             SELECT DISTINCT
@@ -439,6 +452,7 @@ BEGIN
                 , CASE WHEN @Mode IN ('DATE','DATEJOB')      THEN C.IssueDate    END AS GrpDate
                 , CASE WHEN @Mode IN ('ALL','JOB','DATEJOB') THEN C.JobBookingID END AS GrpJob
                 , CASE WHEN @Mode IN ('ALL','JOB','DATEJOB') THEN C.ContentsID   END AS GrpComp
+                , CASE WHEN @ItemLevel = 1                   THEN C.ItemID       END AS GrpItem
                 , C.InWindow                                                         AS GrpInWin
                 , C.ItemName
             FROM Combined C
@@ -448,13 +462,13 @@ BEGIN
     ItemNames AS
     (
         SELECT
-              N.GrpSpec, N.GrpLineSeq, N.GrpDate, N.GrpJob, N.GrpComp, N.GrpInWin
+              N.GrpSpec, N.GrpLineSeq, N.GrpDate, N.GrpJob, N.GrpComp, N.GrpItem, N.GrpInWin
             , MAX(N.DistinctItems)                                           AS ItemCount
             , STRING_AGG(CASE WHEN N.rn <= @MaxItemNames
                               THEN CAST(N.ItemName AS nvarchar(max)) END, ', ')
               WITHIN GROUP (ORDER BY N.ItemName)                             AS NameList
         FROM ItemNameRnk N
-        GROUP BY N.GrpSpec, N.GrpLineSeq, N.GrpDate, N.GrpJob, N.GrpComp, N.GrpInWin
+        GROUP BY N.GrpSpec, N.GrpLineSeq, N.GrpDate, N.GrpJob, N.GrpComp, N.GrpItem, N.GrpInWin
     ),
     Agg AS
     (
@@ -464,9 +478,11 @@ BEGIN
             , CASE WHEN @Mode IN ('DATE','DATEJOB')      THEN C.IssueDate    END   AS GrpDate
             , CASE WHEN @Mode IN ('ALL','JOB','DATEJOB') THEN C.JobBookingID END   AS GrpJob
             , CASE WHEN @Mode IN ('ALL','JOB','DATEJOB') THEN C.ContentsID   END   AS GrpComp
+            , CASE WHEN @ItemLevel = 1                   THEN C.ItemID       END   AS GrpItem
             , C.InWindow                                                           AS GrpInWin
 
             , MAX(C.IssueDate)                                       AS IssueDate
+            , MAX(C.ItemName)                                        AS ItemSortName
             , CASE WHEN @Mode='ALL' AND @MatchLevel <> 'JOB' THEN MAX(C.ItemName)
                    ELSE MAX(C.SpecLabel) END                         AS ItemLabel
             , CASE WHEN COUNT(DISTINCT C.ItemGroupID) = 1
@@ -497,17 +513,19 @@ BEGIN
             , CASE WHEN @Mode IN ('DATE','DATEJOB')      THEN C.IssueDate    END
             , CASE WHEN @Mode IN ('ALL','JOB','DATEJOB') THEN C.JobBookingID END
             , CASE WHEN @Mode IN ('ALL','JOB','DATEJOB') THEN C.ContentsID   END
+            , CASE WHEN @ItemLevel = 1                   THEN C.ItemID       END
             , C.InWindow
     ),
     /* ---- Run: as v9, partitioned on job + component + spec. The Job* figures
             partition on job + spec only. RANGE (not ROWS) for the job running
-            total so every component row of a date sees that whole date. ---- */
+            total so every component / item row of a date sees that whole date.
+            Item rows of one date run in item-name order. -------------------- */
     Run AS
     (
         SELECT
               A.*
             , SUM(A.IssuedKg) OVER (PARTITION BY ISNULL(A.GrpJob,-1), ISNULL(A.GrpComp,-1), A.GrpSpec
-                                    ORDER BY A.IssueDate, A.GrpLineSeq
+                                    ORDER BY A.IssueDate, A.GrpLineSeq, A.ItemSortName, A.GrpItem
                                     ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS CumIssuedKg
             , MAX(A.ReqJobTotal) OVER (PARTITION BY ISNULL(A.GrpJob,-1), ISNULL(A.GrpComp,-1), A.GrpSpec) AS ReqTotal
             , SUM(A.IssuedKg) OVER (PARTITION BY ISNULL(A.GrpJob,-1), A.GrpSpec
@@ -525,6 +543,7 @@ BEGIN
                AND ISNULL(N.GrpDate,'19000101')    = ISNULL(A.GrpDate,'19000101')
                AND ISNULL(N.GrpJob,-1)             = ISNULL(A.GrpJob,-1)
                AND ISNULL(N.GrpComp,-1)            = ISNULL(A.GrpComp,-1)
+               AND ISNULL(N.GrpItem,-1)            = ISNULL(A.GrpItem,-1)
                AND N.GrpInWin                      = A.GrpInWin
     )
     SELECT
@@ -573,7 +592,7 @@ BEGIN
     LEFT JOIN #Comp       CP ON CP.ContentsID   = R.GrpComp
     LEFT JOIN #JobReqSpec JR ON JR.JobBookingID = R.GrpJob AND JR.SpecKey = R.GrpSpec
     WHERE R.GrpInWin = 1          -- history rows fed the running SUM; they do not display
-    ORDER BY [JobNUm], [Component No], [Item], [Date], R.GrpLineSeq
+    ORDER BY [JobNUm], [Component No], [Item], [Date], R.GrpLineSeq, R.ItemSortName, R.GrpItem
     OPTION (RECOMPILE);
 
     DROP TABLE #Item, #Issue, #JobScope, #Comp, #Req, #Gang, #ReqSpec, #JobReqSpec, #IssueSpec, #SpecMap;
