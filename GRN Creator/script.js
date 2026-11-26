@@ -2658,6 +2658,7 @@ async function saveToErp() {
     printRow.appendChild(el('span', 'muted', 'Purchase invoice ' + result.pi.voucherNo + ':'));
     printRow.appendChild(piPrintButtons(result.pi.voucherNo));
     show('piPrint');
+    showSavedDialog(result);
     await loadHistory();
   } catch (err) {
     var detail = err.payload && err.payload.checks
@@ -2669,6 +2670,27 @@ async function saveToErp() {
     // Once written, the button stays off: a second click would only be refused as already posted.
     $('saveErpBtn').disabled = posted;
   }
+}
+
+/**
+ * Once both vouchers are written: print or save the purchase invoice, then
+ * Cancel clears the page for the next invoice. Escape does not close it, so
+ * the page is never left half-way between this invoice and the next.
+ */
+function showSavedDialog(result) {
+  var voucherNo = result.pi.voucherNo;
+  $('savedText').textContent = 'GRN ' + result.grn.voucherNo + ' and purchase invoice ' + voucherNo
+    + ' are in the ' + state.context.site + ' ERP.';
+  $('savedPrintBtn').onclick = function () { printPurchaseInvoice(voucherNo); };
+  $('savedPdfBtn').onclick = function () { downloadPurchaseInvoice(voucherNo, $('savedPdfBtn')); };
+  $('savedDialog').showModal();
+}
+
+/** A new entry: the page again from the top, signed in still, as removing a page does. */
+function startNewEntry() {
+  try { history.scrollRestoration = 'manual'; } catch (e) { /* old browser; scrollTo covers it */ }
+  window.scrollTo(0, 0);
+  window.location.reload();
 }
 
 // -- history ----------------------------------------------------------------
@@ -3574,6 +3596,11 @@ $('rematchBtn').addEventListener('click', function () {
   runMatch('matchStatus').catch(function (err) { setStatus('matchStatus', err.message, 'error'); });
 });
 $('saveErpBtn').addEventListener('click', saveToErp);
+$('savedCancelBtn').addEventListener('click', startNewEntry);
+// Only Cancel closes it. Chrome lets Escape through a prevented 'cancel' when
+// the dialog was opened by code, so the key itself is stopped too.
+$('savedDialog').addEventListener('cancel', function (e) { e.preventDefault(); });
+$('savedDialog').addEventListener('keydown', function (e) { if (e.key === 'Escape') e.preventDefault(); });
 $('startManualBtn').addEventListener('click', startManual);
 // History's purchase invoice screen is a copy of step 5's, ids prefixed "gp".
 $('gpScreenHost').innerHTML = $('piScreen').outerHTML.replace(/\bid="/g, 'id="gp');

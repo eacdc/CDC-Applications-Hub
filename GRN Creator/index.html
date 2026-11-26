@@ -306,6 +306,18 @@
 
 <!-- one floating panel for the whole page: a flag's reason, or an invoice-item picker -->
 <div id="pop" class="pop hidden" role="dialog"></div>
+
+<!-- after Save to ERP: print or save the purchase invoice, then start the next one -->
+<dialog id="savedDialog" class="saved-dialog" aria-labelledby="savedTitle" closedby="none">
+  <h3 id="savedTitle">Saved to ERP</h3>
+  <p id="savedText"></p>
+  <div class="saved-actions">
+    <button id="savedPrintBtn" type="button" class="primary">Print</button>
+    <button id="savedPdfBtn" type="button">Download PDF</button>
+    <button id="savedCancelBtn" type="button">Cancel</button>
+  </div>
+  <p class="muted saved-note">Cancel clears the page for the next invoice.</p>
+</dialog>
 </main>
 
 <script src="config.js"></script>
